@@ -3,7 +3,7 @@
 ## data.gd and regions.gd
 
 Data loading: JSON is loaded with `Resources.Load<TextAsset>` from `Assets/Resources/Data/*.json` and `Assets/Resources/Map/{city,roadgraph}.json`. If a file isn't there, `DataLoader` falls back to `Assets/StreamingAssets/<path>.json`, using File IO on desktop and a synchronous `UnityWebRequest` on Android jar: paths.
-The `data/*.json` files are copied unchanged into **both** `StreamingAssets/Data` and `Resources/Data`. Delete one copy before shipping, or the build carries both.
+The `data/*.json` files live only in `Resources/Data` (and `Resources/Map`). There is no `StreamingAssets` copy; the StreamingAssets fallback in `DataLoader` stays in code but is unused.
 
 Package: `com.unity.nuget.newtonsoft-json` 3.2.1 (in Packages/manifest.json).
 
@@ -51,7 +51,7 @@ Driving it: `var g = new Game(); g.NewRun(diff, seed, ncols); g.StartAt(tile); g
 
 ### Stubbed / not ported
 - **net.gd** (1,347 lines): only `INet` + `OfflineNet`. `Net.cs` lists every Game member net.gd calls. Game keeps `IsClient`, `Mp`, `Actor`, `Serialize(net:true)`, `NetColony`, `SeenSectors`, `ApplyState`, `ApplyZombies`, `PackZombies[Many]`, `SetClientTarget` so the host/client layer can be written against them.
-- **Audio playback**: `Sfx` needs an `IAudioBackend` (AudioSource pool + clips). `NullAudio` is the headless default. Hook with `game.SfxRequested += (n, at) => sfx.Play(n, at)`.
+- ~~**Audio playback**~~ done: `Runtime/UnityAudioBackend.cs` (10 AudioSources, clips from `Resources/Sfx`). `NullAudio` stays the headless default.
 - **Save migrations v4 to v16** (`_migrate_v4` ... `_migrate_v16`, `_shift_vectors`, `_fix_base_lots`, `_ensure_v8_keys`): not ported. They only upgrade Godot `store_var` dictionaries, which this build can't read anyway.
 - The disabled legacy raider block in `_step_camps` (`if false and ...`) was dropped.
 
@@ -79,3 +79,59 @@ Last result: compiles with 0 warnings and throws no exceptions, about 3.3 s wall
 - Unless item 10 checks out, the same seed builds a different world (forest, wrecks, camp placement) and a different run than in Godot.
 - No multiplayer until net.gd is ported.
 - Wherever sorts tie (item 13), a different survivor may get picked first for a job or loadout, or a war duel may pair differently.
+
+## Headless Android build (Unity Build Automation)
+
+Nobody opens this project in the Unity editor, so everything the build needs is in files.
+
+**Editor version: Unity 6000.3.28f1 (6.3 LTS, changeset 8f082d2fe476, released 3 Nov 2026).** 6.3 is the current LTS (supported to Dec 2027). 6.0 LTS support ended in October 2026. Build Automation lists both 6000.3 LTS and 6000.0 LTS as supported. Set the Build Automation target to "6000.3.28f1", or to "latest 6000.3 LTS". Sources: https://unity.com/releases/editor/whats-new/6000.3.28f1 and https://docs.unity.com/en-us/build-automation/reference/supported-unity-versions
+
+**Min SDK is 25, not 24.** Unity 6.3 supports Android 7.1 (API 25) and newer, so API 24 is below its floor (https://docs.unity.com/en-us/engine/6000.3/manual/platform-specific/android/introducing/requirements-and-compatibility). To get API 24, switch to 6000.0.85f2 (6.0 LTS, now out of support): change `ProjectVersion.txt`, `AndroidMinSdkVersion` in ProjectSettings.asset and `AndroidApiLevel25` in BuildScript.cs.
+
+### Files
+| Path | What |
+|---|---|
+| `ProjectSettings/ProjectVersion.txt` | 6000.3.28f1 (8f082d2fe476) |
+| `ProjectSettings/ProjectSettings.asset` | company Austin Harper, product DayZero, version 0.11.0a, version code 1, `com.austinharper.dayzero`, auto-rotation landscape left+right only, IL2CPP, ARM64, min SDK 25, target SDK auto (highest installed), stripping Minimal, old Input Manager (`activeInputHandler: 0`, nothing uses input APIs), built-in render pipeline |
+| `ProjectSettings/EditorBuildSettings.asset` | one scene: `Assets/Scenes/Boot.unity` |
+| `ProjectSettings/EditorSettings.asset` | force-text serialization, visible meta files |
+| `Packages/manifest.json` | newtonsoft-json 3.2.1, ugui 2.0.0 (core package, pinned to the editor), and the modules used: audio, imgui, jsonserialize, unitywebrequest (DataLoader), androidjni, ui, uielements, animation, physics, physics2d, imageconversion |
+| `Assets/Scenes/Boot.unity` | Main Camera (solid dark clear, AudioListener) + `Bootstrap` GameObject with the Bootstrap script (guid 55da3875…) |
+| `Assets/Scripts/Runtime/Bootstrap.cs` | MonoBehaviour: builds `Game` one frame after start, wires Sfx and decisions, runs `Process` each frame, saves to `persistentDataPath/saves`, and saves on pause/quit. `[RuntimeInitializeOnLoadMethod(AfterSceneLoad)]` creates it (and a camera) if the scene wiring fails. Forces InvariantCulture. |
+| `Assets/Scripts/Runtime/GameUI.cs` | IMGUI front end (see below) |
+| `Assets/Scripts/Runtime/UnityAudioBackend.cs` | `UnityAudioBackend : IAudioBackend` + `PlayerPrefsSettingsStore : ISettingsStore` |
+| `Assets/Resources/Sfx/*.wav` | the 13 Godot sound effects (copied from `assets/sfx`) |
+| `Assets/Editor/BuildScript.cs` | `DayZero.EditorTools.BuildScript`: `PreExport()` (applies every Player setting above from code and puts Boot.unity first in the scene list), `PostExport(string)`, `BuildAndroid()` (`-executeMethod`, optional `-output x.apk`/`.aab`) |
+| `Assets/link.xml` | keeps Assembly-CSharp and Newtonsoft.Json from IL2CPP stripping (save classes are built by reflection) |
+| `*.meta` | one for every file and folder under Assets. GUID = md5("dayzero:" + asset path), so regenerating a meta gives the same GUID. |
+
+### Build Automation setup (dashboard, once)
+1. Connect the GitHub repo and branch `main`. The project is at the repo root.
+2. Add an Android target. Unity version: 6000.3.28f1.
+3. Advanced settings: Pre-export method `DayZero.EditorTools.BuildScript.PreExport`. Post-export is optional: `DayZero.EditorTools.BuildScript.PostExport`.
+4. Leave "Build App Bundle" off to get an APK you can sideload. Without a keystore, Build Automation signs the APK with a debug key: fine for your own phone, not for Google Play.
+
+### Runtime UI (IMGUI, everything built in code)
+Virtual 720-px-high canvas, scaled to the screen inside the safe area.
+- **Title:** Continue (if a save exists), New game: Easy, Normal or Hard. The camp site is picked automatically with `SuggestStart(0)` because there's no map view yet.
+- **Top bar:** clock (day, time, night), phase line (infection %, the Fall countdown, night-attack warnings), food, water, meds, ammo, fuel, materials, population, morale. Pause/Play, speed x1/x2/x4 (`Process` calls per frame), +1h and +6h (`Advance`).
+- **Colony tab:** name, survivors, camps, zombies, kills, rescued; camps list; stockpile; job counts; raid warning.
+- **Jobs tab:** survivors 7 per page (name, state, hp, life stage), with < > buttons that cycle `Data.JOBS` through `DoAction("set_job")`. A job the survivor can't take is skipped, and the reason is shown.
+- **Log tab:** the colony log, newest first, 12 per page.
+- **Menu tab:** Save now, Load last save, Title screen, sound on/off and volume (saved in PlayerPrefs).
+- **Popups:** decisions (title, text, one button per choice with its hint, via `ApplyChoice`; the sim pauses while one is open), game over or won (New game / Title), and toasts.
+- **Not covered yet:** the map and world view, picking a start site, building, squads, research, trade, crafting, vehicles and multiplayer. Those still need UI.
+
+### Compile check (work/unity-verify, not committed)
+`bash work/unity-verify/check.sh [days]` builds three projects and then runs the smoke test:
+1. `Verify.csproj`: net8 + `UnityStubs.cs` + `Harness.cs`. It runs the 30-day smoke test plus a `UiFlow()` that mirrors what Bootstrap does: a random-seed new game, auto start, a `set_job` change, save, load, and a job check.
+2. `UnityCompile/Runtime`: all of `Assets/Scripts`, compiled as Assembly-CSharp for **netstandard2.1** against real UnityEngine module DLLs (2022.3 player assemblies, NuGet `RocketModFix.UnityEngine.Redist` 2022.3.62.3). This catches .NET APIs Unity doesn't have. It found `Math.ScaleB` in GdRng.cs (not in .NET Standard 2.1), now replaced by an exact power of 2. The smoke-test output is unchanged.
+3. `UnityCompile/Editor`: `Assets/Editor` against UnityEditor.dll 2021.1 (NuGet `Unity3D.SDK`). That DLL has no `NamedBuildTarget` and no `ManagedStrippingLevel.Minimal`, so check.sh compiles a copy with those two mapped to the old equivalents. Both were checked in the 6000.3 scripting docs.
+
+Result: all three build with 0 errors and 0 warnings. The smoke test matches the earlier run (fall on day 28 at 03:36), and the UI flow passes.
+
+### Not verifiable without a Unity editor (first cloud build will tell)
+- The hand-written YAML (ProjectSettings.asset, Boot.unity, metas) is valid YAML with plausible serialized versions, but Unity hasn't imported it yet. Unity normally upgrades or fills in missing fields. The Bootstrap fallback starts the game even if the scene's script link breaks.
+- That IMGUI looks right on a phone (font size, safe area, button sizes), and that touch maps to IMGUI clicks (it does by default).
+- Newtonsoft under IL2CPP with the generic `ODict<,>` state types (AOT generics). link.xml keeps the types, but a save/load on the device is the real test.
+- Speed: `new Game()` (world and forest generation) runs on the main thread during the loading frame. On desktop .NET, `new Game()` plus `NewRun` took about 0.3 s. A phone may be 5–10× slower.

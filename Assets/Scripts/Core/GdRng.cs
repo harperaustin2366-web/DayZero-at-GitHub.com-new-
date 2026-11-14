@@ -74,8 +74,11 @@ namespace DayZero.Core
             uint protoExpOffset = Next();
             if (protoExpOffset == 0) return 0f;
             uint m = Next() | 0x80000001u;
-            return (float)Math.ScaleB((float)m, -32 - Clz32(protoExpOffset));
+            return (float)((double)(float)m * Pow2(-32 - Clz32(protoExpOffset)));
         }
+
+        /// <summary>Exact 2^n as a double (Math.ScaleB is not in Unity's .NET Standard 2.1 profile).</summary>
+        static double Pow2(int n) => BitConverter.Int64BitsToDouble((long)(1023 + n) << 52);
 
         /// <summary>randf_range(from, to): randf() * (to - from) + from (float math, like Godot).</summary>
         public float RandfRange(double from, double to) => Randf() * (float)(to - from) + (float)from;

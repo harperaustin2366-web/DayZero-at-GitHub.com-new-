@@ -7,3 +7,9 @@
 [Uu]ser[Ss]ettings/
 *.csproj
 *.sln
+
+# build output
+*.apk
+*.aab
+[Mm]emoryCaptures/
+.vs/
