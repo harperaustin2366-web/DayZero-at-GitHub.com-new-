@@ -1,0 +1,399 @@
+// Typed replacements for the untyped Dictionaries game.gd keeps in its state `S`.
+// Field names are the GDScript keys in PascalCase; the save writer uses a snake_case naming
+// strategy, so the JSON keys read like the original ("next_arrival_t", "garage_ok"...).
+// Keys GDScript tested with has()/get(k, default) are nullable or carry the default value.
+// Small fixed-shape arrays (fences [tier, hp, col], towers, traps, conversions, guts, craft jobs)
+// became small classes.
+using System.Collections.Generic;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using UnityEngine;
+
+namespace DayZero.Core
+{
+    public sealed class Person
+    {
+        public const int NO_BLD = -999999;
+        public int Id;
+        public string Name = "";
+        public string Job = "Civilian";
+        public int Base;
+        public double Hp = 100.0;
+        public double Inf = -1.0;
+        public bool Known;
+        public string St = "base";      // base | move | work | dead
+        public string Goal = "";
+        public Vector2Int Tgt = new Vector2Int(-1, -1);
+        public int Lot = -1;
+        public Vector2 Pos;
+        public ODict<string, double> Carry = new ODict<string, double>();
+        public double Wt, Cd;
+        public int Kills;
+        public int Tf;                   // group id, or -1000000 - lot for a supply run
+        public int Pi;
+        public double Seg;
+        public string Wpn = "", Vest = "", Helm = "";
+        public bool Veh, Vlead;
+        public int Col;
+        public int Sq;
+        public int Inb = NO_BLD, Home = NO_BLD;
+        public string Work = "";
+        public int Wl = -1;
+        [JsonIgnore] public List<Vector2> Path = new List<Vector2>();
+
+        // family (game.gd _fam_init)
+        public string Sex;
+        public double Born = -1.0;
+        public string Stage;
+        public ODict<string, double> Rel = new ODict<string, double>();
+        public int Partner;
+        public List<int> Parents = new List<int>();
+        public List<string> Pnames = new List<string>();
+        public List<int> Kids = new List<int>();
+        public double Preg = -1.0;
+        public int PregBy;
+        public double LastBirth = -1000000.0;
+        public string Lost = "";
+
+        // optional keys
+        public bool Guard;
+        public bool? Gauto;
+        public Vector2? Post;
+        public bool Hold;
+        public int? Trav;
+        public bool Resume;
+        public string Vt;
+        public double? Vspd, Vcargo, Varm;
+        public int? Vid;
+        public bool Tow;
+
+        // client-side interpolation (net clients only, never saved)
+        [JsonIgnore] public Vector2? CFrom, CTo;
+        [JsonIgnore] public double CLt, CLd;
+
+        public string Slot(string s) => s == "wpn" ? Wpn : (s == "vest" ? Vest : (s == "helm" ? Helm : ""));
+        public void SetSlot(string s, string id)
+        {
+            if (s == "wpn") Wpn = id; else if (s == "vest") Vest = id; else if (s == "helm") Helm = id;
+        }
+        public string First => (Name ?? "?").Split(' ')[0];
+    }
+
+    public sealed class Base
+    {
+        public int Id;
+        public Vector2Int Pos;
+        public bool Main;
+        public double Done = 1.0;
+        public int Veh;
+        public ODict<string, int> Up = new ODict<string, int>();
+        public int Col;
+        public int Lvl;
+        public string Name = "";
+        public int Lot = -1;
+        public List<int> Claim = new List<int>();
+        public string Site = "";
+        public bool GarageOk;
+        public ODict<string, bool> Auto;   // per-camp overrides (null = use colony default)
+        public int U(string k) => Up.Get(k, 0);
+    }
+
+    public sealed class ResearchState
+    {
+        public List<string> Done = new List<string>();
+        public string Cur = "";
+        public ODict<string, double> Prog = new ODict<string, double>();
+    }
+
+    public sealed class AutoCfg
+    {
+        public double R = 26.0;
+        public bool Scav = true, Rescue = true, Conv = true, Guards = true;
+        public bool Get(string k) => k == "scav" ? Scav : k == "rescue" ? Rescue : k == "conv" ? Conv : k == "guards" ? Guards : true;
+    }
+
+    public sealed class CraftJob
+    {
+        public string Kind, Id;
+        public double End = -1.0, Hours = 3.0;
+    }
+
+    public sealed class Vehicle
+    {
+        public int Id;
+        public string Type = "pickup";
+        public int Base;
+        public double Hp = 1.0;
+        public List<string> Need = new List<string>();
+        public double Fuel;
+        public int Sq = -1;
+        public string St = "ok";   // ok | out | repair | wreck
+        public double End;
+        public int Drv = -1;
+    }
+
+    public sealed class Wreck
+    {
+        public int Id;
+        public string Type = "pickup";
+        public Vector2Int Pos;
+        public double Hp;
+        public List<string> Need = new List<string>();
+        public double Fuel;
+        public int Own = -1;
+    }
+
+    public sealed class Squad
+    {
+        public int Id;
+        public string Name = "";
+        public List<int> Members = new List<int>();
+        public int Base;
+        public string St = "idle";   // idle | out | return | search | attack | travel | field
+        public Vector2Int Tgt = new Vector2Int(-1, -1);
+        public List<int> Route = new List<int>();
+        public int Kills, Cleared;
+        public double? Kit;
+        public int Vid = -1;
+        public bool Vret;
+        public string Mode = "";
+        public int TowId = -1;
+        public Wreck Towing;
+        public string Dest, From;
+        public int Hops = 1;
+        public double? Tarr;
+        public string CurMap;
+        public Vector2Int? At;
+        public string Foe = "";
+        public double? SearchEnd;
+        public int Searched;
+        public double KitOr1 => Kit ?? 1.0;
+    }
+
+    public sealed class Raid
+    {
+        public double NextT = -1.0;
+        public int N;
+        public int Bid = -1;
+        public double Dir;
+        public bool Warned, On;
+        public int Spawned, Breaks, Nights, LastDay;
+        public double Start = -1.0;
+        public double Dmg;
+    }
+
+    public sealed class Fighter
+    {
+        public int Pid;
+        public string Name = "", Job = "", Gear = "";
+        public bool Armor;
+        public int Dice;
+        public string State = "up";
+    }
+
+    public sealed class WarReport
+    {
+        public int Id;
+        public string Foe;
+        public bool Won;
+        public int Day;
+        public string Summary, Casualties;
+        public List<string> Head = new List<string>();
+        public List<string> Lines = new List<string>();
+        public int Rounds;
+        public string Surrender;
+        public int Ammo;
+    }
+
+    public sealed class WarState
+    {
+        public string St = "none";  // none | demand | prep
+        public string Foe = "", Lord = "";
+        public double CoolT = -1.0, BattleT = -1.0;
+        public List<int> Army = new List<int>();
+        public int Melee, Vests;
+        public ODict<string, double> Paid = new ODict<string, double>();
+        public WarReport Report;
+        public int Rid, DawnDay, Rolls, Hits;
+        public int Uid = -1;
+    }
+
+    public sealed class TradeGood
+    {
+        public string M = "ignore";
+        public int Lvl;
+    }
+
+    public sealed class TradeCfg
+    {
+        public ODict<string, TradeGood> Goods = new ODict<string, TradeGood>();
+        public double Credit, Next;
+        public string Last = "";
+    }
+
+    public sealed class Colony
+    {
+        public int Id;
+        public string Name = "";
+        public ODict<string, double> Res = new ODict<string, double>();
+        public List<Base> Bases = new List<Base>();
+        public List<Person> People = new List<Person>();
+        public ResearchState Research = new ResearchState();
+        public List<Squad> Squads = new List<Squad>();
+        public ODict<string, double> Cd = new ODict<string, double>();
+        public List<string> Pacts = new List<string>();
+        public AutoCfg Auto = new AutoCfg();
+        public ODict<string, int> Weapons = new ODict<string, int>();
+        public ODict<string, int> Kit = new ODict<string, int>();
+        public List<CraftJob> Craft = new List<CraftJob>();
+        public List<Vehicle> Vehs = new List<Vehicle>();
+        public ODict<string, int> Parts = new ODict<string, int>();
+        public ODict<string, int> Stats = new ODict<string, int>();
+        public double Morale = 70.0;
+        public double NextArrivalT, NextEventT;
+        public bool WonShown;
+        public bool Started, Lost, Won;
+        public int LostDay;
+        public int Merged = -1;
+        public Raid Nraid = new Raid();
+        public double StartT;
+        public WarState War = new WarState();
+        public TradeCfg Trade;
+        public Vector2Int? Spawn;
+        public bool Away;           // set by the network layer when the player is offline
+        public int Stat(string k) => Stats.Get(k, 0);
+        public void AddStat(string k, int v) => Stats[k] = Stats.Get(k, 0) + v;
+    }
+
+    public sealed class Group
+    {
+        public int Id, Lot;
+        public Vector2Int Pos;
+        public int N;
+        public string Label = "";
+        public string St = "wait";
+        public bool Tf;
+    }
+
+    public sealed class Camp
+    {
+        public string Id = "", Name = "", Leader = "";
+        public int Pop;
+        public string Att = "Neutral";
+        public double Rel;
+        public int Lot;
+        public Vector2Int Pos;
+        public bool Alive = true;
+        public List<string> Needs = new List<string>(), Surplus = new List<string>();
+        public string Desc = "";
+        // faction (game.gd _faction_init)
+        public int? Fi;
+        public string Color;
+        public double Str = 30.0;
+        public ODict<string, double> Stock = new ODict<string, double>();
+        public List<double> Rels;
+        public List<int> Claim;
+        public double NextScav, NextGrow, NextGift, NextRaid, NextAmbush, NextHelp;
+        public ODict<string, double> Truce = new ODict<string, double>();
+        public int Searched;
+        public int Lord = -1;
+        public ODict<string, double> Owed = new ODict<string, double>();
+        public int? DefeatedBy;
+        public List<string> List(string which) => which == "needs" ? Needs : (which == "surplus" ? Surplus : new List<string>());
+    }
+
+    public sealed class Fence { public int Tier; public double Hp; public int Col; }
+    public sealed class FenceSeg { public int Tier; public int Col; }
+    public sealed class Tower { public int Tier; public double Hp; public int Col; public int Bid; }
+    public sealed class Trap { public int Kind; public double Hp; public int Col; public int Lvl; }
+    public sealed class Conversion { public string Type; public int Col; public int Bid; public int Manual; public double T; }
+    public sealed class GutJob { public int Col; public double Left, Total; public int Bid; public int Manual = 1; }
+    public sealed class PlayerInfo { public string Name = ""; public int Col; }
+
+    public sealed class LogEntry
+    {
+        public double T;
+        public string Text = "", Kind = "info";
+        public int Col, N;
+        public string Rid;   // research id for "Research complete" entries
+    }
+
+    /// <summary>The global part of game.gd `S`. The per-colony refs GDScript aliased into S
+    /// (res, bases, people, research...) live on Colony; Game exposes the current one as C.</summary>
+    public sealed class GameState
+    {
+        public int Ver;
+        public int Seed;
+        public double T = 6.0;
+        public string Phase = "pick";
+        public int Difficulty = 1;
+        public List<Group> Groups = new List<Group>();
+        public List<Camp> Camps = new List<Camp>();
+        public ODict<int, Fence> Fences = new ODict<int, Fence>();
+        public ODict<int, FenceSeg> Fsegs = new ODict<int, FenceSeg>();
+        public ODict<int, Tower> Towers = new ODict<int, Tower>();
+        public ODict<int, Trap> Traps = new ODict<int, Trap>();
+        public ODict<int, int> Gates = new ODict<int, int>();
+        public ODict<int, Conversion> Conv = new ODict<int, Conversion>();
+        public ODict<int, int> Gut = new ODict<int, int>();
+        public ODict<int, GutJob> Guts = new ODict<int, GutJob>();
+        public int FenceVer = 1, NextId = 1, ConvVer = 1;
+        public byte[] Ctrl;
+        public float[] CtrlH, Scout, Loot, Zinf, Srch;
+        public byte[] SrchC;
+        public Vector2Int Zcorner;
+        public double FallT = -1.0, NextHordeT, NextGroupT = 36.0, NextRaidT = 90.0, NextJumpT = 72.0;
+        public List<LogEntry> Log = new List<LogEntry>();
+        public List<Colony> Cols = new List<Colony>();
+        public ODict<string, PlayerInfo> Players = new ODict<string, PlayerInfo>();
+        public string Mode = "solo";
+        public List<Wreck> Wrecks = new List<Wreck>();
+        public int VehN = 1, VehVer = 1;
+        public int NextUid = 1;
+        // zombies (only filled while saving / loading)
+        public int[] Zc, Zn;
+        public float[] Zp;
+        public byte[] Zh;
+    }
+
+    /// <summary>Per-person daily routine state (game.gd _rt entries; runtime only).</summary>
+    public sealed class Routine
+    {
+        public string Code = "";
+        public Vector2Int Tt = new Vector2Int(-1, -1);
+        public List<Vector2> Path = new List<Vector2>();
+        public int Pi;
+        public double Seg;
+        public bool Arr;
+        public int Ek = Person.NO_BLD;
+        public int Hk = Person.NO_BLD;
+        public Vector2Int Hd;
+        public int Wk = Person.NO_BLD;
+        public Vector2Int Wa = new Vector2Int(-9, -9);
+        public Vector2 Ws;
+        public double J, Leave;
+        public bool Danger;
+        public int Bid = -1;
+        public bool? Set;
+    }
+
+    /// <summary>Result of fence_preview / seg_preview / trap_preview.</summary>
+    public sealed class BuildPreview
+    {
+        public List<bool> Ok = new List<bool>();
+        public int N, Edges;
+        public Dictionary<string, double> Cost = new Dictionary<string, double>();
+        public string Err = "";
+    }
+
+    public sealed class TravelInfo
+    {
+        public string Err = "";
+        public int Hops;
+        public double Hours, Fuel;
+        public string Veh = "";
+    }
+
+    public sealed class SquadRisk { public int Sectors, N; public double Inf, Loss, Power; }
+    public sealed class Quote { public double Price; public Camp Camp; }
+}

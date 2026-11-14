@@ -94,8 +94,8 @@ namespace DayZero.Core
     }
 
     /// <summary>
-    /// Stand-in for Godot's RandomNumberGenerator. NOTE: Godot uses PCG32; outputs will not
-    /// match the Godot build unless an implementation ports PCG32 + Godot's randf/randi_range.
+    /// The subset of Godot's RandomNumberGenerator that data.gd needs. GdRng (GdRng.cs) is the
+    /// PCG32 port the game uses; SystemRng is only for tests that don't need Godot sequences.
     /// </summary>
     public interface IRng
     {
