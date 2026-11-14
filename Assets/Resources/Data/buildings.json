@@ -1,0 +1,218 @@
+{
+ "barricade": {
+  "slot": false,
+  "levels": [
+   {
+    "name": "Walls I",
+    "desc": "Cars, pallets and wire across the gaps.",
+    "cost": {
+     "materials": 15
+    },
+    "days": 2,
+    "defense": 12
+   },
+   {
+    "name": "Walls II",
+    "desc": "Welded sheet metal and a proper gate.",
+    "cost": {
+     "materials": 30
+    },
+    "days": 4,
+    "defense": 26
+   },
+   {
+    "name": "Walls III",
+    "desc": "Double wall with a kill corridor.",
+    "cost": {
+     "materials": 55
+    },
+    "days": 6,
+    "defense": 45
+   }
+  ]
+ },
+ "watchtower": {
+  "slot": true,
+  "levels": [
+   {
+    "name": "Watchtower",
+    "desc": "Eyes on the street. +10 defense, scavenging risk -3%.",
+    "cost": {
+     "materials": 20
+    },
+    "days": 3,
+    "defense": 10
+   }
+  ]
+ },
+ "garden": {
+  "slot": true,
+  "levels": [
+   {
+    "name": "Garden",
+    "desc": "Raised beds in the yard. +4 food a day, more with Farmers.",
+    "cost": {
+     "materials": 10
+    },
+    "days": 2,
+    "food": 4,
+    "farmer_bonus": 1.5,
+    "per_person": 0.15
+   },
+   {
+    "name": "Farm",
+    "desc": "Tilled plots and a coop. +11 food a day, much more with Farmers.",
+    "cost": {
+     "materials": 35
+    },
+    "days": 5,
+    "food": 11,
+    "farmer_bonus": 3.0,
+    "per_person": 0.3
+   }
+  ]
+ },
+ "water": {
+  "slot": true,
+  "levels": [
+   {
+    "name": "Water collector",
+    "desc": "Tarps and barrels. +6 water a day plus hauling. Half in winter.",
+    "cost": {
+     "materials": 8
+    },
+    "days": 1,
+    "water": 6,
+    "per_person": 0.5
+   },
+   {
+    "name": "Well",
+    "desc": "A hand-dug well with a pump. +14 water a day plus hauling.",
+    "cost": {
+     "materials": 30
+    },
+    "days": 5,
+    "water": 14,
+    "per_person": 0.7
+   },
+   {
+    "name": "Water tower",
+    "desc": "A rooftop tank fed by the well and the gutters, with a sand filter. +24 water a day plus hauling.",
+    "cost": {
+     "materials": 45
+    },
+    "days": 5,
+    "water": 24,
+    "per_person": 0.8
+   }
+  ]
+ },
+ "infirmary": {
+  "slot": true,
+  "levels": [
+   {
+    "name": "Infirmary",
+    "desc": "Cots and a clean room. Faster healing, better amputation odds.",
+    "cost": {
+     "materials": 25
+    },
+    "days": 3
+   }
+  ]
+ },
+ "workshop": {
+  "slot": true,
+  "levels": [
+   {
+    "name": "Workshop",
+    "desc": "Benches and tools. Builds 35% faster, salvages 1 material a day.",
+    "cost": {
+     "materials": 20
+    },
+    "days": 3
+   }
+  ]
+ },
+ "barracks": {
+  "slot": true,
+  "levels": [
+   {
+    "name": "Barracks",
+    "desc": "Bunks for more people. +10 capacity.",
+    "cost": {
+     "materials": 25
+    },
+    "days": 3,
+    "capacity": 10
+   },
+   {
+    "name": "Barracks II",
+    "desc": "A second floor of bunks. +10 more capacity.",
+    "cost": {
+     "materials": 45
+    },
+    "days": 5,
+    "capacity": 10
+   }
+  ]
+ },
+ "lab": {
+  "slot": true,
+  "levels": [
+   {
+    "name": "Research lab",
+    "desc": "A Scientist can work here. Unlocks Research.",
+    "cost": {
+     "materials": 30
+    },
+    "days": 4
+   }
+  ]
+ },
+ "tents": {
+  "slot": false,
+  "levels": [
+   {
+    "name": "Tents",
+    "desc": "Tarps and camping tents in the yard. +8 beds. Cold and cramped (morale -1).",
+    "cost": {
+     "materials": 4
+    },
+    "days": 1,
+    "capacity": 8
+   },
+   {
+    "name": "Tents II",
+    "desc": "More tents and a mess tarp. +8 beds.",
+    "cost": {
+     "materials": 8
+    },
+    "days": 1,
+    "capacity": 8
+   },
+   {
+    "name": "Tents III",
+    "desc": "A whole tent city. +8 beds.",
+    "cost": {
+     "materials": 14
+    },
+    "days": 2,
+    "capacity": 8
+   }
+  ]
+ },
+ "radio": {
+  "slot": true,
+  "levels": [
+   {
+    "name": "Radio tower",
+    "desc": "A mast on the roof and a car battery bank. Contact camps without sending anyone, and hear trade offers.",
+    "cost": {
+     "materials": 18,
+     "ammo": 0
+    },
+    "days": 3
+   }
+  ]
+ }
+}

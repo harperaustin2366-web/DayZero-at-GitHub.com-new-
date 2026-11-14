@@ -1,0 +1,62 @@
+{
+ "note": "Road barricades and compound expansion (home city only). Barricades sit on road/alley tiles; a block joins the compound when every road tile around it is sealed off from the outside by barricades and the block has been cleared.",
+ "barricade_levels": [
+  {
+   "name": "Plank barricade",
+   "hp": 40,
+   "cost": {
+    "materials": 3
+   },
+   "hours": 3,
+   "sprite": "rb1"
+  },
+  {
+   "name": "Sandbag wall",
+   "hp": 90,
+   "cost": {
+    "materials": 5
+   },
+   "hours": 5,
+   "sprite": "rb2"
+  },
+  {
+   "name": "Concrete barrier",
+   "hp": 170,
+   "cost": {
+    "materials": 8
+   },
+   "hours": 8,
+   "sprite": "rb3"
+  }
+ ],
+ "crews": 2,
+ "crews_per_engineer": 1,
+ "max_crews": 4,
+ "upkeep_per_tile": 0.05,
+ "guard_tiles": 6,
+ "understaffed_min": 0.6,
+ "block_base": {
+  "capacity": 4,
+  "slots": 1,
+  "water": 1.5
+ },
+ "clear": {
+  "base_danger": 0.08,
+  "per_dot": 0.012,
+  "hours": 6
+ },
+ "dots": {
+  "max": 1400,
+  "per_infected_tile": 1.1,
+  "survive_floor": 260,
+  "speed": 1.6,
+  "attract_radius": 12,
+  "clump": 0.3,
+  "team_attack_per_dot": 0.011,
+  "group_pressure_dots": 4,
+  "barricade_dmg_per_dot": 0.25,
+  "barricade_dmg_min_dots": 5,
+  "horde_dots_per_strength": 3.0
+ },
+ "fall_barricade_discount": 1.0
+}

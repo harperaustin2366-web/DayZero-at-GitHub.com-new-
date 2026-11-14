@@ -1,0 +1,146 @@
+{
+ "high_school": {
+  "name": "Lincoln High School",
+  "short": "High School",
+  "district": "suburbs",
+  "desc": "Chain-link fences, a gym that sleeps dozens and a cafeteria pantry. Lots of room, thin walls.",
+  "defense": 12,
+  "capacity": 26,
+  "slots": 7,
+  "food": 45,
+  "water": 40,
+  "ammo": 10,
+  "meds": 5,
+  "materials": 25,
+  "crew": [
+   "Civilian",
+   "Scientist",
+   "Engineer",
+   "Civilian"
+  ],
+  "prebuilt": {},
+  "task_force": [
+   "Soldier",
+   "Soldier",
+   "Civilian"
+  ],
+  "poi": "school",
+  "fuel": 12
+ },
+ "police": {
+  "name": "5th Street Precinct",
+  "short": "Police Precinct",
+  "district": "police",
+  "desc": "Brick walls, a sally port and an armory. Cramped cells and a small yard.",
+  "defense": 26,
+  "capacity": 14,
+  "slots": 5,
+  "food": 25,
+  "water": 30,
+  "ammo": 45,
+  "meds": 6,
+  "materials": 15,
+  "crew": [
+   "Civilian",
+   "Civilian",
+   "Scavenger"
+  ],
+  "prebuilt": {},
+  "task_force": [
+   "Soldier",
+   "Soldier",
+   "Soldier",
+   "Soldier"
+  ],
+  "poi": "police",
+  "fuel": 12
+ },
+ "hospital": {
+  "name": "St. Mary's Hospital",
+  "short": "Hospital",
+  "district": "hospital",
+  "desc": "Generators, a full pharmacy, and the city's sick still arriving at the doors. Infection starts close.",
+  "defense": 14,
+  "capacity": 22,
+  "slots": 6,
+  "food": 25,
+  "water": 40,
+  "ammo": 6,
+  "meds": 35,
+  "materials": 15,
+  "crew": [
+   "Medic",
+   "Medic",
+   "Scientist",
+   "Civilian"
+  ],
+  "prebuilt": {
+   "infirmary": 1
+  },
+  "task_force": [
+   "Soldier",
+   "Soldier",
+   "Scavenger"
+  ],
+  "poi": "hospital",
+  "fuel": 12
+ },
+ "warehouse": {
+  "name": "Harlan Freight Warehouse",
+  "short": "Warehouse",
+  "district": "industrial",
+  "desc": "Steel shutters, a loading yard and pallets of dry goods. Easy to wall off, far from the hospitals.",
+  "defense": 20,
+  "capacity": 20,
+  "slots": 7,
+  "food": 60,
+  "water": 35,
+  "ammo": 10,
+  "meds": 3,
+  "materials": 50,
+  "crew": [
+   "Engineer",
+   "Scavenger",
+   "Civilian",
+   "Civilian"
+  ],
+  "prebuilt": {},
+  "task_force": [
+   "Soldier",
+   "Soldier",
+   "Scavenger"
+  ],
+  "poi": "warehouse",
+  "fuel": 12
+ },
+ "farmhouse": {
+  "name": "Miller Farm",
+  "short": "Farmhouse",
+  "district": "farmland",
+  "desc": "Out past the city edge. Open fields, a hand pump and a root cellar. Quiet, but every run into town is long.",
+  "defense": 8,
+  "capacity": 12,
+  "slots": 6,
+  "food": 45,
+  "water": 45,
+  "ammo": 14,
+  "meds": 4,
+  "materials": 15,
+  "crew": [
+   "Farmer",
+   "Farmer",
+   "Civilian"
+  ],
+  "prebuilt": {
+   "garden": 1,
+   "water": 1
+  },
+  "task_force": [
+   "Soldier",
+   "Scavenger",
+   "Civilian"
+  ],
+  "poi": "farm",
+  "fuel": 30
+ }
+}

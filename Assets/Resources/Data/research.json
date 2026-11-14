@@ -1,0 +1,3630 @@
+{
+"cats": [
+"farming",
+"crafting",
+"housing",
+"plumbing",
+"electricity",
+"diplomacy",
+"vehicles",
+"aviation",
+"scouting"
+],
+"cat_names": {
+"farming": "Farming",
+"crafting": "Crafting",
+"housing": "Housing",
+"plumbing": "Plumbing",
+"electricity": "Electricity",
+"diplomacy": "Diplomacy",
+"vehicles": "Vehicles",
+"aviation": "Aviation",
+"scouting": "Scouting"
+},
+"v03_map": {
+"fort1": "craft_01",
+"fort2": "craft_05",
+"agri1": "farm_02",
+"agri2": "farm_06",
+"med1": "plumb_03",
+"med2": "plumb_06",
+"weap1": "craft_02",
+"weap2": "craft_06"
+},
+"fx_labels": {
+"food_mult": "Food production +{p}",
+"farmer_mult": "Farmers +{p}",
+"storage_mult": "Storage +{p}",
+"morale_add": "Morale +{v}/h",
+"camp_aid": "Friendly camps send {v} supplies a day",
+"salvage_mult": "Engineer salvage +{p}",
+"craft_disc": "Crafting & fences {p} cheaper",
+"defense_add": "+{v} defense at every base",
+"ammo_daily": "+{v} ammo/day per base with Workshop or Armory",
+"fence_hp": "Fences +{p} HP",
+"hit_add": "Guards hit +{p}",
+"ammo_craft": "+{v} ammo per ammo craft",
+"repair_mult": "Repairs {p} cheaper and faster",
+"squad_power": "Squads fight +{p} better",
+"squad_safe": "Squad casualties -{p}",
+"tower_dmg": "Towers hit +{p}",
+"housing_add": "+{v} beds per base",
+"slots_add": "+{v} building slot per base",
+"housing_mult": "Beds +{p}",
+"water_mult": "Water +{p}",
+"water_flat": "+{v} water/day per base",
+"cure_add": "Infection cure +{p}",
+"heal_mult": "Healing +{p}",
+"detect_add": "Hidden-bite detection +{p}",
+"meds_flat": "+{v} meds/day per base",
+"research_speed": "Research +{p} faster",
+"power": "+{v} power",
+"night_def": "+{v} defense at night",
+"tower_range": "Towers +{v} tiles range",
+"rel_gain": "Relations improve {p} faster",
+"trade_rate": "Trades +{p} better",
+"group_rate": "SOS calls & strangers +{p}",
+"raid_deter": "+{v} defense against raiders",
+"gift_bonus": "Gifts between colonies arrive +{p} (multiplayer)",
+"recruit_n": "+{v} recruit per recruit deal",
+"ally_def": "+{p} of the strongest friendly colony's defense (multiplayer)",
+"veh_loot": "Vehicle hauls +{p}",
+"veh_speed": "Vehicles +{p} faster",
+"scav_range": "Auto-scavenge radius +{v} tiles",
+"auto_r": "Auto-scavenge radius +{v} tiles",
+"search_speed": "Searching buildings {p} faster",
+"squad_size": "+{v} squad member (bigger squads)",
+"squad_range": "Squads reach +{v} tiles further",
+"search_r": "Squads search +{v} tiles wider",
+"search_n": "Squads search +{v} more buildings per run",
+"find_people": "{p} more likely to find people hiding in buildings",
+"veh_safe": "Vehicles avoid {p} more fights",
+"mats_flat": "+{v} materials/day per base",
+"clear_hold": "Cleared areas stay clear +{v}h",
+"recon": "Squads & scavengers {p} safer",
+"supply_drop": "Air drop: +{v} of each supply per day",
+"quiet": "Quiet weapons: runners get into {p} fewer fights"
+},
+"unlock_labels": {
+"fence_1": "Chain-link fences",
+"fence_2": "Sheet-metal walls",
+"fence_3": "Concrete walls",
+"fence_4": "Reinforced concrete walls",
+"tower_0": "Watchtowers",
+"tower_1": "MG nests",
+"tower_2": "Rifle towers",
+"tower_3": "Auto-turrets",
+"lvl_main_1": "Main camp -> Settlement",
+"lvl_main_2": "Main camp -> Town",
+"lvl_main_3": "Main camp -> Stronghold",
+"lvl_out_1": "Outposts -> Fortified",
+"lvl_out_2": "Outposts -> Garrison",
+"barracks": "Barracks facility",
+"pact": "Pacts with friendly camps (they fight hordes with you)",
+"gift_person": "Send survivors to another colony (multiplayer)",
+"squad_veh": "Squads drive (faster, safer)",
+"squad_scav": "Squad scavenging & scouting runs beyond the auto radius",
+"parley": "Peace talks with Hostile camps",
+"drone": "Scouting drone (finds survivors, reveals danger)",
+"heli": "Helicopter rescue (instant pick-up)",
+"air_strike": "Gunship strike (clears an area)"
+},
+"techs": {
+"farm_01": {
+"cat": "farming",
+"tier": 1,
+"name": "Seed saving",
+"cost": {
+"materials": 5,
+"food": 4
+},
+"hours": 6.0,
+"requires": [],
+"fx": {
+"food_mult": 0.06
+},
+"unlock": [],
+"desc": "Food production +6%."
+},
+"farm_02": {
+"cat": "farming",
+"tier": 2,
+"name": "Crop rotation",
+"cost": {
+"materials": 6,
+"food": 5
+},
+"hours": 7.1,
+"requires": [
+"farm_01"
+],
+"fx": {
+"food_mult": 0.4
+},
+"unlock": [],
+"desc": "Food production +40%."
+},
+"farm_03": {
+"cat": "farming",
+"tier": 3,
+"name": "Raised beds",
+"cost": {
+"materials": 7,
+"food": 6
+},
+"hours": 8.3,
+"requires": [
+"farm_02"
+],
+"fx": {
+"food_mult": 0.077
+},
+"unlock": [],
+"desc": "Food production +8%."
+},
+"farm_04": {
+"cat": "farming",
+"tier": 4,
+"name": "Compost heaps",
+"cost": {
+"materials": 8,
+"food": 7
+},
+"hours": 9.7,
+"requires": [
+"farm_03"
+],
+"fx": {
+"food_mult": 0.085
+},
+"unlock": [],
+"desc": "Food production +8%."
+},
+"farm_05": {
+"cat": "farming",
+"tier": 5,
+"name": "Companion planting",
+"cost": {
+"materials": 9,
+"food": 8
+},
+"hours": 11.4,
+"requires": [
+"farm_04"
+],
+"fx": {
+"food_mult": 0.094
+},
+"unlock": [],
+"desc": "Food production +9%."
+},
+"farm_06": {
+"cat": "farming",
+"tier": 6,
+"name": "Selective breeding",
+"cost": {
+"materials": 11,
+"food": 10
+},
+"hours": 13.4,
+"requires": [
+"farm_05"
+],
+"fx": {
+"food_mult": 0.102,
+"farmer_mult": 0.3
+},
+"unlock": [],
+"desc": "Food production +10%. Farmers +30%."
+},
+"farm_07": {
+"cat": "farming",
+"tier": 7,
+"name": "Chicken coops",
+"cost": {
+"materials": 13,
+"food": 12
+},
+"hours": 15.8,
+"requires": [
+"farm_06"
+],
+"fx": {
+"food_mult": 0.111,
+"morale_add": 0.05
+},
+"unlock": [],
+"desc": "Food production +11%. Morale +0.05/h."
+},
+"farm_08": {
+"cat": "farming",
+"tier": 8,
+"name": "Greenhouses",
+"cost": {
+"materials": 15,
+"food": 14
+},
+"hours": 18.6,
+"requires": [
+"farm_07"
+],
+"fx": {
+"food_mult": 0.119,
+"farmer_mult": 0.2
+},
+"unlock": [],
+"desc": "Food production +12%. Farmers +20%."
+},
+"farm_09": {
+"cat": "farming",
+"tier": 9,
+"name": "Root cellars",
+"cost": {
+"materials": 18,
+"food": 17
+},
+"hours": 21.8,
+"requires": [
+"farm_08"
+],
+"fx": {
+"food_mult": 0.127,
+"storage_mult": 0.15
+},
+"unlock": [],
+"desc": "Food production +13%. Storage +15%."
+},
+"farm_10": {
+"cat": "farming",
+"tier": 10,
+"name": "Hydroponic trays",
+"cost": {
+"materials": 21,
+"food": 21
+},
+"hours": 25.6,
+"requires": [
+"farm_09",
+"plumb_06"
+],
+"fx": {
+"food_mult": 0.136
+},
+"unlock": [],
+"desc": "Food production +14%."
+},
+"farm_11": {
+"cat": "farming",
+"tier": 11,
+"name": "Orchard grafting",
+"cost": {
+"materials": 24,
+"food": 25
+},
+"hours": 30.1,
+"requires": [
+"farm_10"
+],
+"fx": {
+"food_mult": 0.144
+},
+"unlock": [],
+"desc": "Food production +14%."
+},
+"farm_12": {
+"cat": "farming",
+"tier": 12,
+"name": "Pest control",
+"cost": {
+"materials": 28,
+"food": 30
+},
+"hours": 35.4,
+"requires": [
+"farm_11"
+],
+"fx": {
+"food_mult": 0.153
+},
+"unlock": [],
+"desc": "Food production +15%."
+},
+"farm_13": {
+"cat": "farming",
+"tier": 13,
+"name": "Livestock pens",
+"cost": {
+"materials": 33,
+"food": 36
+},
+"hours": 41.6,
+"requires": [
+"farm_12"
+],
+"fx": {
+"food_mult": 0.161,
+"farmer_mult": 0.25,
+"morale_add": 0.05
+},
+"unlock": [],
+"desc": "Food production +16%. Farmers +25%. Morale +0.05/h."
+},
+"farm_14": {
+"cat": "farming",
+"tier": 14,
+"name": "Fertilizer synthesis",
+"cost": {
+"materials": 38,
+"food": 43
+},
+"hours": 48.8,
+"requires": [
+"farm_13",
+"craft_08"
+],
+"fx": {
+"food_mult": 0.169
+},
+"unlock": [],
+"desc": "Food production +17%."
+},
+"farm_15": {
+"cat": "farming",
+"tier": 15,
+"name": "Grain mill",
+"cost": {
+"materials": 45,
+"food": 51
+},
+"hours": 57.4,
+"requires": [
+"farm_14"
+],
+"fx": {
+"food_mult": 0.178
+},
+"unlock": [],
+"desc": "Food production +18%."
+},
+"farm_16": {
+"cat": "farming",
+"tier": 16,
+"name": "Aquaponics",
+"cost": {
+"materials": 53,
+"food": 62
+},
+"hours": 67.4,
+"requires": [
+"farm_15",
+"plumb_12"
+],
+"fx": {
+"food_mult": 0.186
+},
+"unlock": [],
+"desc": "Food production +19%."
+},
+"farm_17": {
+"cat": "farming",
+"tier": 17,
+"name": "Vertical farms",
+"cost": {
+"materials": 62,
+"food": 74
+},
+"hours": 79.2,
+"requires": [
+"farm_16",
+"elec_10"
+],
+"fx": {
+"food_mult": 0.195,
+"farmer_mult": 0.25
+},
+"unlock": [],
+"desc": "Food production +20%. Farmers +25%."
+},
+"farm_18": {
+"cat": "farming",
+"tier": 18,
+"name": "Seed vault",
+"cost": {
+"materials": 72,
+"food": 89
+},
+"hours": 93.1,
+"requires": [
+"farm_17"
+],
+"fx": {
+"food_mult": 0.203
+},
+"unlock": [],
+"desc": "Food production +20%."
+},
+"farm_19": {
+"cat": "farming",
+"tier": 19,
+"name": "Climate-proof crops",
+"cost": {
+"materials": 84,
+"food": 106
+},
+"hours": 109.4,
+"requires": [
+"farm_18"
+],
+"fx": {
+"food_mult": 0.212
+},
+"unlock": [],
+"desc": "Food production +21%."
+},
+"farm_20": {
+"cat": "farming",
+"tier": 20,
+"name": "Agri-cooperative",
+"cost": {
+"materials": 99,
+"food": 128
+},
+"hours": 128.5,
+"requires": [
+"farm_19"
+],
+"fx": {
+"food_mult": 0.22,
+"camp_aid": 1.0
+},
+"unlock": [],
+"desc": "Food production +22%. Friendly camps send 1 supplies a day."
+},
+"craft_01": {
+"cat": "crafting",
+"tier": 1,
+"name": "Reinforced walls",
+"cost": {
+"materials": 5,
+"ammo": 2
+},
+"hours": 6.0,
+"requires": [],
+"fx": {
+"salvage_mult": 0.04,
+"defense_add": 10
+},
+"unlock": [],
+"desc": "Engineer salvage +4%. +10 defense at every base."
+},
+"craft_02": {
+"cat": "crafting",
+"tier": 2,
+"name": "Ammo reloading",
+"cost": {
+"materials": 6,
+"ammo": 3
+},
+"hours": 7.1,
+"requires": [
+"craft_01"
+],
+"fx": {
+"salvage_mult": 0.046,
+"ammo_daily": 1.0
+},
+"unlock": [],
+"desc": "Engineer salvage +5%. +1 ammo/day per base with Workshop or Armory."
+},
+"craft_03": {
+"cat": "crafting",
+"tier": 3,
+"name": "Chain-link fencing",
+"cost": {
+"materials": 7,
+"ammo": 4
+},
+"hours": 8.3,
+"requires": [
+"craft_02"
+],
+"fx": {
+"salvage_mult": 0.052,
+"craft_disc": 0.03
+},
+"unlock": [
+"fence_1"
+],
+"desc": "Unlocks Chain-link fences. Engineer salvage +5%. Crafting & fences 3% cheaper."
+},
+"craft_04": {
+"cat": "crafting",
+"tier": 4,
+"name": "Watchtower carpentry",
+"cost": {
+"materials": 8,
+"ammo": 4
+},
+"hours": 9.7,
+"requires": [
+"craft_03"
+],
+"fx": {
+"salvage_mult": 0.057
+},
+"unlock": [
+"tower_0"
+],
+"desc": "Unlocks Watchtowers. Engineer salvage +6%."
+},
+"craft_05": {
+"cat": "crafting",
+"tier": 5,
+"name": "Trap lines",
+"cost": {
+"materials": 9,
+"ammo": 5
+},
+"hours": 11.4,
+"requires": [
+"craft_04"
+],
+"fx": {
+"salvage_mult": 0.063,
+"defense_add": 18
+},
+"unlock": [],
+"desc": "Engineer salvage +6%. +18 defense at every base."
+},
+"craft_06": {
+"cat": "crafting",
+"tier": 6,
+"name": "Suppressors",
+"cost": {
+"materials": 11,
+"ammo": 6
+},
+"hours": 13.4,
+"requires": [
+"craft_05"
+],
+"fx": {
+"salvage_mult": 0.069,
+"craft_disc": 0.03,
+"quiet": 0.45
+},
+"unlock": [],
+"desc": "Engineer salvage +7%. Crafting & fences 3% cheaper. Quiet weapons: runners get into 45% fewer fights."
+},
+"craft_07": {
+"cat": "crafting",
+"tier": 7,
+"name": "Sheet-metal walls",
+"cost": {
+"materials": 13,
+"ammo": 7
+},
+"hours": 15.8,
+"requires": [
+"craft_06"
+],
+"fx": {
+"salvage_mult": 0.075
+},
+"unlock": [
+"fence_2"
+],
+"desc": "Unlocks Sheet-metal walls. Engineer salvage +8%."
+},
+"craft_08": {
+"cat": "crafting",
+"tier": 8,
+"name": "MG emplacements",
+"cost": {
+"materials": 15,
+"ammo": 8
+},
+"hours": 18.6,
+"requires": [
+"craft_07"
+],
+"fx": {
+"salvage_mult": 0.081
+},
+"unlock": [
+"tower_1"
+],
+"desc": "Unlocks MG nests. Engineer salvage +8%."
+},
+"craft_09": {
+"cat": "crafting",
+"tier": 9,
+"name": "Concrete casting",
+"cost": {
+"materials": 18,
+"ammo": 10
+},
+"hours": 21.8,
+"requires": [
+"craft_08"
+],
+"fx": {
+"salvage_mult": 0.086,
+"craft_disc": 0.03,
+"fence_hp": 0.15
+},
+"unlock": [],
+"desc": "Engineer salvage +9%. Crafting & fences 3% cheaper. Fences +15% HP."
+},
+"craft_10": {
+"cat": "crafting",
+"tier": 10,
+"name": "Gunsmithing",
+"cost": {
+"materials": 21,
+"ammo": 13
+},
+"hours": 25.6,
+"requires": [
+"craft_09"
+],
+"fx": {
+"salvage_mult": 0.092,
+"hit_add": 0.04,
+"ammo_craft": 3
+},
+"unlock": [],
+"desc": "Engineer salvage +9%. Guards hit +4%. +3 ammo per ammo craft."
+},
+"craft_11": {
+"cat": "crafting",
+"tier": 11,
+"name": "Precision tooling",
+"cost": {
+"materials": 24,
+"ammo": 15
+},
+"hours": 30.1,
+"requires": [
+"craft_10"
+],
+"fx": {
+"salvage_mult": 0.098,
+"repair_mult": 0.3
+},
+"unlock": [],
+"desc": "Engineer salvage +10%. Repairs 30% cheaper and faster."
+},
+"craft_12": {
+"cat": "crafting",
+"tier": 12,
+"name": "Rifle towers",
+"cost": {
+"materials": 28,
+"ammo": 18
+},
+"hours": 35.4,
+"requires": [
+"craft_11",
+"house_06"
+],
+"fx": {
+"salvage_mult": 0.104,
+"craft_disc": 0.03
+},
+"unlock": [
+"tower_2"
+],
+"desc": "Unlocks Rifle towers. Engineer salvage +10%. Crafting & fences 3% cheaper."
+},
+"craft_13": {
+"cat": "crafting",
+"tier": 13,
+"name": "Hardened alloys",
+"cost": {
+"materials": 33,
+"ammo": 22
+},
+"hours": 41.6,
+"requires": [
+"craft_12"
+],
+"fx": {
+"salvage_mult": 0.109,
+"fence_hp": 0.2
+},
+"unlock": [],
+"desc": "Engineer salvage +11%. Fences +20% HP."
+},
+"craft_14": {
+"cat": "crafting",
+"tier": 14,
+"name": "Mass production",
+"cost": {
+"materials": 38,
+"ammo": 26
+},
+"hours": 48.8,
+"requires": [
+"craft_13"
+],
+"fx": {
+"salvage_mult": 0.115,
+"ammo_daily": 1.5
+},
+"unlock": [],
+"desc": "Engineer salvage +12%. +1.5 ammo/day per base with Workshop or Armory."
+},
+"craft_15": {
+"cat": "crafting",
+"tier": 15,
+"name": "Composite armor",
+"cost": {
+"materials": 45,
+"ammo": 31
+},
+"hours": 57.4,
+"requires": [
+"craft_14"
+],
+"fx": {
+"salvage_mult": 0.121,
+"craft_disc": 0.03,
+"squad_power": 0.1
+},
+"unlock": [],
+"desc": "Engineer salvage +12%. Crafting & fences 3% cheaper. Squads fight +10% better."
+},
+"craft_16": {
+"cat": "crafting",
+"tier": 16,
+"name": "Rebar & formwork",
+"cost": {
+"materials": 53,
+"ammo": 37
+},
+"hours": 67.4,
+"requires": [
+"craft_15",
+"house_10"
+],
+"fx": {
+"salvage_mult": 0.127,
+"fence_hp": 0.25
+},
+"unlock": [],
+"desc": "Engineer salvage +13%. Fences +25% HP."
+},
+"craft_17": {
+"cat": "crafting",
+"tier": 17,
+"name": "CNC machining",
+"cost": {
+"materials": 62,
+"ammo": 44
+},
+"hours": 79.2,
+"requires": [
+"craft_16",
+"elec_07"
+],
+"fx": {
+"salvage_mult": 0.133,
+"tower_dmg": 0.06
+},
+"unlock": [],
+"desc": "Engineer salvage +13%. Towers hit +6%."
+},
+"craft_18": {
+"cat": "crafting",
+"tier": 18,
+"name": "Ballistic plating",
+"cost": {
+"materials": 72,
+"ammo": 53
+},
+"hours": 93.1,
+"requires": [
+"craft_17"
+],
+"fx": {
+"salvage_mult": 0.138,
+"craft_disc": 0.03,
+"squad_safe": 0.12
+},
+"unlock": [],
+"desc": "Engineer salvage +14%. Crafting & fences 3% cheaper. Squad casualties -12%."
+},
+"craft_19": {
+"cat": "crafting",
+"tier": 19,
+"name": "Arms factory",
+"cost": {
+"materials": 84,
+"ammo": 64
+},
+"hours": 109.4,
+"requires": [
+"craft_18"
+],
+"fx": {
+"salvage_mult": 0.144,
+"ammo_daily": 3.0,
+"hit_add": 0.05
+},
+"unlock": [],
+"desc": "Engineer salvage +14%. +3 ammo/day per base with Workshop or Armory. Guards hit +5%."
+},
+"craft_20": {
+"cat": "crafting",
+"tier": 20,
+"name": "Master armorers",
+"cost": {
+"materials": 99,
+"ammo": 77
+},
+"hours": 128.5,
+"requires": [
+"craft_19"
+],
+"fx": {
+"salvage_mult": 0.15,
+"tower_dmg": 0.08,
+"squad_power": 0.15
+},
+"unlock": [],
+"desc": "Engineer salvage +15%. Towers hit +8%. Squads fight +15% better."
+},
+"house_01": {
+"cat": "housing",
+"tier": 1,
+"name": "Bunk beds",
+"cost": {
+"materials": 6
+},
+"hours": 6.0,
+"requires": [],
+"fx": {
+"housing_add": 2
+},
+"unlock": [],
+"desc": "+2 beds per base."
+},
+"house_02": {
+"cat": "housing",
+"tier": 2,
+"name": "Settlement charter",
+"cost": {
+"materials": 8
+},
+"hours": 7.1,
+"requires": [
+"house_01"
+],
+"fx": {
+"housing_add": 2
+},
+"unlock": [
+"lvl_main_1"
+],
+"desc": "Unlocks Main camp -> Settlement. +2 beds per base."
+},
+"house_03": {
+"cat": "housing",
+"tier": 3,
+"name": "Insulated tents",
+"cost": {
+"materials": 9
+},
+"hours": 8.3,
+"requires": [
+"house_02"
+],
+"fx": {
+"housing_add": 2,
+"morale_add": 0.05
+},
+"unlock": [],
+"desc": "+2 beds per base. Morale +0.05/h."
+},
+"house_04": {
+"cat": "housing",
+"tier": 4,
+"name": "Prefab cabins",
+"cost": {
+"materials": 10
+},
+"hours": 9.7,
+"requires": [
+"house_03"
+],
+"fx": {
+"housing_add": 3
+},
+"unlock": [
+"barracks"
+],
+"desc": "Unlocks Barracks facility. +3 beds per base."
+},
+"house_05": {
+"cat": "housing",
+"tier": 5,
+"name": "Fortified outposts",
+"cost": {
+"materials": 12
+},
+"hours": 11.4,
+"requires": [
+"house_04"
+],
+"fx": {
+"housing_add": 3
+},
+"unlock": [
+"lvl_out_1"
+],
+"desc": "Unlocks Outposts -> Fortified. +3 beds per base."
+},
+"house_06": {
+"cat": "housing",
+"tier": 6,
+"name": "Framed housing",
+"cost": {
+"materials": 14
+},
+"hours": 13.4,
+"requires": [
+"house_05"
+],
+"fx": {
+"housing_add": 3
+},
+"unlock": [
+"lvl_main_2"
+],
+"desc": "Unlocks Main camp -> Town. +3 beds per base."
+},
+"house_07": {
+"cat": "housing",
+"tier": 7,
+"name": "Warehousing",
+"cost": {
+"materials": 17
+},
+"hours": 15.8,
+"requires": [
+"house_06"
+],
+"fx": {
+"housing_add": 3,
+"storage_mult": 0.25
+},
+"unlock": [],
+"desc": "+3 beds per base. Storage +25%."
+},
+"house_08": {
+"cat": "housing",
+"tier": 8,
+"name": "Communal kitchen",
+"cost": {
+"materials": 20
+},
+"hours": 18.6,
+"requires": [
+"house_07"
+],
+"fx": {
+"housing_add": 3,
+"morale_add": 0.08
+},
+"unlock": [],
+"desc": "+3 beds per base. Morale +0.08/h."
+},
+"house_09": {
+"cat": "housing",
+"tier": 9,
+"name": "Garrison quarters",
+"cost": {
+"materials": 23
+},
+"hours": 21.8,
+"requires": [
+"house_08"
+],
+"fx": {
+"housing_add": 4,
+"slots_add": 1
+},
+"unlock": [
+"lvl_out_2"
+],
+"desc": "Unlocks Outposts -> Garrison. +4 beds per base. +1 building slot per base."
+},
+"house_10": {
+"cat": "housing",
+"tier": 10,
+"name": "Masonry",
+"cost": {
+"materials": 27
+},
+"hours": 25.6,
+"requires": [
+"house_09",
+"craft_09"
+],
+"fx": {
+"housing_add": 4
+},
+"unlock": [
+"fence_3"
+],
+"desc": "Unlocks Concrete walls. +4 beds per base."
+},
+"house_11": {
+"cat": "housing",
+"tier": 11,
+"name": "Town planning",
+"cost": {
+"materials": 31
+},
+"hours": 30.1,
+"requires": [
+"house_10"
+],
+"fx": {
+"housing_add": 4,
+"slots_add": 1,
+"fence_hp": 0.1
+},
+"unlock": [],
+"desc": "+4 beds per base. +1 building slot per base. Fences +10% HP."
+},
+"house_12": {
+"cat": "housing",
+"tier": 12,
+"name": "Stronghold design",
+"cost": {
+"materials": 36
+},
+"hours": 35.4,
+"requires": [
+"house_11",
+"craft_09"
+],
+"fx": {
+"housing_add": 4
+},
+"unlock": [
+"lvl_main_3"
+],
+"desc": "Unlocks Main camp -> Stronghold. +4 beds per base."
+},
+"house_13": {
+"cat": "housing",
+"tier": 13,
+"name": "Bunker shelters",
+"cost": {
+"materials": 43
+},
+"hours": 41.6,
+"requires": [
+"house_12"
+],
+"fx": {
+"housing_add": 5,
+"defense_add": 12
+},
+"unlock": [],
+"desc": "+5 beds per base. +12 defense at every base."
+},
+"house_14": {
+"cat": "housing",
+"tier": 14,
+"name": "Cold storage",
+"cost": {
+"materials": 49
+},
+"hours": 48.8,
+"requires": [
+"house_13",
+"elec_09"
+],
+"fx": {
+"housing_add": 5,
+"storage_mult": 0.3
+},
+"unlock": [],
+"desc": "+5 beds per base. Storage +30%."
+},
+"house_15": {
+"cat": "housing",
+"tier": 15,
+"name": "Apartment blocks",
+"cost": {
+"materials": 58
+},
+"hours": 57.4,
+"requires": [
+"house_14"
+],
+"fx": {
+"housing_add": 5,
+"housing_mult": 0.15
+},
+"unlock": [],
+"desc": "+5 beds per base. Beds +15%."
+},
+"house_16": {
+"cat": "housing",
+"tier": 16,
+"name": "Reinforced concrete",
+"cost": {
+"materials": 69
+},
+"hours": 67.4,
+"requires": [
+"house_15",
+"craft_13"
+],
+"fx": {
+"housing_add": 5
+},
+"unlock": [
+"fence_4"
+],
+"desc": "Unlocks Reinforced concrete walls. +5 beds per base."
+},
+"house_17": {
+"cat": "housing",
+"tier": 17,
+"name": "Civic center",
+"cost": {
+"materials": 81
+},
+"hours": 79.2,
+"requires": [
+"house_16"
+],
+"fx": {
+"housing_add": 5,
+"slots_add": 1,
+"morale_add": 0.1
+},
+"unlock": [],
+"desc": "+5 beds per base. +1 building slot per base. Morale +0.1/h."
+},
+"house_18": {
+"cat": "housing",
+"tier": 18,
+"name": "Underground vaults",
+"cost": {
+"materials": 94
+},
+"hours": 93.1,
+"requires": [
+"house_17"
+],
+"fx": {
+"housing_add": 6,
+"storage_mult": 0.4,
+"defense_add": 15
+},
+"unlock": [],
+"desc": "+6 beds per base. Storage +40%. +15 defense at every base."
+},
+"house_19": {
+"cat": "housing",
+"tier": 19,
+"name": "Arcology plans",
+"cost": {
+"materials": 109
+},
+"hours": 109.4,
+"requires": [
+"house_18",
+"elec_12",
+"plumb_12"
+],
+"fx": {
+"housing_add": 6,
+"housing_mult": 0.25
+},
+"unlock": [],
+"desc": "+6 beds per base. Beds +25%."
+},
+"house_20": {
+"cat": "housing",
+"tier": 20,
+"name": "New city",
+"cost": {
+"materials": 129
+},
+"hours": 128.5,
+"requires": [
+"house_19"
+],
+"fx": {
+"housing_add": 6,
+"slots_add": 2,
+"housing_mult": 0.3
+},
+"unlock": [],
+"desc": "+6 beds per base. +2 building slot per base. Beds +30%."
+},
+"plumb_01": {
+"cat": "plumbing",
+"tier": 1,
+"name": "Water filters",
+"cost": {
+"materials": 5,
+"water": 4
+},
+"hours": 6.0,
+"requires": [],
+"fx": {
+"water_mult": 0.06
+},
+"unlock": [],
+"desc": "Water +6%."
+},
+"plumb_02": {
+"cat": "plumbing",
+"tier": 2,
+"name": "Rain catchment",
+"cost": {
+"materials": 6,
+"water": 5
+},
+"hours": 7.1,
+"requires": [
+"plumb_01"
+],
+"fx": {
+"water_mult": 0.07,
+"water_flat": 2.0
+},
+"unlock": [],
+"desc": "Water +7%. +2 water/day per base."
+},
+"plumb_03": {
+"cat": "plumbing",
+"tier": 3,
+"name": "Sanitation",
+"cost": {
+"materials": 7,
+"water": 6
+},
+"hours": 8.3,
+"requires": [
+"plumb_02"
+],
+"fx": {
+"water_mult": 0.08,
+"cure_add": 0.15
+},
+"unlock": [],
+"desc": "Water +8%. Infection cure +15%."
+},
+"plumb_04": {
+"cat": "plumbing",
+"tier": 4,
+"name": "Gravity tanks",
+"cost": {
+"materials": 8,
+"water": 7
+},
+"hours": 9.7,
+"requires": [
+"plumb_03"
+],
+"fx": {
+"water_mult": 0.09
+},
+"unlock": [],
+"desc": "Water +9%."
+},
+"plumb_05": {
+"cat": "plumbing",
+"tier": 5,
+"name": "Boiling stations",
+"cost": {
+"materials": 9,
+"water": 8
+},
+"hours": 11.4,
+"requires": [
+"plumb_04"
+],
+"fx": {
+"water_mult": 0.1,
+"detect_add": 0.05
+},
+"unlock": [],
+"desc": "Water +10%. Hidden-bite detection +5%."
+},
+"plumb_06": {
+"cat": "plumbing",
+"tier": 6,
+"name": "Field surgery",
+"cost": {
+"materials": 11,
+"water": 10
+},
+"hours": 13.4,
+"requires": [
+"plumb_05"
+],
+"fx": {
+"water_mult": 0.11,
+"heal_mult": 1.0,
+"cure_add": 0.15
+},
+"unlock": [],
+"desc": "Water +11%. Healing +100%. Infection cure +15%."
+},
+"plumb_07": {
+"cat": "plumbing",
+"tier": 7,
+"name": "Septic systems",
+"cost": {
+"materials": 13,
+"water": 12
+},
+"hours": 15.8,
+"requires": [
+"plumb_06"
+],
+"fx": {
+"water_mult": 0.12
+},
+"unlock": [],
+"desc": "Water +12%."
+},
+"plumb_08": {
+"cat": "plumbing",
+"tier": 8,
+"name": "Hand pumps",
+"cost": {
+"materials": 15,
+"water": 14,
+"meds": 5
+},
+"hours": 18.6,
+"requires": [
+"plumb_07"
+],
+"fx": {
+"water_mult": 0.13,
+"water_flat": 3.0
+},
+"unlock": [],
+"desc": "Water +13%. +3 water/day per base."
+},
+"plumb_09": {
+"cat": "plumbing",
+"tier": 9,
+"name": "Pipe fitting",
+"cost": {
+"materials": 18,
+"water": 17,
+"meds": 5
+},
+"hours": 21.8,
+"requires": [
+"plumb_08"
+],
+"fx": {
+"water_mult": 0.14
+},
+"unlock": [],
+"desc": "Water +14%."
+},
+"plumb_10": {
+"cat": "plumbing",
+"tier": 10,
+"name": "Chlorination",
+"cost": {
+"materials": 21,
+"water": 21,
+"meds": 6
+},
+"hours": 25.6,
+"requires": [
+"plumb_09"
+],
+"fx": {
+"water_mult": 0.15,
+"cure_add": 0.05,
+"meds_flat": 0.5
+},
+"unlock": [],
+"desc": "Water +15%. Infection cure +5%. +0.5 meds/day per base."
+},
+"plumb_11": {
+"cat": "plumbing",
+"tier": 11,
+"name": "Clean rooms",
+"cost": {
+"materials": 24,
+"water": 25,
+"meds": 7
+},
+"hours": 30.1,
+"requires": [
+"plumb_10",
+"elec_06"
+],
+"fx": {
+"water_mult": 0.16,
+"detect_add": 0.08
+},
+"unlock": [],
+"desc": "Water +16%. Hidden-bite detection +8%."
+},
+"plumb_12": {
+"cat": "plumbing",
+"tier": 12,
+"name": "Water mains",
+"cost": {
+"materials": 28,
+"water": 30,
+"meds": 7
+},
+"hours": 35.4,
+"requires": [
+"plumb_11"
+],
+"fx": {
+"water_mult": 0.17
+},
+"unlock": [],
+"desc": "Water +17%."
+},
+"plumb_13": {
+"cat": "plumbing",
+"tier": 13,
+"name": "Reverse osmosis",
+"cost": {
+"materials": 33,
+"water": 36,
+"meds": 8
+},
+"hours": 41.6,
+"requires": [
+"plumb_12"
+],
+"fx": {
+"water_mult": 0.18
+},
+"unlock": [],
+"desc": "Water +18%."
+},
+"plumb_14": {
+"cat": "plumbing",
+"tier": 14,
+"name": "Hot water",
+"cost": {
+"materials": 38,
+"water": 43,
+"meds": 8
+},
+"hours": 48.8,
+"requires": [
+"plumb_13",
+"elec_09"
+],
+"fx": {
+"water_mult": 0.19,
+"morale_add": 0.08
+},
+"unlock": [],
+"desc": "Water +19%. Morale +0.08/h."
+},
+"plumb_15": {
+"cat": "plumbing",
+"tier": 15,
+"name": "Isolation wards",
+"cost": {
+"materials": 45,
+"water": 51,
+"meds": 9
+},
+"hours": 57.4,
+"requires": [
+"plumb_14"
+],
+"fx": {
+"water_mult": 0.2,
+"cure_add": 0.08,
+"detect_add": 0.08
+},
+"unlock": [],
+"desc": "Water +20%. Infection cure +8%. Hidden-bite detection +8%."
+},
+"plumb_16": {
+"cat": "plumbing",
+"tier": 16,
+"name": "Pressure pumps",
+"cost": {
+"materials": 53,
+"water": 62,
+"meds": 10
+},
+"hours": 67.4,
+"requires": [
+"plumb_15"
+],
+"fx": {
+"water_mult": 0.21
+},
+"unlock": [],
+"desc": "Water +21%."
+},
+"plumb_17": {
+"cat": "plumbing",
+"tier": 17,
+"name": "Sterile surgery",
+"cost": {
+"materials": 62,
+"water": 74,
+"meds": 10
+},
+"hours": 79.2,
+"requires": [
+"plumb_16",
+"elec_11"
+],
+"fx": {
+"water_mult": 0.22,
+"heal_mult": 0.8,
+"cure_add": 0.08
+},
+"unlock": [],
+"desc": "Water +22%. Healing +80%. Infection cure +8%."
+},
+"plumb_18": {
+"cat": "plumbing",
+"tier": 18,
+"name": "Water treatment plant",
+"cost": {
+"materials": 72,
+"water": 89,
+"meds": 11
+},
+"hours": 93.1,
+"requires": [
+"plumb_17"
+],
+"fx": {
+"water_mult": 0.23,
+"water_flat": 6.0
+},
+"unlock": [],
+"desc": "Water +23%. +6 water/day per base."
+},
+"plumb_19": {
+"cat": "plumbing",
+"tier": 19,
+"name": "Closed-loop recycling",
+"cost": {
+"materials": 84,
+"water": 106,
+"meds": 11
+},
+"hours": 109.4,
+"requires": [
+"plumb_18"
+],
+"fx": {
+"water_mult": 0.24,
+"meds_flat": 1.0
+},
+"unlock": [],
+"desc": "Water +24%. +1 meds/day per base."
+},
+"plumb_20": {
+"cat": "plumbing",
+"tier": 20,
+"name": "Aqueduct",
+"cost": {
+"materials": 99,
+"water": 128,
+"meds": 12
+},
+"hours": 128.5,
+"requires": [
+"plumb_19"
+],
+"fx": {
+"water_mult": 0.25,
+"water_flat": 10.0,
+"morale_add": 0.1
+},
+"unlock": [],
+"desc": "Water +25%. +10 water/day per base. Morale +0.1/h."
+},
+"elec_01": {
+"cat": "electricity",
+"tier": 1,
+"name": "Car batteries",
+"cost": {
+"materials": 5,
+"fuel": 4
+},
+"hours": 6.0,
+"requires": [],
+"fx": {
+"research_speed": 0.04,
+"power": 1
+},
+"unlock": [],
+"desc": "Research +4% faster. +1 power."
+},
+"elec_02": {
+"cat": "electricity",
+"tier": 2,
+"name": "Hand-crank dynamos",
+"cost": {
+"materials": 6,
+"fuel": 5
+},
+"hours": 7.1,
+"requires": [
+"elec_01"
+],
+"fx": {
+"research_speed": 0.044,
+"power": 1
+},
+"unlock": [],
+"desc": "Research +4% faster. +1 power."
+},
+"elec_03": {
+"cat": "electricity",
+"tier": 3,
+"name": "Solar panels",
+"cost": {
+"materials": 7,
+"fuel": 6
+},
+"hours": 8.3,
+"requires": [
+"elec_02"
+],
+"fx": {
+"research_speed": 0.048,
+"power": 2
+},
+"unlock": [],
+"desc": "Research +5% faster. +2 power."
+},
+"elec_04": {
+"cat": "electricity",
+"tier": 4,
+"name": "Floodlights",
+"cost": {
+"materials": 8,
+"fuel": 7
+},
+"hours": 9.7,
+"requires": [
+"elec_03"
+],
+"fx": {
+"research_speed": 0.053,
+"power": 2,
+"night_def": 8
+},
+"unlock": [],
+"desc": "Research +5% faster. +2 power. +8 defense at night."
+},
+"elec_05": {
+"cat": "electricity",
+"tier": 5,
+"name": "Wind turbines",
+"cost": {
+"materials": 9,
+"fuel": 8
+},
+"hours": 11.4,
+"requires": [
+"elec_04"
+],
+"fx": {
+"research_speed": 0.057,
+"power": 2
+},
+"unlock": [],
+"desc": "Research +6% faster. +2 power."
+},
+"elec_06": {
+"cat": "electricity",
+"tier": 6,
+"name": "Wiring",
+"cost": {
+"materials": 11,
+"fuel": 10
+},
+"hours": 13.4,
+"requires": [
+"elec_05"
+],
+"fx": {
+"research_speed": 0.061,
+"power": 2
+},
+"unlock": [],
+"desc": "Research +6% faster. +2 power."
+},
+"elec_07": {
+"cat": "electricity",
+"tier": 7,
+"name": "Lab computers",
+"cost": {
+"materials": 13,
+"fuel": 12
+},
+"hours": 15.8,
+"requires": [
+"elec_06"
+],
+"fx": {
+"research_speed": 0.25,
+"power": 3
+},
+"unlock": [],
+"desc": "Research +25% faster. +3 power."
+},
+"elec_08": {
+"cat": "electricity",
+"tier": 8,
+"name": "Electric fences",
+"cost": {
+"materials": 20,
+"fuel": 14
+},
+"hours": 18.6,
+"requires": [
+"elec_07"
+],
+"fx": {
+"research_speed": 0.069,
+"power": 3,
+"defense_add": 10,
+"fence_hp": 0.1
+},
+"unlock": [],
+"desc": "Research +7% faster. +3 power. +10 defense at every base. Fences +10% HP."
+},
+"elec_09": {
+"cat": "electricity",
+"tier": 9,
+"name": "Battery banks",
+"cost": {
+"materials": 23,
+"fuel": 17
+},
+"hours": 21.8,
+"requires": [
+"elec_08"
+],
+"fx": {
+"research_speed": 0.074,
+"power": 3
+},
+"unlock": [],
+"desc": "Research +7% faster. +3 power."
+},
+"elec_10": {
+"cat": "electricity",
+"tier": 10,
+"name": "Diesel generators",
+"cost": {
+"materials": 27,
+"fuel": 21
+},
+"hours": 25.6,
+"requires": [
+"elec_09",
+"veh_03"
+],
+"fx": {
+"research_speed": 0.078,
+"power": 3,
+"heal_mult": 0.3
+},
+"unlock": [],
+"desc": "Research +8% faster. +3 power. Healing +30%."
+},
+"elec_11": {
+"cat": "electricity",
+"tier": 11,
+"name": "Radio relays",
+"cost": {
+"materials": 31,
+"fuel": 25
+},
+"hours": 30.1,
+"requires": [
+"elec_10"
+],
+"fx": {
+"research_speed": 0.082,
+"power": 4
+},
+"unlock": [],
+"desc": "Research +8% faster. +4 power."
+},
+"elec_12": {
+"cat": "electricity",
+"tier": 12,
+"name": "Microgrids",
+"cost": {
+"materials": 35,
+"fuel": 30
+},
+"hours": 35.4,
+"requires": [
+"elec_11"
+],
+"fx": {
+"research_speed": 0.086,
+"power": 4
+},
+"unlock": [],
+"desc": "Research +9% faster. +4 power."
+},
+"elec_13": {
+"cat": "electricity",
+"tier": 13,
+"name": "Motion sensors",
+"cost": {
+"materials": 41,
+"fuel": 36
+},
+"hours": 41.6,
+"requires": [
+"elec_12"
+],
+"fx": {
+"research_speed": 0.091,
+"power": 4,
+"tower_range": 1.0
+},
+"unlock": [],
+"desc": "Research +9% faster. +4 power. Towers +1 tiles range."
+},
+"elec_14": {
+"cat": "electricity",
+"tier": 14,
+"name": "Auto-turrets",
+"cost": {
+"materials": 46,
+"fuel": 43
+},
+"hours": 48.8,
+"requires": [
+"elec_13",
+"craft_12"
+],
+"fx": {
+"research_speed": 0.095,
+"power": 4
+},
+"unlock": [
+"tower_3"
+],
+"desc": "Unlocks Auto-turrets. Research +10% faster. +4 power."
+},
+"elec_15": {
+"cat": "electricity",
+"tier": 15,
+"name": "Power substation",
+"cost": {
+"materials": 54,
+"fuel": 51
+},
+"hours": 57.4,
+"requires": [
+"elec_14"
+],
+"fx": {
+"research_speed": 0.099,
+"power": 5
+},
+"unlock": [],
+"desc": "Research +10% faster. +5 power."
+},
+"elec_16": {
+"cat": "electricity",
+"tier": 16,
+"name": "Searchlight grid",
+"cost": {
+"materials": 63,
+"fuel": 62
+},
+"hours": 67.4,
+"requires": [
+"elec_15"
+],
+"fx": {
+"research_speed": 0.103,
+"power": 5,
+"night_def": 15,
+"tower_dmg": 0.05
+},
+"unlock": [],
+"desc": "Research +10% faster. +5 power. +15 defense at night. Towers hit +5%."
+},
+"elec_17": {
+"cat": "electricity",
+"tier": 17,
+"name": "Electronics fab",
+"cost": {
+"materials": 72,
+"fuel": 74
+},
+"hours": 79.2,
+"requires": [
+"elec_16",
+"craft_14"
+],
+"fx": {
+"research_speed": 0.107,
+"power": 5
+},
+"unlock": [],
+"desc": "Research +11% faster. +5 power."
+},
+"elec_18": {
+"cat": "electricity",
+"tier": 18,
+"name": "Smart grid",
+"cost": {
+"materials": 83,
+"fuel": 89
+},
+"hours": 93.1,
+"requires": [
+"elec_17"
+],
+"fx": {
+"research_speed": 0.112,
+"power": 5,
+"water_mult": 0.2
+},
+"unlock": [],
+"desc": "Research +11% faster. +5 power. Water +20%."
+},
+"elec_19": {
+"cat": "electricity",
+"tier": 19,
+"name": "Avionics",
+"cost": {
+"materials": 95,
+"fuel": 106
+},
+"hours": 109.4,
+"requires": [
+"elec_18",
+"craft_15"
+],
+"fx": {
+"research_speed": 0.116,
+"power": 6
+},
+"unlock": [],
+"desc": "Research +12% faster. +6 power."
+},
+"elec_20": {
+"cat": "electricity",
+"tier": 20,
+"name": "Fusion of everything",
+"cost": {
+"materials": 111,
+"fuel": 128
+},
+"hours": 128.5,
+"requires": [
+"elec_19"
+],
+"fx": {
+"research_speed": 0.3,
+"power": 6,
+"tower_range": 1.5
+},
+"unlock": [],
+"desc": "Research +30% faster. +6 power. Towers +1.5 tiles range."
+},
+"dipl_01": {
+"cat": "diplomacy",
+"tier": 1,
+"name": "Radio etiquette",
+"cost": {
+"materials": 5,
+"food": 4
+},
+"hours": 6.0,
+"requires": [],
+"fx": {
+"rel_gain": 0.05,
+"trade_rate": 0.02
+},
+"unlock": [],
+"desc": "Relations improve 5% faster. Trades +2% better."
+},
+"dipl_02": {
+"cat": "diplomacy",
+"tier": 2,
+"name": "Barter rules",
+"cost": {
+"materials": 6,
+"food": 5
+},
+"hours": 7.1,
+"requires": [
+"dipl_01"
+],
+"fx": {
+"rel_gain": 0.058,
+"trade_rate": 0.022
+},
+"unlock": [],
+"desc": "Relations improve 6% faster. Trades +2% better."
+},
+"dipl_03": {
+"cat": "diplomacy",
+"tier": 3,
+"name": "Emissaries",
+"cost": {
+"materials": 7,
+"food": 6
+},
+"hours": 8.3,
+"requires": [
+"dipl_02"
+],
+"fx": {
+"rel_gain": 0.066,
+"trade_rate": 0.024,
+"group_rate": 0.1
+},
+"unlock": [],
+"desc": "Relations improve 7% faster. Trades +2% better. SOS calls & strangers +10%."
+},
+"dipl_04": {
+"cat": "diplomacy",
+"tier": 4,
+"name": "Fair weights",
+"cost": {
+"materials": 8,
+"food": 7
+},
+"hours": 9.7,
+"requires": [
+"dipl_03"
+],
+"fx": {
+"rel_gain": 0.074,
+"trade_rate": 0.026
+},
+"unlock": [],
+"desc": "Relations improve 7% faster. Trades +3% better."
+},
+"dipl_05": {
+"cat": "diplomacy",
+"tier": 5,
+"name": "Peace talks",
+"cost": {
+"materials": 9,
+"food": 8
+},
+"hours": 11.4,
+"requires": [
+"dipl_04"
+],
+"fx": {
+"rel_gain": 0.082,
+"trade_rate": 0.028,
+"raid_deter": 10
+},
+"unlock": [
+"parley"
+],
+"desc": "Unlocks Peace talks with Hostile camps. Relations improve 8% faster. Trades +3% better. +10 defense against raiders."
+},
+"dipl_06": {
+"cat": "diplomacy",
+"tier": 6,
+"name": "Survivor census",
+"cost": {
+"materials": 11,
+"food": 10
+},
+"hours": 13.4,
+"requires": [
+"dipl_05"
+],
+"fx": {
+"rel_gain": 0.089,
+"trade_rate": 0.031,
+"group_rate": 0.15
+},
+"unlock": [],
+"desc": "Relations improve 9% faster. Trades +3% better. SOS calls & strangers +15%."
+},
+"dipl_07": {
+"cat": "diplomacy",
+"tier": 7,
+"name": "Trade caravans",
+"cost": {
+"materials": 13,
+"food": 12
+},
+"hours": 15.8,
+"requires": [
+"dipl_06"
+],
+"fx": {
+"rel_gain": 0.097,
+"trade_rate": 0.033
+},
+"unlock": [],
+"desc": "Relations improve 10% faster. Trades +3% better."
+},
+"dipl_08": {
+"cat": "diplomacy",
+"tier": 8,
+"name": "Aid convoys",
+"cost": {
+"materials": 15,
+"food": 14
+},
+"hours": 18.6,
+"requires": [
+"dipl_07"
+],
+"fx": {
+"rel_gain": 0.105,
+"trade_rate": 0.035,
+"camp_aid": 1.0
+},
+"unlock": [],
+"desc": "Relations improve 10% faster. Trades +4% better. Friendly camps send 1 supplies a day."
+},
+"dipl_09": {
+"cat": "diplomacy",
+"tier": 9,
+"name": "Gift customs",
+"cost": {
+"materials": 18,
+"food": 17
+},
+"hours": 21.8,
+"requires": [
+"dipl_08"
+],
+"fx": {
+"rel_gain": 0.113,
+"trade_rate": 0.037,
+"gift_bonus": 0.15
+},
+"unlock": [],
+"desc": "Relations improve 11% faster. Trades +4% better. Gifts between colonies arrive +15% (multiplayer)."
+},
+"dipl_10": {
+"cat": "diplomacy",
+"tier": 10,
+"name": "Mutual defense",
+"cost": {
+"materials": 21,
+"food": 21
+},
+"hours": 25.6,
+"requires": [
+"dipl_09"
+],
+"fx": {
+"rel_gain": 0.121,
+"trade_rate": 0.039,
+"raid_deter": 15
+},
+"unlock": [
+"pact"
+],
+"desc": "Unlocks Pacts with friendly camps (they fight hordes with you). Relations improve 12% faster. Trades +4% better. +15 defense against raiders."
+},
+"dipl_11": {
+"cat": "diplomacy",
+"tier": 11,
+"name": "Refugee programs",
+"cost": {
+"materials": 24,
+"food": 25
+},
+"hours": 30.1,
+"requires": [
+"dipl_10"
+],
+"fx": {
+"rel_gain": 0.129,
+"trade_rate": 0.041,
+"recruit_n": 1
+},
+"unlock": [],
+"desc": "Relations improve 13% faster. Trades +4% better. +1 recruit per recruit deal."
+},
+"dipl_12": {
+"cat": "diplomacy",
+"tier": 12,
+"name": "Trade federation",
+"cost": {
+"materials": 28,
+"food": 30
+},
+"hours": 35.4,
+"requires": [
+"dipl_11"
+],
+"fx": {
+"rel_gain": 0.137,
+"trade_rate": 0.043
+},
+"unlock": [],
+"desc": "Relations improve 14% faster. Trades +4% better."
+},
+"dipl_13": {
+"cat": "diplomacy",
+"tier": 13,
+"name": "Shared watch",
+"cost": {
+"materials": 33,
+"food": 36
+},
+"hours": 41.6,
+"requires": [
+"dipl_12"
+],
+"fx": {
+"rel_gain": 0.145,
+"trade_rate": 0.045,
+"ally_def": 0.1
+},
+"unlock": [],
+"desc": "Relations improve 14% faster. Trades +4% better. +10% of the strongest friendly colony's defense (multiplayer)."
+},
+"dipl_14": {
+"cat": "diplomacy",
+"tier": 14,
+"name": "Exchange of people",
+"cost": {
+"materials": 38,
+"food": 43
+},
+"hours": 48.8,
+"requires": [
+"dipl_13"
+],
+"fx": {
+"rel_gain": 0.153,
+"trade_rate": 0.047
+},
+"unlock": [
+"gift_person"
+],
+"desc": "Unlocks Send survivors to another colony (multiplayer). Relations improve 15% faster. Trades +5% better."
+},
+"dipl_15": {
+"cat": "diplomacy",
+"tier": 15,
+"name": "Treaty council",
+"cost": {
+"materials": 45,
+"food": 51
+},
+"hours": 57.4,
+"requires": [
+"dipl_14"
+],
+"fx": {
+"rel_gain": 0.161,
+"trade_rate": 0.049,
+"gift_bonus": 0.2
+},
+"unlock": [],
+"desc": "Relations improve 16% faster. Trades +5% better. Gifts between colonies arrive +20% (multiplayer)."
+},
+"dipl_16": {
+"cat": "diplomacy",
+"tier": 16,
+"name": "Recruitment drives",
+"cost": {
+"materials": 53,
+"food": 62
+},
+"hours": 67.4,
+"requires": [
+"dipl_15"
+],
+"fx": {
+"rel_gain": 0.168,
+"trade_rate": 0.052,
+"recruit_n": 1
+},
+"unlock": [],
+"desc": "Relations improve 17% faster. Trades +5% better. +1 recruit per recruit deal."
+},
+"dipl_17": {
+"cat": "diplomacy",
+"tier": 17,
+"name": "Regional market",
+"cost": {
+"materials": 62,
+"food": 74
+},
+"hours": 79.2,
+"requires": [
+"dipl_16"
+],
+"fx": {
+"rel_gain": 0.176,
+"trade_rate": 0.054,
+"camp_aid": 2.0
+},
+"unlock": [],
+"desc": "Relations improve 18% faster. Trades +5% better. Friendly camps send 2 supplies a day."
+},
+"dipl_18": {
+"cat": "diplomacy",
+"tier": 18,
+"name": "Grand alliance",
+"cost": {
+"materials": 72,
+"food": 89
+},
+"hours": 93.1,
+"requires": [
+"dipl_17"
+],
+"fx": {
+"rel_gain": 0.184,
+"trade_rate": 0.056,
+"ally_def": 0.15,
+"raid_deter": 20
+},
+"unlock": [],
+"desc": "Relations improve 18% faster. Trades +6% better. +15% of the strongest friendly colony's defense (multiplayer). +20 defense against raiders."
+},
+"dipl_19": {
+"cat": "diplomacy",
+"tier": 19,
+"name": "Common law",
+"cost": {
+"materials": 84,
+"food": 106
+},
+"hours": 109.4,
+"requires": [
+"dipl_18"
+],
+"fx": {
+"rel_gain": 0.192,
+"trade_rate": 0.058,
+"morale_add": 0.1
+},
+"unlock": [],
+"desc": "Relations improve 19% faster. Trades +6% better. Morale +0.1/h."
+},
+"dipl_20": {
+"cat": "diplomacy",
+"tier": 20,
+"name": "United survivors",
+"cost": {
+"materials": 99,
+"food": 128
+},
+"hours": 128.5,
+"requires": [
+"dipl_19"
+],
+"fx": {
+"rel_gain": 0.2,
+"trade_rate": 0.06,
+"camp_aid": 3.0,
+"gift_bonus": 0.25
+},
+"unlock": [],
+"desc": "Relations improve 20% faster. Trades +6% better. Friendly camps send 3 supplies a day. Gifts between colonies arrive +25% (multiplayer)."
+},
+"veh_01": {
+"cat": "vehicles",
+"tier": 1,
+"name": "Siphoning",
+"cost": {
+"materials": 5,
+"fuel": 4
+},
+"hours": 6.0,
+"requires": [],
+"fx": {
+"veh_loot": 0.05,
+"veh_speed": 0.03
+},
+"unlock": [],
+"desc": "Vehicle hauls +5%. Vehicles +3% faster."
+},
+"veh_02": {
+"cat": "vehicles",
+"tier": 2,
+"name": "Tire patching",
+"cost": {
+"materials": 6,
+"fuel": 5
+},
+"hours": 7.1,
+"requires": [
+"veh_01"
+],
+"fx": {
+"veh_loot": 0.057,
+"veh_speed": 0.034
+},
+"unlock": [],
+"desc": "Vehicle hauls +6%. Vehicles +3% faster."
+},
+"veh_03": {
+"cat": "vehicles",
+"tier": 3,
+"name": "Engine swaps",
+"cost": {
+"materials": 7,
+"fuel": 6
+},
+"hours": 8.3,
+"requires": [
+"veh_02"
+],
+"fx": {
+"veh_loot": 0.064,
+"veh_speed": 0.037,
+"scav_range": 6
+},
+"unlock": [],
+"desc": "Vehicle hauls +6%. Vehicles +4% faster. Auto-scavenge radius +6 tiles."
+},
+"veh_04": {
+"cat": "vehicles",
+"tier": 4,
+"name": "Cargo racks",
+"cost": {
+"materials": 8,
+"fuel": 7
+},
+"hours": 9.7,
+"requires": [
+"veh_03"
+],
+"fx": {
+"veh_loot": 0.071,
+"veh_speed": 0.041
+},
+"unlock": [],
+"desc": "Vehicle hauls +7%. Vehicles +4% faster."
+},
+"veh_05": {
+"cat": "vehicles",
+"tier": 5,
+"name": "Armored doors",
+"cost": {
+"materials": 9,
+"fuel": 8
+},
+"hours": 11.4,
+"requires": [
+"veh_04"
+],
+"fx": {
+"veh_loot": 0.077,
+"veh_speed": 0.045,
+"veh_safe": 0.15
+},
+"unlock": [],
+"desc": "Vehicle hauls +8%. Vehicles +4% faster. Vehicles avoid 15% more fights."
+},
+"veh_06": {
+"cat": "vehicles",
+"tier": 6,
+"name": "Ram plates",
+"cost": {
+"materials": 11,
+"fuel": 10
+},
+"hours": 13.4,
+"requires": [
+"veh_05",
+"craft_05"
+],
+"fx": {
+"veh_loot": 0.084,
+"veh_speed": 0.048,
+"veh_safe": 0.1
+},
+"unlock": [],
+"desc": "Vehicle hauls +8%. Vehicles +5% faster. Vehicles avoid 10% more fights."
+},
+"veh_07": {
+"cat": "vehicles",
+"tier": 7,
+"name": "Scout bikes",
+"cost": {
+"materials": 13,
+"fuel": 12
+},
+"hours": 15.8,
+"requires": [
+"veh_06"
+],
+"fx": {
+"veh_loot": 0.091,
+"veh_speed": 0.052
+},
+"unlock": [],
+"desc": "Vehicle hauls +9%. Vehicles +5% faster."
+},
+"veh_08": {
+"cat": "vehicles",
+"tier": 8,
+"name": "Fuel distilling",
+"cost": {
+"materials": 15,
+"fuel": 14
+},
+"hours": 18.6,
+"requires": [
+"veh_07"
+],
+"fx": {
+"veh_loot": 0.098,
+"veh_speed": 0.056,
+"mats_flat": 1.0
+},
+"unlock": [],
+"desc": "Vehicle hauls +10%. Vehicles +6% faster. +1 materials/day per base."
+},
+"veh_09": {
+"cat": "vehicles",
+"tier": 9,
+"name": "Convoy tactics",
+"cost": {
+"materials": 18,
+"fuel": 17
+},
+"hours": 21.8,
+"requires": [
+"veh_08"
+],
+"fx": {
+"veh_loot": 0.105,
+"veh_speed": 0.059,
+"squad_power": 0.1
+},
+"unlock": [],
+"desc": "Vehicle hauls +10%. Vehicles +6% faster. Squads fight +10% better."
+},
+"veh_10": {
+"cat": "vehicles",
+"tier": 10,
+"name": "Truck squads",
+"cost": {
+"materials": 21,
+"fuel": 21
+},
+"hours": 25.6,
+"requires": [
+"veh_09"
+],
+"fx": {
+"veh_loot": 0.112,
+"veh_speed": 0.063
+},
+"unlock": [
+"squad_veh"
+],
+"desc": "Unlocks Squads drive (faster, safer). Vehicle hauls +11%. Vehicles +6% faster."
+},
+"veh_11": {
+"cat": "vehicles",
+"tier": 11,
+"name": "Off-road suspension",
+"cost": {
+"materials": 24,
+"fuel": 25
+},
+"hours": 30.1,
+"requires": [
+"veh_10"
+],
+"fx": {
+"veh_loot": 0.118,
+"veh_speed": 0.067
+},
+"unlock": [],
+"desc": "Vehicle hauls +12%. Vehicles +7% faster."
+},
+"veh_12": {
+"cat": "vehicles",
+"tier": 12,
+"name": "Mechanic school",
+"cost": {
+"materials": 28,
+"fuel": 30
+},
+"hours": 35.4,
+"requires": [
+"veh_11"
+],
+"fx": {
+"veh_loot": 0.125,
+"veh_speed": 0.071,
+"repair_mult": 0.2
+},
+"unlock": [],
+"desc": "Vehicle hauls +12%. Vehicles +7% faster. Repairs 20% cheaper and faster."
+},
+"veh_13": {
+"cat": "vehicles",
+"tier": 13,
+"name": "Armored personnel carrier",
+"cost": {
+"materials": 33,
+"fuel": 36
+},
+"hours": 41.6,
+"requires": [
+"veh_12",
+"craft_13"
+],
+"fx": {
+"veh_loot": 0.132,
+"veh_speed": 0.074,
+"squad_safe": 0.15
+},
+"unlock": [],
+"desc": "Vehicle hauls +13%. Vehicles +7% faster. Squad casualties -15%."
+},
+"veh_14": {
+"cat": "vehicles",
+"tier": 14,
+"name": "Diesel refits",
+"cost": {
+"materials": 38,
+"fuel": 43
+},
+"hours": 48.8,
+"requires": [
+"veh_13"
+],
+"fx": {
+"veh_loot": 0.139,
+"veh_speed": 0.078
+},
+"unlock": [],
+"desc": "Vehicle hauls +14%. Vehicles +8% faster."
+},
+"veh_15": {
+"cat": "vehicles",
+"tier": 15,
+"name": "Supply runs",
+"cost": {
+"materials": 45,
+"fuel": 51
+},
+"hours": 57.4,
+"requires": [
+"veh_14"
+],
+"fx": {
+"veh_loot": 0.146,
+"veh_speed": 0.082,
+"scav_range": 10
+},
+"unlock": [],
+"desc": "Vehicle hauls +15%. Vehicles +8% faster. Auto-scavenge radius +10 tiles."
+},
+"veh_16": {
+"cat": "vehicles",
+"tier": 16,
+"name": "Road graders",
+"cost": {
+"materials": 53,
+"fuel": 62
+},
+"hours": 67.4,
+"requires": [
+"veh_15"
+],
+"fx": {
+"veh_loot": 0.153,
+"veh_speed": 0.085,
+"clear_hold": 24
+},
+"unlock": [],
+"desc": "Vehicle hauls +15%. Vehicles +8% faster. Cleared areas stay clear +24h."
+},
+"veh_17": {
+"cat": "vehicles",
+"tier": 17,
+"name": "Heavy haulers",
+"cost": {
+"materials": 62,
+"fuel": 74
+},
+"hours": 79.2,
+"requires": [
+"veh_16",
+"elec_10"
+],
+"fx": {
+"veh_loot": 0.159,
+"veh_speed": 0.089
+},
+"unlock": [],
+"desc": "Vehicle hauls +16%. Vehicles +9% faster."
+},
+"veh_18": {
+"cat": "vehicles",
+"tier": 18,
+"name": "Battle buses",
+"cost": {
+"materials": 72,
+"fuel": 89
+},
+"hours": 93.1,
+"requires": [
+"veh_17"
+],
+"fx": {
+"veh_loot": 0.166,
+"veh_speed": 0.093,
+"squad_power": 0.15,
+"squad_safe": 0.1
+},
+"unlock": [],
+"desc": "Vehicle hauls +17%. Vehicles +9% faster. Squads fight +15% better. Squad casualties -10%."
+},
+"veh_19": {
+"cat": "vehicles",
+"tier": 19,
+"name": "Mobile workshops",
+"cost": {
+"materials": 84,
+"fuel": 106
+},
+"hours": 109.4,
+"requires": [
+"veh_18"
+],
+"fx": {
+"veh_loot": 0.173,
+"veh_speed": 0.096,
+"mats_flat": 2.0
+},
+"unlock": [],
+"desc": "Vehicle hauls +17%. Vehicles +10% faster. +2 materials/day per base."
+},
+"veh_20": {
+"cat": "vehicles",
+"tier": 20,
+"name": "Motor pool",
+"cost": {
+"materials": 99,
+"fuel": 128
+},
+"hours": 128.5,
+"requires": [
+"veh_19"
+],
+"fx": {
+"veh_loot": 0.18,
+"veh_speed": 0.1,
+"clear_hold": 48,
+"veh_safe": 0.15
+},
+"unlock": [],
+"desc": "Vehicle hauls +18%. Vehicles +10% faster. Cleared areas stay clear +48h. Vehicles avoid 15% more fights."
+},
+"avi_01": {
+"cat": "aviation",
+"tier": 1,
+"name": "Kite balloons",
+"cost": {
+"materials": 60,
+"fuel": 30,
+"ammo": 5
+},
+"hours": 48.0,
+"requires": [
+"elec_08",
+"veh_10",
+"craft_10"
+],
+"fx": {
+"recon": 0.02
+},
+"unlock": [],
+"desc": "Squads & scavengers 2% safer."
+},
+"avi_02": {
+"cat": "aviation",
+"tier": 2,
+"name": "Model aircraft",
+"cost": {
+"materials": 70,
+"fuel": 35,
+"ammo": 6
+},
+"hours": 54.2,
+"requires": [
+"avi_01"
+],
+"fx": {
+"recon": 0.022
+},
+"unlock": [],
+"desc": "Squads & scavengers 2% safer."
+},
+"avi_03": {
+"cat": "aviation",
+"tier": 3,
+"name": "Scouting drone",
+"cost": {
+"materials": 81,
+"fuel": 41,
+"ammo": 7
+},
+"hours": 61.3,
+"requires": [
+"avi_02"
+],
+"fx": {
+"recon": 0.024
+},
+"unlock": [
+"drone"
+],
+"desc": "Unlocks Scouting drone (finds survivors, reveals danger). Squads & scavengers 2% safer."
+},
+"avi_04": {
+"cat": "aviation",
+"tier": 4,
+"name": "Drone swarms",
+"cost": {
+"materials": 94,
+"fuel": 48,
+"ammo": 8
+},
+"hours": 69.3,
+"requires": [
+"avi_03"
+],
+"fx": {
+"recon": 0.026
+},
+"unlock": [],
+"desc": "Squads & scavengers 3% safer."
+},
+"avi_05": {
+"cat": "aviation",
+"tier": 5,
+"name": "Ultralight gliders",
+"cost": {
+"materials": 109,
+"fuel": 56,
+"ammo": 9
+},
+"hours": 78.3,
+"requires": [
+"avi_04",
+"elec_12"
+],
+"fx": {
+"recon": 0.028
+},
+"unlock": [],
+"desc": "Squads & scavengers 3% safer."
+},
+"avi_06": {
+"cat": "aviation",
+"tier": 6,
+"name": "Airstrip",
+"cost": {
+"materials": 126,
+"fuel": 66,
+"ammo": 10
+},
+"hours": 88.4,
+"requires": [
+"avi_05",
+"veh_14",
+"house_10"
+],
+"fx": {
+"recon": 0.031
+},
+"unlock": [],
+"desc": "Squads & scavengers 3% safer."
+},
+"avi_07": {
+"cat": "aviation",
+"tier": 7,
+"name": "Rotor workshop",
+"cost": {
+"materials": 146,
+"fuel": 77,
+"ammo": 12
+},
+"hours": 99.9,
+"requires": [
+"avi_06"
+],
+"fx": {
+"recon": 0.033
+},
+"unlock": [],
+"desc": "Squads & scavengers 3% safer."
+},
+"avi_08": {
+"cat": "aviation",
+"tier": 8,
+"name": "Air recon",
+"cost": {
+"materials": 170,
+"fuel": 90,
+"ammo": 13
+},
+"hours": 112.9,
+"requires": [
+"avi_07"
+],
+"fx": {
+"recon": 0.035,
+"tower_range": 2.0,
+"squad_safe": 0.1
+},
+"unlock": [],
+"desc": "Squads & scavengers 4% safer. Towers +2 tiles range. Squad casualties -10%."
+},
+"avi_09": {
+"cat": "aviation",
+"tier": 9,
+"name": "Parachute packing",
+"cost": {
+"materials": 197,
+"fuel": 105,
+"ammo": 15
+},
+"hours": 127.6,
+"requires": [
+"avi_08"
+],
+"fx": {
+"recon": 0.037
+},
+"unlock": [],
+"desc": "Squads & scavengers 4% safer."
+},
+"avi_10": {
+"cat": "aviation",
+"tier": 10,
+"name": "Supply drops",
+"cost": {
+"materials": 228,
+"fuel": 123,
+"ammo": 18
+},
+"hours": 144.2,
+"requires": [
+"avi_09",
+"elec_15"
+],
+"fx": {
+"recon": 0.039,
+"supply_drop": 4.0
+},
+"unlock": [],
+"desc": "Squads & scavengers 4% safer. Air drop: +4 of each supply per day."
+},
+"avi_11": {
+"cat": "aviation",
+"tier": 11,
+"name": "Turbine overhaul",
+"cost": {
+"materials": 265,
+"fuel": 144,
+"ammo": 20
+},
+"hours": 162.9,
+"requires": [
+"avi_10"
+],
+"fx": {
+"recon": 0.041
+},
+"unlock": [],
+"desc": "Squads & scavengers 4% safer."
+},
+"avi_12": {
+"cat": "aviation",
+"tier": 12,
+"name": "Helipad",
+"cost": {
+"materials": 307,
+"fuel": 169,
+"ammo": 23
+},
+"hours": 184.1,
+"requires": [
+"avi_11",
+"craft_16"
+],
+"fx": {
+"recon": 0.043
+},
+"unlock": [],
+"desc": "Squads & scavengers 4% safer."
+},
+"avi_13": {
+"cat": "aviation",
+"tier": 13,
+"name": "Helicopter rescue",
+"cost": {
+"materials": 356,
+"fuel": 197,
+"ammo": 27
+},
+"hours": 208.1,
+"requires": [
+"avi_12"
+],
+"fx": {
+"recon": 0.045
+},
+"unlock": [
+"heli"
+],
+"desc": "Unlocks Helicopter rescue (instant pick-up). Squads & scavengers 4% safer."
+},
+"avi_14": {
+"cat": "aviation",
+"tier": 14,
+"name": "Night flying",
+"cost": {
+"materials": 413,
+"fuel": 231,
+"ammo": 31
+},
+"hours": 235.1,
+"requires": [
+"avi_13",
+"elec_17"
+],
+"fx": {
+"recon": 0.047,
+"clear_hold": 24
+},
+"unlock": [],
+"desc": "Squads & scavengers 5% safer. Cleared areas stay clear +24h."
+},
+"avi_15": {
+"cat": "aviation",
+"tier": 15,
+"name": "Cargo helicopter",
+"cost": {
+"materials": 479,
+"fuel": 270,
+"ammo": 35
+},
+"hours": 265.7,
+"requires": [
+"avi_14"
+],
+"fx": {
+"recon": 0.049
+},
+"unlock": [],
+"desc": "Squads & scavengers 5% safer."
+},
+"avi_16": {
+"cat": "aviation",
+"tier": 16,
+"name": "Heavy-lift drops",
+"cost": {
+"materials": 556,
+"fuel": 316,
+"ammo": 41
+},
+"hours": 300.2,
+"requires": [
+"avi_15",
+"veh_18"
+],
+"fx": {
+"recon": 0.052,
+"supply_drop": 6.0
+},
+"unlock": [],
+"desc": "Squads & scavengers 5% safer. Air drop: +6 of each supply per day."
+},
+"avi_17": {
+"cat": "aviation",
+"tier": 17,
+"name": "Door gunners",
+"cost": {
+"materials": 645,
+"fuel": 370,
+"ammo": 47
+},
+"hours": 339.2,
+"requires": [
+"avi_16"
+],
+"fx": {
+"recon": 0.054,
+"squad_safe": 0.12
+},
+"unlock": [],
+"desc": "Squads & scavengers 5% safer. Squad casualties -12%."
+},
+"avi_18": {
+"cat": "aviation",
+"tier": 18,
+"name": "Gunship",
+"cost": {
+"materials": 748,
+"fuel": 433,
+"ammo": 54
+},
+"hours": 383.3,
+"requires": [
+"avi_17",
+"craft_19",
+"elec_19"
+],
+"fx": {
+"recon": 0.056
+},
+"unlock": [
+"air_strike"
+],
+"desc": "Unlocks Gunship strike (clears an area). Squads & scavengers 6% safer."
+},
+"avi_19": {
+"cat": "aviation",
+"tier": 19,
+"name": "Air traffic control",
+"cost": {
+"materials": 868,
+"fuel": 506,
+"ammo": 62
+},
+"hours": 433.2,
+"requires": [
+"avi_18"
+],
+"fx": {
+"recon": 0.058,
+"group_rate": 0.2
+},
+"unlock": [],
+"desc": "Squads & scavengers 6% safer. SOS calls & strangers +20%."
+},
+"avi_20": {
+"cat": "aviation",
+"tier": 20,
+"name": "Air bridge",
+"cost": {
+"materials": 1007,
+"fuel": 592,
+"ammo": 71
+},
+"hours": 489.5,
+"requires": [
+"avi_19"
+],
+"fx": {
+"recon": 0.06,
+"supply_drop": 10.0,
+"morale_add": 0.1
+},
+"unlock": [],
+"desc": "Squads & scavengers 6% safer. Air drop: +10 of each supply per day. Morale +0.1/h."
+},
+"scout_01": {
+"cat": "scouting",
+"tier": 1,
+"name": "Scouting parties",
+"cost": {
+"materials": 5,
+"food": 4
+},
+"hours": 6.0,
+"requires": [],
+"fx": {
+"search_speed": 0.04
+},
+"unlock": [
+"squad_scav"
+],
+"desc": "Unlocks Squad scavenging & scouting runs beyond the auto radius. Searching buildings 4% faster."
+},
+"scout_02": {
+"cat": "scouting",
+"tier": 2,
+"name": "Street maps",
+"cost": {
+"materials": 6,
+"food": 5
+},
+"hours": 7.1,
+"requires": [
+"scout_01"
+],
+"fx": {
+"search_speed": 0.043,
+"auto_r": 4
+},
+"unlock": [],
+"desc": "Searching buildings 4% faster. Auto-scavenge radius +4 tiles."
+},
+"scout_03": {
+"cat": "scouting",
+"tier": 3,
+"name": "Buddy system",
+"cost": {
+"materials": 7,
+"food": 6
+},
+"hours": 8.3,
+"requires": [
+"scout_02"
+],
+"fx": {
+"search_speed": 0.046,
+"squad_size": 1
+},
+"unlock": [],
+"desc": "Searching buildings 5% faster. +1 squad member (bigger squads)."
+},
+"scout_04": {
+"cat": "scouting",
+"tier": 4,
+"name": "Long walks",
+"cost": {
+"materials": 8,
+"food": 7
+},
+"hours": 9.7,
+"requires": [
+"scout_03"
+],
+"fx": {
+"search_speed": 0.049,
+"squad_range": 15
+},
+"unlock": [],
+"desc": "Searching buildings 5% faster. Squads reach +15 tiles further."
+},
+"scout_05": {
+"cat": "scouting",
+"tier": 5,
+"name": "Hidden-room checks",
+"cost": {
+"materials": 9,
+"food": 8
+},
+"hours": 11.4,
+"requires": [
+"scout_04",
+"veh_03"
+],
+"fx": {
+"search_speed": 0.053,
+"find_people": 0.5
+},
+"unlock": [],
+"desc": "Searching buildings 5% faster. 50% more likely to find people hiding in buildings."
+},
+"scout_06": {
+"cat": "scouting",
+"tier": 6,
+"name": "Supply caches",
+"cost": {
+"materials": 11,
+"food": 10
+},
+"hours": 13.4,
+"requires": [
+"scout_05"
+],
+"fx": {
+"search_speed": 0.056,
+"auto_r": 4
+},
+"unlock": [],
+"desc": "Searching buildings 6% faster. Auto-scavenge radius +4 tiles."
+},
+"scout_07": {
+"cat": "scouting",
+"tier": 7,
+"name": "Fireteams",
+"cost": {
+"materials": 13,
+"food": 12
+},
+"hours": 15.8,
+"requires": [
+"scout_06"
+],
+"fx": {
+"search_speed": 0.059,
+"squad_size": 1
+},
+"unlock": [],
+"desc": "Searching buildings 6% faster. +1 squad member (bigger squads)."
+},
+"scout_08": {
+"cat": "scouting",
+"tier": 8,
+"name": "Radio check-ins",
+"cost": {
+"materials": 15,
+"food": 14
+},
+"hours": 18.6,
+"requires": [
+"scout_07"
+],
+"fx": {
+"search_speed": 0.062,
+"search_r": 2,
+"squad_range": 15
+},
+"unlock": [],
+"desc": "Searching buildings 6% faster. Squads search +2 tiles wider. Squads reach +15 tiles further."
+},
+"scout_09": {
+"cat": "scouting",
+"tier": 9,
+"name": "Quiet entry",
+"cost": {
+"materials": 18,
+"food": 17
+},
+"hours": 21.8,
+"requires": [
+"scout_08"
+],
+"fx": {
+"search_speed": 0.065,
+"recon": 0.03
+},
+"unlock": [],
+"desc": "Searching buildings 6% faster. Squads & scavengers 3% safer."
+},
+"scout_10": {
+"cat": "scouting",
+"tier": 10,
+"name": "Patrol routes",
+"cost": {
+"materials": 21,
+"food": 21
+},
+"hours": 25.6,
+"requires": [
+"scout_09",
+"craft_08"
+],
+"fx": {
+"search_speed": 0.068,
+"auto_r": 6
+},
+"unlock": [],
+"desc": "Searching buildings 7% faster. Auto-scavenge radius +6 tiles."
+},
+"scout_11": {
+"cat": "scouting",
+"tier": 11,
+"name": "Forced marches",
+"cost": {
+"materials": 24,
+"food": 25
+},
+"hours": 30.1,
+"requires": [
+"scout_10"
+],
+"fx": {
+"search_speed": 0.072,
+"squad_range": 20
+},
+"unlock": [],
+"desc": "Searching buildings 7% faster. Squads reach +20 tiles further."
+},
+"scout_12": {
+"cat": "scouting",
+"tier": 12,
+"name": "Squad leaders",
+"cost": {
+"materials": 28,
+"food": 30
+},
+"hours": 35.4,
+"requires": [
+"scout_11",
+"house_06"
+],
+"fx": {
+"search_speed": 0.075,
+"squad_size": 1
+},
+"unlock": [],
+"desc": "Searching buildings 8% faster. +1 squad member (bigger squads)."
+},
+"scout_13": {
+"cat": "scouting",
+"tier": 13,
+"name": "Systematic sweeps",
+"cost": {
+"materials": 33,
+"food": 36
+},
+"hours": 41.6,
+"requires": [
+"scout_12"
+],
+"fx": {
+"search_speed": 0.078,
+"search_n": 2
+},
+"unlock": [],
+"desc": "Searching buildings 8% faster. Squads search +2 more buildings per run."
+},
+"scout_14": {
+"cat": "scouting",
+"tier": 14,
+"name": "Search & rescue",
+"cost": {
+"materials": 38,
+"food": 43
+},
+"hours": 48.8,
+"requires": [
+"scout_13"
+],
+"fx": {
+"search_speed": 0.081,
+"find_people": 0.5,
+"auto_r": 4
+},
+"unlock": [],
+"desc": "Searching buildings 8% faster. 50% more likely to find people hiding in buildings. Auto-scavenge radius +4 tiles."
+},
+"scout_15": {
+"cat": "scouting",
+"tier": 15,
+"name": "Forward caches",
+"cost": {
+"materials": 45,
+"food": 51
+},
+"hours": 57.4,
+"requires": [
+"scout_14",
+"elec_10"
+],
+"fx": {
+"search_speed": 0.084,
+"squad_range": 20
+},
+"unlock": [],
+"desc": "Searching buildings 8% faster. Squads reach +20 tiles further."
+},
+"scout_16": {
+"cat": "scouting",
+"tier": 16,
+"name": "Room clearing",
+"cost": {
+"materials": 53,
+"food": 62
+},
+"hours": 67.4,
+"requires": [
+"scout_15"
+],
+"fx": {
+"search_speed": 0.087,
+"search_r": 3
+},
+"unlock": [],
+"desc": "Searching buildings 9% faster. Squads search +3 tiles wider."
+},
+"scout_17": {
+"cat": "scouting",
+"tier": 17,
+"name": "Platoons",
+"cost": {
+"materials": 62,
+"food": 74
+},
+"hours": 79.2,
+"requires": [
+"scout_16"
+],
+"fx": {
+"search_speed": 0.091,
+"squad_size": 1
+},
+"unlock": [],
+"desc": "Searching buildings 9% faster. +1 squad member (bigger squads)."
+},
+"scout_18": {
+"cat": "scouting",
+"tier": 18,
+"name": "Wide patrols",
+"cost": {
+"materials": 72,
+"food": 89
+},
+"hours": 93.1,
+"requires": [
+"scout_17"
+],
+"fx": {
+"search_speed": 0.094,
+"auto_r": 6
+},
+"unlock": [],
+"desc": "Searching buildings 9% faster. Auto-scavenge radius +6 tiles."
+},
+"scout_19": {
+"cat": "scouting",
+"tier": 19,
+"name": "Expeditions",
+"cost": {
+"materials": 84,
+"food": 106
+},
+"hours": 109.4,
+"requires": [
+"scout_18",
+"veh_15"
+],
+"fx": {
+"search_speed": 0.097,
+"squad_range": 20
+},
+"unlock": [],
+"desc": "Searching buildings 10% faster. Squads reach +20 tiles further."
+},
+"scout_20": {
+"cat": "scouting",
+"tier": 20,
+"name": "Rangers",
+"cost": {
+"materials": 99,
+"food": 128
+},
+"hours": 128.5,
+"requires": [
+"scout_19"
+],
+"fx": {
+"search_speed": 0.1,
+"search_n": 3,
+"find_people": 1.0
+},
+"unlock": [],
+"desc": "Searching buildings 10% faster. Squads search +3 more buildings per run. 100% more likely to find people hiding in buildings."
+}
+}
+}

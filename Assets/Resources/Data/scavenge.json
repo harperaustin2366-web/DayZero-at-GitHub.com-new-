@@ -1,0 +1,488 @@
+{
+ "supermarket": {
+  "name": "Supermarket",
+  "names": [
+   "Foodland",
+   "Shop 'n Save",
+   "Harvest Market",
+   "Valu-Mart"
+  ],
+  "danger": 0.12,
+  "districts": [
+   "downtown",
+   "suburbs"
+  ],
+  "style": "supermarket",
+  "loot": {
+   "food": [
+    28,
+    52
+   ],
+   "water": [
+    10,
+    24
+   ]
+  },
+  "annex": {
+   "food": 2.0
+  },
+  "annex_desc": "+2 food a day from the stockroom"
+ },
+ "pharmacy": {
+  "name": "Pharmacy",
+  "names": [
+   "Corner Drugs",
+   "Rexall Pharmacy",
+   "Main St. Drug",
+   "CareWell Pharmacy"
+  ],
+  "danger": 0.14,
+  "districts": [
+   "downtown",
+   "suburbs"
+  ],
+  "style": "small_med",
+  "loot": {
+   "meds": [
+    5,
+    11
+   ],
+   "food": [
+    0,
+    5
+   ]
+  },
+  "annex": {
+   "meds": 0.5
+  },
+  "annex_desc": "+0.5 meds a day"
+ },
+ "gun_shop": {
+  "name": "Gun store",
+  "names": [
+   "Big Bore Guns",
+   "Frontier Arms",
+   "Hunter's Supply"
+  ],
+  "danger": 0.18,
+  "districts": [
+   "downtown",
+   "industrial",
+   "suburbs"
+  ],
+  "style": "small_tar",
+  "loot": {
+   "ammo": [
+    16,
+    34
+   ],
+   "materials": [
+    0,
+    6
+   ]
+  },
+  "annex": {
+   "ammo": 1.0
+  },
+  "annex_desc": "+1 ammo a day, +4 defense",
+  "annex_defense": 4
+ },
+ "gas_station": {
+  "name": "Gas station",
+  "names": [
+   "Gas-N-Go",
+   "Route 9 Fuel",
+   "Sunoco",
+   "Pump & Pantry"
+  ],
+  "danger": 0.1,
+  "districts": [
+   "suburbs",
+   "industrial",
+   "farmland",
+   "downtown"
+  ],
+  "style": "gas",
+  "loot": {
+   "fuel": [
+    8,
+    18
+   ],
+   "food": [
+    3,
+    9
+   ],
+   "water": [
+    4,
+    12
+   ]
+  },
+  "annex": {
+   "fuel": 1.0
+  },
+  "annex_desc": "+1 fuel a day from the tanks"
+ },
+ "hardware": {
+  "name": "Hardware store",
+  "names": [
+   "Ace Hardware",
+   "Miller Lumber",
+   "Tool Barn"
+  ],
+  "danger": 0.12,
+  "districts": [
+   "industrial",
+   "suburbs",
+   "downtown"
+  ],
+  "style": "hardware",
+  "loot": {
+   "materials": [
+    14,
+    30
+   ]
+  },
+  "annex": {
+   "materials": 1.5
+  },
+  "annex_desc": "+1.5 materials a day"
+ },
+ "police": {
+  "name": "Police station",
+  "names": [
+   "Sheriff's Office",
+   "Police Precinct",
+   "Town Marshal"
+  ],
+  "danger": 0.22,
+  "districts": [
+   "downtown"
+  ],
+  "style": "police",
+  "loot": {
+   "ammo": [
+    12,
+    26
+   ],
+   "meds": [
+    2,
+    5
+   ],
+   "materials": [
+    2,
+    8
+   ]
+  },
+  "annex": {
+   "ammo": 0.5
+  },
+  "annex_desc": "+10 defense, +0.5 ammo a day",
+  "annex_defense": 10
+ },
+ "school": {
+  "name": "School",
+  "names": [
+   "Lincoln High",
+   "Roosevelt Elementary",
+   "County Middle School"
+  ],
+  "danger": 0.16,
+  "districts": [
+   "suburbs"
+  ],
+  "style": "school",
+  "loot": {
+   "food": [
+    6,
+    16
+   ],
+   "water": [
+    4,
+    10
+   ],
+   "materials": [
+    4,
+    12
+   ]
+  },
+  "annex": {},
+  "annex_desc": "+14 beds in the gym",
+  "annex_capacity": 14
+ },
+ "church": {
+  "name": "Church",
+  "names": [
+   "St. Brigid's",
+   "First Baptist",
+   "Grace Chapel",
+   "Holy Trinity"
+  ],
+  "danger": 0.08,
+  "districts": [
+   "suburbs",
+   "downtown",
+   "farmland"
+  ],
+  "style": "church",
+  "loot": {
+   "food": [
+    4,
+    12
+   ],
+   "water": [
+    2,
+    8
+   ]
+  },
+  "annex": {},
+  "annex_desc": "+6 beds, morale +6",
+  "annex_capacity": 6,
+  "annex_morale": 6
+ },
+ "clinic": {
+  "name": "Clinic",
+  "names": [
+   "Urgent Care",
+   "Family Clinic",
+   "County Health"
+  ],
+  "danger": 0.2,
+  "districts": [
+   "downtown",
+   "suburbs"
+  ],
+  "style": "clinic",
+  "loot": {
+   "meds": [
+    7,
+    15
+   ]
+  },
+  "annex": {
+   "meds": 0.4
+  },
+  "annex_desc": "+0.4 meds a day, wounded heal faster",
+  "annex_heal": 3
+ },
+ "farm": {
+  "name": "Farm",
+  "names": [
+   "Haskell Farm",
+   "Two Creeks Farm",
+   "Oberg Dairy"
+  ],
+  "danger": 0.07,
+  "districts": [
+   "farmland"
+  ],
+  "style": "farm",
+  "loot": {
+   "food": [
+    16,
+    34
+   ],
+   "water": [
+    6,
+    14
+   ],
+   "fuel": [
+    2,
+    6
+   ],
+   "materials": [
+    3,
+    8
+   ]
+  },
+  "annex": {
+   "food": 4.0
+  },
+  "annex_desc": "+4 food a day (less in winter)"
+ },
+ "checkpoint": {
+  "name": "Military checkpoint",
+  "names": [
+   "Guard checkpoint",
+   "FEMA checkpoint",
+   "Army roadblock"
+  ],
+  "danger": 0.32,
+  "districts": [
+   "industrial",
+   "farmland",
+   "suburbs",
+   "downtown"
+  ],
+  "style": "checkpoint",
+  "loot": {
+   "ammo": [
+    30,
+    60
+   ],
+   "meds": [
+    6,
+    14
+   ],
+   "materials": [
+    10,
+    24
+   ],
+   "fuel": [
+    6,
+    14
+   ]
+  },
+  "annex": {},
+  "annex_desc": "+14 defense",
+  "annex_defense": 14
+ },
+ "warehouse": {
+  "name": "Warehouse",
+  "names": [
+   "Freight Depot",
+   "Kessler Distribution",
+   "Cold Storage"
+  ],
+  "danger": 0.14,
+  "districts": [
+   "industrial"
+  ],
+  "style": "warehouse",
+  "loot": {
+   "materials": [
+    10,
+    22
+   ],
+   "food": [
+    6,
+    16
+   ]
+  },
+  "annex": {
+   "materials": 1.0
+  },
+  "annex_desc": "+1 materials a day, +1 build slot",
+  "annex_slots": 1
+ },
+ "hospital": {
+  "name": "Hospital",
+  "names": [
+   "St. Mary's Hospital",
+   "Mercy General"
+  ],
+  "danger": 0.3,
+  "districts": [
+   "downtown"
+  ],
+  "style": "hospital",
+  "loot": {
+   "meds": [
+    12,
+    24
+   ],
+   "food": [
+    2,
+    8
+   ]
+  },
+  "annex": {
+   "meds": 0.6
+  },
+  "annex_desc": "+0.6 meds a day, wounded heal faster",
+  "annex_heal": 4
+ },
+ "fire_station": {
+  "name": "Fire Station",
+  "names": [
+   "Fire Station No. 1",
+   "Fire Station No. 2",
+   "Fire Station No. 3",
+   "Fire Station No. 4",
+   "Fire Station No. 5",
+   "Fire Station No. 6",
+   "Fire Station No. 7",
+   "Fire Station No. 8",
+   "Fire Station No. 9"
+  ],
+  "danger": 0.1,
+  "districts": [],
+  "style": "office",
+  "loot": {
+   "meds": [
+    3,
+    8
+   ],
+   "fuel": [
+    4,
+    10
+   ],
+   "materials": [
+    6,
+    14
+   ],
+   "water": [
+    4,
+    10
+   ]
+  }
+ },
+ "silo": {
+  "name": "Silo",
+  "names": [
+   "Feed Silo",
+   "Grain Silo",
+   "Corn Silo"
+  ],
+  "danger": 0.05,
+  "districts": [
+   "farmland"
+  ],
+  "style": "silo",
+  "loot": {
+   "food": [
+    14,
+    30
+   ],
+   "materials": [
+    2,
+    6
+   ]
+  },
+  "annex": {
+   "food": 2.0
+  },
+  "annex_desc": "+2 food a day from stored grain and seed"
+ },
+ "grain_elevator": {
+  "name": "Grain Elevator",
+  "names": [
+   "County Grain Co-op",
+   "Harvest Elevator",
+   "Prairie Grain Elevator"
+  ],
+  "danger": 0.09,
+  "districts": [
+   "farmland"
+  ],
+  "style": "grain_elevator",
+  "loot": {
+   "food": [
+    30,
+    60
+   ],
+   "fuel": [
+    6,
+    16
+   ],
+   "materials": [
+    8,
+    18
+   ]
+  },
+  "annex": {
+   "food": 3.0,
+   "fuel": 0.5
+  },
+  "annex_desc": "+3 food and +0.5 fuel a day (grain, seed stock, diesel tanks)"
+ }
+}

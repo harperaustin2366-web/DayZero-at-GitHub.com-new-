@@ -1,0 +1,355 @@
+{
+ "prices": {
+  "food": 1.0,
+  "water": 0.8,
+  "ammo": 2.2,
+  "meds": 4.0,
+  "materials": 1.2,
+  "fuel": 2.0,
+  "wood": 0.8,
+  "nails": 1.0,
+  "metal": 1.4,
+  "plastic": 0.9,
+  "cloth": 0.9,
+  "wire": 1.2,
+  "drywall": 0.6,
+  "elec": 2.0,
+  "furniture": 1.0
+ },
+ "need_mult": 1.7,
+ "surplus_mult": 0.55,
+ "attitudes": {
+  "Friendly": {
+   "base": 35,
+   "color": "#93a861",
+   "trade": true,
+   "route": true,
+   "ally": true
+  },
+  "Neutral": {
+   "base": 5,
+   "color": "#c9b26a",
+   "trade": true,
+   "route": true,
+   "ally": true
+  },
+  "Hostile": {
+   "base": -35,
+   "color": "#d9822b",
+   "trade": false,
+   "route": false,
+   "ally": false
+  },
+  "Raiders": {
+   "base": -60,
+   "color": "#b8322c",
+   "trade": true,
+   "route": false,
+   "ally": false
+  }
+ },
+ "thresholds": {
+  "friendly": 25,
+  "hostile": -25,
+  "alliance": 60,
+  "trade_min": -20
+ },
+ "alliance": {
+  "horde_help": 0.3,
+  "research_share": 0.35,
+  "gift_every": 18
+ },
+ "route": {
+  "min_every": 3,
+  "max_every": 10,
+  "rel_per_delivery": 2,
+  "raid_rel": -1
+ },
+ "raid": {
+  "loot_share": 0.35,
+  "rel_hit": -70,
+  "friends_hit": -15
+ },
+ "camps": {
+  "millbrook": {
+   "name": "Millbrook Grange",
+   "leader": "Ruth Calloway",
+   "pop": 24,
+   "attitude": "Friendly",
+   "strength": 30,
+   "needs": [
+    "meds",
+    "ammo"
+   ],
+   "surplus": [
+    "food",
+    "water"
+   ],
+   "stock": {
+    "food": 220,
+    "water": 160,
+    "ammo": 20,
+    "meds": 6,
+    "materials": 60,
+    "fuel": 20
+   },
+   "desc": "Farmers and mill workers holed up in the grain co-op. They feed people and ask few questions.",
+   "relations": {
+    "cedar_falls": 30,
+    "fort_hale": 10,
+    "riverbend": -40,
+    "pine_hollow": -10
+   },
+   "color": "#e8c95a"
+  },
+  "cedar_falls": {
+   "name": "The Dam Crew",
+   "leader": "Hollis Breck",
+   "pop": 16,
+   "attitude": "Neutral",
+   "strength": 26,
+   "needs": [
+    "food",
+    "meds"
+   ],
+   "surplus": [
+    "materials",
+    "fuel"
+   ],
+   "stock": {
+    "food": 30,
+    "water": 200,
+    "ammo": 30,
+    "meds": 4,
+    "materials": 220,
+    "fuel": 90
+   },
+   "desc": "Utility workers running the hydro dam. Short on food, long on tools and diesel.",
+   "relations": {
+    "millbrook": 30,
+    "fort_hale": 0,
+    "riverbend": -20,
+    "pine_hollow": 10
+   },
+   "color": "#5ab8e8"
+  },
+  "fort_hale": {
+   "name": "Fort Hale Remnant",
+   "leader": "Sgt. Dana Ocampo",
+   "pop": 30,
+   "attitude": "Neutral",
+   "strength": 62,
+   "needs": [
+    "food",
+    "meds"
+   ],
+   "surplus": [
+    "ammo",
+    "fuel"
+   ],
+   "stock": {
+    "food": 60,
+    "water": 120,
+    "ammo": 260,
+    "meds": 10,
+    "materials": 90,
+    "fuel": 160
+   },
+   "desc": "What's left of a Guard company. Disciplined, well armed, and hungry. They respect strength.",
+   "relations": {
+    "millbrook": 10,
+    "cedar_falls": 0,
+    "riverbend": -60,
+    "pine_hollow": -10
+   },
+   "color": "#9cc070"
+  },
+  "riverbend": {
+   "name": "River Kings",
+   "leader": "Duke Varga",
+   "pop": 22,
+   "attitude": "Raiders",
+   "strength": 44,
+   "needs": [
+    "fuel",
+    "ammo",
+    "food"
+   ],
+   "surplus": [
+    "materials",
+    "water"
+   ],
+   "stock": {
+    "food": 80,
+    "water": 150,
+    "ammo": 60,
+    "meds": 12,
+    "materials": 140,
+    "fuel": 30
+   },
+   "desc": "Truckers and ex-cons who took the river docks. They take what they want from anyone weaker.",
+   "relations": {
+    "millbrook": -40,
+    "cedar_falls": -20,
+    "fort_hale": -60,
+    "pine_hollow": -30
+   },
+   "color": "#e0503c"
+  },
+  "pine_hollow": {
+   "name": "Pine Hollow Watch",
+   "leader": "Elias Mercer",
+   "pop": 20,
+   "attitude": "Hostile",
+   "strength": 34,
+   "needs": [
+    "water",
+    "meds"
+   ],
+   "surplus": [
+    "food",
+    "materials"
+   ],
+   "stock": {
+    "food": 200,
+    "water": 40,
+    "ammo": 40,
+    "meds": 3,
+    "materials": 120,
+    "fuel": 25
+   },
+   "desc": "A church congregation turned militia. They shoot strangers first and pray about it after.",
+   "relations": {
+    "millbrook": -10,
+    "cedar_falls": 10,
+    "fort_hale": -10,
+    "riverbend": -30
+   },
+   "color": "#c070e0"
+  },
+  "scrapyard": {
+   "name": "Scrapyard Dogs",
+   "leader": "Vic \"Rust\" Mahler",
+   "pop": 14,
+   "attitude": "Raiders",
+   "strength": 30,
+   "needs": [
+    "fuel",
+    "meds",
+    "food"
+   ],
+   "surplus": [
+    "materials",
+    "ammo"
+   ],
+   "stock": {
+    "food": 40,
+    "water": 80,
+    "ammo": 50,
+    "meds": 4,
+    "materials": 160,
+    "fuel": 20
+   },
+   "desc": "A biker crew that fortified a salvage yard in the industrial flats. They strip anything they can carry.",
+   "relations": {
+    "riverbend": 20,
+    "millbrook": -30,
+    "fort_hale": -40
+   },
+   "district": "the_flats",
+   "color": "#ff8a2a"
+  },
+  "saint_anne": {
+   "name": "Saint Anne's Mission",
+   "leader": "Sister Maren Okafor",
+   "pop": 18,
+   "attitude": "Friendly",
+   "strength": 18,
+   "needs": [
+    "food",
+    "materials"
+   ],
+   "surplus": [
+    "meds",
+    "water"
+   ],
+   "stock": {
+    "food": 50,
+    "water": 160,
+    "ammo": 10,
+    "meds": 30,
+    "materials": 30,
+    "fuel": 10
+   },
+   "desc": "Nurses and volunteers running a clinic out of a parish school. They'll patch up anyone who comes in peace.",
+   "relations": {
+    "millbrook": 30,
+    "cedar_falls": 15,
+    "riverbend": -30
+   },
+   "district": "larkspur",
+   "color": "#f0f0f0"
+  }
+ },
+ "requests": [
+  {
+   "id": "sick",
+   "title": "{camp} asks for medicine",
+   "text": "{leader} comes on the radio, voice tight. \"We've got a fever going through the kids. Anything you can spare. We'll remember it.\"",
+   "res": "meds",
+   "amount": [
+    4,
+    8
+   ],
+   "rel": 12,
+   "refuse": -5
+  },
+  {
+   "id": "hungry",
+   "title": "{camp} is running low",
+   "text": "A runner from {camp} reaches your gate on a bicycle. Their stores are nearly gone. {leader} asks for food to get them through the week.",
+   "res": "food",
+   "amount": [
+    15,
+    30
+   ],
+   "rel": 10,
+   "refuse": -4
+  },
+  {
+   "id": "ammo",
+   "title": "{camp} needs ammunition",
+   "text": "{leader}: \"A herd is pushing up from the south and we're down to a few boxes. Help us hold, and we owe you.\"",
+   "res": "ammo",
+   "amount": [
+    8,
+    16
+   ],
+   "rel": 10,
+   "refuse": -4
+  },
+  {
+   "id": "parts",
+   "title": "{camp} wants materials",
+   "text": "{camp}'s wall came down in the storm. {leader} asks for lumber and wire to rebuild.",
+   "res": "wood",
+   "amount": [
+    12,
+    24
+   ],
+   "rel": 8,
+   "refuse": -3
+  }
+ ],
+ "demands": {
+  "text": "A truck from {camp} idles at your gate. {leader}'s people want {food} food and {ammo} ammo, \"for protection\". They don't say what happens if you refuse.",
+  "food": [
+   10,
+   20
+  ],
+  "ammo": [
+   6,
+   12
+  ]
+ }
+}

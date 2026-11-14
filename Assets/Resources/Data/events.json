@@ -1,0 +1,163 @@
+[
+  {
+    "id": "looters_gate", "phase": "any", "weight": 3, "min_day": 1,
+    "title": "Looters at the gate",
+    "text": "Three men with crowbars and a pickup truck are rattling the fence. One of them says they just want what's in the storeroom. {name} has a rifle up and is waiting for you.",
+    "choices": [
+      {"label": "Fire a warning shot", "hint": "-3 ammo, they might push back",
+       "effects": {"ammo": -3, "chance": 0.7,
+         "success": {"morale": 4, "text": "The shot echoes down the block. The truck reverses and is gone."},
+         "fail": {"food": -10, "injure": 1, "text": "They rush the fence anyway. You drive them off, but they grab a box of food and someone takes a crowbar to the arm."}}},
+      {"label": "Hand over some food", "hint": "-12 food, nobody gets hurt",
+       "effects": {"food": -12, "morale": -4, "text": "You pass two boxes over the fence. They leave without a word. Nobody is proud of it."}}
+    ]
+  },
+  {
+    "id": "radio_plea", "phase": "fall", "weight": 4, "min_day": 1,
+    "title": "A voice on the radio",
+    "text": "Static, then a woman's voice: \"...anyone... we're on the roof, there are kids with us, please...\" She gives a street name before the signal drops.",
+    "choices": [
+      {"label": "Mark it on the map", "hint": "New survivor group, short deadline",
+       "effects": {"spawn_group": {"deadline": 9, "min": 3, "max": 6}, "text": "You circle the street on the map. They won't last long up there."}},
+      {"label": "Turn the radio off", "hint": "-6 morale",
+       "effects": {"morale": -6, "text": "You click it off. The room is very quiet for a long time."}}
+    ]
+  },
+  {
+    "id": "horde_passing", "phase": "fall", "weight": 3, "min_day": 2,
+    "title": "Horde passing",
+    "text": "Hundreds of them are shuffling down the main road, drawn by a car alarm somewhere east. They will pass right by the walls.",
+    "choices": [
+      {"label": "Lights out, stay silent", "hint": "Usually safe",
+       "effects": {"chance": 0.8,
+         "success": {"text": "Nobody breathes for an hour. The sound of feet fades west."},
+         "fail": {"damage_barricade": 1, "materials": -8, "morale": -5, "text": "A child cries out. A dozen of them peel off and tear at the barricade before you put them down."}}},
+      {"label": "Draw them off with a truck", "hint": "One volunteer, risky, keeps the walls safe",
+       "effects": {"chance": 0.6,
+         "success": {"morale": 6, "text": "{name} floors it with the horn blaring and comes back two hours later, grinning and shaking."},
+         "fail": {"kill": 1, "morale": -6, "text": "{name} drew them away. The truck never came back."}}}
+    ]
+  },
+  {
+    "id": "refugees_gate", "phase": "fall", "weight": 3, "min_day": 2,
+    "title": "Strangers at the gate",
+    "text": "A family of three is at the gate, exhausted. The father keeps his left arm behind his back.",
+    "choices": [
+      {"label": "Let them in", "hint": "+3 people, risk of infection",
+       "effects": {"add_people": 3, "chance": 0.65,
+         "success": {"morale": 3, "text": "It was a cut from a fence. They cry when the gate closes behind them."},
+         "fail": {"bite": 1, "text": "It's a bite. You let them in anyway, and now there is a decision to make."}}},
+      {"label": "Turn them away", "hint": "-5 morale",
+       "effects": {"morale": -5, "text": "They walk away slowly. Nobody talks at dinner."}}
+    ]
+  },
+  {
+    "id": "pharmacy_truck", "phase": "fall", "weight": 2, "min_day": 1,
+    "title": "Abandoned ambulance",
+    "text": "{name} spots an ambulance on its side two blocks out. The back doors are shut. Something might be moving inside.",
+    "choices": [
+      {"label": "Send {name} to check it", "hint": "Medical supplies, some risk",
+       "effects": {"chance": 0.7,
+         "success": {"meds": 8, "text": "Only the wind. {name} comes back with two full trauma bags."},
+         "fail": {"meds": 3, "injure": 1, "text": "The driver was still strapped in. {name} gets away with a few supplies and a deep cut."}}},
+      {"label": "Leave it", "hint": "Nothing happens",
+       "effects": {"text": "You let it be."}}
+    ]
+  },
+  {
+    "id": "trader", "phase": "survive", "weight": 3, "min_day": 10,
+    "title": "A trader",
+    "text": "An old man with a cart and a shotgun waves a white rag. He has ammunition and wants food.",
+    "choices": [
+      {"label": "Trade 15 food for 18 ammo", "hint": "Needs 15 food", "requires": {"food": 15},
+       "effects": {"food": -15, "ammo": 18, "text": "He counts every can twice and leaves whistling."}},
+      {"label": "Send him on his way", "hint": "Nothing happens",
+       "effects": {"text": "He shrugs and heads north."}}
+    ]
+  },
+  {
+    "id": "sick_child", "phase": "any", "weight": 2, "min_day": 4,
+    "title": "Fever",
+    "text": "One of the kids has a high fever. Not a bite, {name} is sure of it, but it isn't breaking.",
+    "choices": [
+      {"label": "Use antibiotics", "hint": "-4 meds", "requires": {"meds": 4},
+       "effects": {"meds": -4, "morale": 5, "text": "Two days later she is asking for food. People smile for the first time in a while."}},
+      {"label": "Wait it out", "hint": "It might pass",
+       "effects": {"chance": 0.55,
+         "success": {"text": "The fever breaks on the third night."},
+         "fail": {"morale": -10, "text": "She doesn't wake up. You bury her by the fence."}}}
+    ]
+  },
+  {
+    "id": "wanderer", "phase": "survive", "weight": 3, "min_day": 9,
+    "title": "Lone wanderer",
+    "text": "A thin woman with a hunting bow walks up the road and stops at the wire. She says she can pull her weight.",
+    "choices": [
+      {"label": "Take her in", "hint": "+1 Scavenger, small risk",
+       "effects": {"add_role": "Scavenger", "chance": 0.85,
+         "success": {"text": "She sleeps for fourteen hours, then goes straight to work."},
+         "fail": {"bite": 1, "text": "Three nights later she starts running a fever. There was a bite under her sleeve."}}},
+      {"label": "Give her water and send her off", "hint": "-3 water",
+       "effects": {"water": -3, "text": "She nods, drinks, and keeps walking."}}
+    ]
+  },
+  {
+    "id": "storm", "phase": "survive", "weight": 2, "min_day": 9,
+    "title": "Storm front",
+    "text": "Black clouds roll in fast. The wind is already pulling at the tarps.",
+    "choices": [
+      {"label": "Put out every container", "hint": "+water, some damage",
+       "effects": {"water": 14, "materials": -4, "text": "Barrels fill to the brim. The wind takes a section of roofing."}},
+      {"label": "Tie everything down", "hint": "-2 materials",
+       "effects": {"materials": -2, "water": 4, "text": "Everything holds. You catch a little rain."}}
+    ]
+  },
+  {
+    "id": "blight", "phase": "survive", "weight": 2, "min_day": 15, "requires": {"building": "garden"},
+    "title": "Blight in the beds",
+    "text": "{name} shows you the leaves. Spots, spreading from plant to plant.",
+    "choices": [
+      {"label": "Burn the sick rows", "hint": "-10 food",
+       "effects": {"food": -10, "text": "You lose a week of food, but the rest of the crop is clean."}},
+      {"label": "Try to save them", "hint": "Gamble",
+       "effects": {"chance": 0.45,
+         "success": {"food": 6, "text": "{name} treats the soil with ash. The crop recovers."},
+         "fail": {"food": -22, "morale": -4, "text": "It spreads through everything. Half the harvest rots."}}}
+    ]
+  },
+  {
+    "id": "brawl", "phase": "any", "weight": 2, "min_day": 6,
+    "title": "Fight in the mess hall",
+    "text": "{name} and {name2} are on the floor swinging. It started over a missing can of peaches.",
+    "choices": [
+      {"label": "Extra rations to calm things", "hint": "-6 food, +morale",
+       "effects": {"food": -6, "morale": 4, "text": "Full bellies cool tempers. They shake hands, sort of."}},
+      {"label": "Put both on night watch", "hint": "Discipline",
+       "effects": {"chance": 0.6,
+         "success": {"morale": 2, "text": "A week of cold nights together and they are friends again."},
+         "fail": {"morale": -6, "text": "The grudge spreads. People start picking sides."}}}
+    ]
+  },
+  {
+    "id": "dog", "phase": "any", "weight": 1, "min_day": 3,
+    "title": "A stray dog",
+    "text": "A skinny shepherd mix has been circling the walls for two days. It growls at the dead, not at you.",
+    "choices": [
+      {"label": "Take it in", "hint": "-5 food, +8 morale",
+       "effects": {"food": -5, "morale": 8, "text": "The kids name him Biscuit. He barks at anything that moves outside."}},
+      {"label": "Shoo it away", "hint": "Nothing happens",
+       "effects": {"text": "It watches you for a while, then trots off."}}
+    ]
+  },
+  {
+    "id": "fire", "phase": "survive", "weight": 1, "min_day": 20,
+    "title": "Fire in the storeroom",
+    "text": "A lantern tipped over. Smoke is pouring out of the storeroom.",
+    "choices": [
+      {"label": "Use the water to put it out", "hint": "-12 water",
+       "effects": {"water": -12, "text": "You form a bucket line. The fire is out in ten minutes."}},
+      {"label": "Tear down the wall to stop it", "hint": "-10 materials, -8 food",
+       "effects": {"materials": -10, "food": -8, "text": "You lose part of the storeroom, but the fire doesn't spread."}}
+    ]
+  }
+]
