@@ -160,6 +160,7 @@ namespace DayZero.Runtime
             try
             {
                 Pending.Clear(); Ended = false; Won = false; Paused = false;
+                Map?.Invalidate();   // v0.12.0a: drop the old world's yard geometry before the save is installed
                 if (!Game.LoadGame()) { Toast(Game.LastLoadError != "" ? Game.LastLoadError : "No save found."); return; }
                 Map?.Invalidate();   // camp yards come from the loaded bases (the chosen start site is a saved Base)
                 Game.Use(Math.Max(0, Game.ViewCol));

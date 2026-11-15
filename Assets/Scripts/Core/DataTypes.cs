@@ -126,6 +126,7 @@ namespace DayZero.Core
     {
         public string Name, Tag, Icon, Desc;
         public Color Color;
+        public double Hours = 8;   // v0.12.0a: set-up time in game hours
     }
 
     public sealed class TrapDef

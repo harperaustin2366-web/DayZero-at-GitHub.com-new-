@@ -460,6 +460,7 @@ namespace DayZero.Core
             col.StartT = S.T;
             var b = AddBase(p, true, lot);
             b.Done = 1.0;
+            FoundPalisade(b);   // v0.12.0a: the drawn palisade is a real (wood, breakable) wall
             if (first)
             {
                 var corners = new List<Vector2Int>();

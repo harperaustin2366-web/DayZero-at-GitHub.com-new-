@@ -420,15 +420,24 @@ namespace DayZero.Runtime
             int me = game.CurCol;
             var conv = game.S.Conv;
             var lit = game.LitLots();
-            foreach (var kv in conv) Marker(g, kv.Key, Hex("#6a9a4a"));
+            // v0.12.0a: converted buildings get exterior dressing (+ a floating HUD label) instead of a flag
+            foreach (var kv in conv)
+            {
+                bool pend = kv.Value.Ready > 0.0 && kv.Value.Ready > game.S.T;
+                ConvDressing(g, kv.Key, kv.Value, pend, (float)game.ConvProgress(kv.Key));
+            }
             foreach (var kv in lit) if (!conv.ContainsKey(kv.Key)) Marker(g, kv.Key, kv.Value == me ? Hex("#d8a840") : Hex("#b04a3a"));
+            var walled = new HashSet<int>();
+            if (game.S.Walls != null) foreach (var w in game.S.Walls) if (w.Starter) walled.Add(w.Bid);
             foreach (var b in game.AllBases())
             {
                 bool mine = b.Col == me;
                 CampRect(b, out var c, out float half, out var bld);
                 if (bld.HasValue && mine) LitWindows(g, b.Lot);
-                Camp(g, c, half, b.Id, b.Main, bld, mine);
+                Camp(g, c, half, b.Id, b.Main, bld, mine, walled.Contains(b.Id));
             }
+            DrawWalls(g, game);
+            DrawTowersTraps(g, game);
             return new Chunk { Mesh = g.M, Shadow = g.S };
         }
 
@@ -486,7 +495,7 @@ namespace DayZero.Runtime
 
         /// <summary>Survivor FOB (bible section 6, tier 1): palisade with gate, watchtower, cabin with lit
         /// windows, campfire with a warm light pool, crates, barrels, sandbags, flag, an armoured truck.</summary>
-        void Camp(Geo g, Vector2 c, float half, int salt, bool main, ORect? bld, bool mine)
+        void Camp(Geo g, Vector2 c, float half, int salt, bool main, ORect? bld, bool mine, bool simWall = false)
         {
             // V points away from the gate: the gate / fire side faces the camera
             var V = -CampFront(); var U = new Vector2(V.y, -V.x);
@@ -503,8 +512,9 @@ namespace DayZero.Runtime
                     var p11 = yard.P(-1f + 2f * (a + 1) / N, -1f + 2f * (b2 + 1) / N); var p01 = yard.P(-1f + 2f * a / N, -1f + 2f * (b2 + 1) / N);
                     g.Flat(p00, p10, p11, p01, y, YardCol(p00, fire, yard, main), YardCol(p10, fire, yard, main), YardCol(p11, fire, yard, main), YardCol(p01, fire, yard, main));
                 }
-            // palisade
-            for (int side = 0; side < 4; side++)
+            // palisade (v0.12.0a: when the sim holds the starter palisade as wall runs, DrawWalls draws it
+            // with each tile's damage and breaches, so only the gate is drawn here)
+            for (int side = 0; side < 4 && !simWall; side++)
             {
                 Vector2 along = side % 2 == 0 ? U : V, nrm = side % 2 == 0 ? V : U;
                 float sg = side < 2 ? -1f : 1f;

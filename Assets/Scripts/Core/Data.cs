@@ -226,6 +226,7 @@ namespace DayZero.Core
             ["tower"] = new UpgradeDef { Name = "Lookout post", Slot = false, Max = 1, Cost = L(Gd.D(("wood", 18), ("nails", 7))), Desc = "Guards at the camp shoot from further away (+3 tiles)." },
             ["barracks"] = new UpgradeDef { Name = "Barracks", Max = 3, Unlock = "barracks", Cost = L(Gd.D(("wood", 12), ("furniture", 10), ("cloth", 8), ("nails", 5)), Gd.D(("wood", 20), ("furniture", 18), ("cloth", 12), ("nails", 10)), Gd.D(("wood", 30), ("furniture", 25), ("cloth", 15), ("drywall", 10), ("nails", 10), ("fuel", 5))), Desc = "Bunks: +10 beds per level." },
             ["lab"] = new UpgradeDef { Name = "Research Lab", Max = 2, Cost = L(Gd.D(("elec", 10), ("furniture", 8), ("copper", 6), ("plastic", 6)), Gd.D(("elec", 25), ("copper", 15), ("metal", 15), ("plastic", 15), ("fuel", 10))), Desc = "Scientists work 40% faster per level (best lab counts)." },
+            ["siren"] = new UpgradeDef { Name = "Air-raid siren", Slot = false, Max = 1, Cost = L(Gd.D(("metal", 6), ("elec", 3), ("copper", 2), ("wire", 2))), Desc = "A hand-crank siren on a mast. Lookouts sound it 3 hours before an attack (every attack, not just the big ones) and the guards man the wall at once." },
             ["radio"] = new UpgradeDef { Name = "Radio", Slot = false, Max = 1, Cost = L(Gd.D(("elec", 8), ("copper", 5), ("metal", 2), ("fuel", 8))), Desc = "Strangers find you more often. Main camp only." },
         };
 
@@ -367,8 +368,8 @@ namespace DayZero.Core
         {
             new FenceDef { Id = "wood", Name = "Wood palisade", Hp = 90, Cost = Gd.D(("wood", 1), ("nails", 0.25)), Color = Gd.Hex("#8b6a3e"), Unlock = "" },
             new FenceDef { Id = "chain", Name = "Chain-link fence", Hp = 160, Cost = Gd.D(("metal", 1), ("wire", 1)), Color = Gd.Hex("#b4bcc0"), Unlock = "fence_1" },
-            new FenceDef { Id = "sheet", Name = "Sheet-metal wall", Hp = 260, Cost = Gd.D(("metal", 2), ("nails", 1)), Color = Gd.Hex("#7d8b96"), Unlock = "fence_2" },
-            new FenceDef { Id = "concrete", Name = "Concrete wall", Hp = 420, Cost = Gd.D(("metal", 2), ("wood", 1), ("nails", 1)), Color = Gd.Hex("#cfcbc0"), Unlock = "fence_3" },
+            new FenceDef { Id = "sheet", Name = "Scrap-metal wall", Hp = 260, Cost = Gd.D(("metal", 1), ("nails", 0.5), ("wood", 0.5)), Color = Gd.Hex("#7d8b96"), Unlock = "" },
+            new FenceDef { Id = "concrete", Name = "Concrete wall", Hp = 420, Cost = Gd.D(("metal", 2), ("drywall", 1), ("nails", 1)), Color = Gd.Hex("#cfcbc0"), Unlock = "" },
             new FenceDef { Id = "rconcrete", Name = "Reinforced concrete", Hp = 600, Cost = Gd.D(("metal", 4), ("wire", 1), ("nails", 1), ("fuel", 1)), Color = Gd.Hex("#e8e4d8"), Unlock = "fence_4" },
         };
 
@@ -376,7 +377,7 @@ namespace DayZero.Core
 
         public static readonly TowerDef[] TOWERS =
         {
-            new TowerDef { Id = "watch", Name = "Watchtower", Hp = 120, Range = 6.5, Hit = 0.6, Shots = 1, Ammo = 0.0, Crew = true, Cost = Gd.D(("wood", 14), ("nails", 6)), Unlock = "tower_0",
+            new TowerDef { Id = "watch", Name = "Watchtower", Hp = 120, Range = 6.5, Hit = 0.6, Shots = 1, Ammo = 0.0, Crew = true, Cost = Gd.D(("wood", 14), ("nails", 6)), Unlock = "",
                 Desc = "Crossbows and a lookout. Needs one survivor at its base to man it. No ammo." },
             new TowerDef { Id = "mg", Name = "MG nest", Hp = 200, Range = 7.0, Hit = 0.55, Shots = 3, Ammo = 0.35, Crew = true, Cost = Gd.D(("wood", 15), ("metal", 20), ("nails", 10), ("ammo", 20)), Unlock = "tower_1",
                 Desc = "Sandbagged machine gun. Manned, burns ammo, hits several at once." },
@@ -405,24 +406,25 @@ namespace DayZero.Core
 
         public static readonly Dictionary<string, ConversionDef> CONVERSIONS = new Dictionary<string, ConversionDef>
         {
-            ["hospital"] = new ConversionDef { Name = "Infirmary", Tag = "INFIRMARY", Icon = "✚", Color = Gd.Hex("#ff8a8a"), Desc = "+0.5 meds/day, the wounded at its camp heal 2 hp/h faster, +6% cure odds." },
-            ["farm"] = new ConversionDef { Name = "Rooftop Farm", Tag = "FARM", Icon = "☼", Color = Gd.Hex("#9be36a"), Desc = "Planters on the roof and in the lot: +5 food/day." },
-            ["water"] = new ConversionDef { Name = "Water Cistern", Tag = "CISTERN", Icon = "◇", Color = Gd.Hex("#74c8ff"), Desc = "Rain catch and filtered tanks: +4 water/day." },
-            ["barracks"] = new ConversionDef { Name = "Bunkhouse", Tag = "BUNKHOUSE", Icon = "≡", Color = Gd.Hex("#d6b88a"), Desc = "+8 beds at its camp." },
-            ["storage"] = new ConversionDef { Name = "Storage Depot", Tag = "DEPOT", Icon = "▣", Color = Gd.Hex("#c8b48c"), Desc = "+150 storage for every resource." },
-            ["workshop"] = new ConversionDef { Name = "Workshop", Tag = "WORKSHOP", Icon = "⚒", Color = Gd.Hex("#f0b860"), Desc = "+1.5 materials/day (mixed items), repairs cost 20% less (up to 40%)." },
-            ["armory"] = new ConversionDef { Name = "Armory", Tag = "ARMORY", Icon = "⚔", Color = Gd.Hex("#9fb4ff"), Desc = "Reloading bench: turns 0.5 metal + 0.3 plastic into 1.2 ammo/day, guards hit 3% more often (up to 9%)." },
-            ["garage"] = new ConversionDef { Name = "Garage", Tag = "GARAGE", Icon = "⚡", Color = Gd.Hex("#f0d060"), Desc = "Siphons and stores fuel: +0.8 fuel/day." },
-            ["school"] = new ConversionDef { Name = "School", Tag = "SCHOOL", Icon = "★", Color = Gd.Hex("#ffe08a"), Desc = "Lessons and a library: research 12% faster (up to 48%), +morale." },
+            ["hospital"] = new ConversionDef { Name = "Hospital", Tag = "HOSPITAL", Icon = "✚", Color = Gd.Hex("#ff8a8a"), Hours = 10, Desc = "+0.5 meds/day, the wounded at its camp heal 2 hp/h faster, +6% cure odds." },
+            ["farm"] = new ConversionDef { Name = "Greenhouse Farm", Tag = "FARM", Icon = "☼", Color = Gd.Hex("#9be36a"), Hours = 12, Desc = "Planters on the roof and crop rows in the lot: +5 food/day." },
+            ["water"] = new ConversionDef { Name = "Water Station", Tag = "WATER", Icon = "◇", Color = Gd.Hex("#74c8ff"), Hours = 8, Desc = "Rain catch and filtered tanks: +4 water/day." },
+            ["barracks"] = new ConversionDef { Name = "Barracks", Tag = "BARRACKS", Icon = "≡", Color = Gd.Hex("#d6b88a"), Hours = 8, Desc = "Bunks for survivors: +8 beds at its camp." },
+            ["storage"] = new ConversionDef { Name = "Storage", Tag = "STORAGE", Icon = "▣", Color = Gd.Hex("#c8b48c"), Hours = 6, Desc = "+150 storage for every resource." },
+            ["workshop"] = new ConversionDef { Name = "Workshop", Tag = "WORKSHOP", Icon = "⚒", Color = Gd.Hex("#f0b860"), Hours = 10, Desc = "+1.5 materials/day (mixed items), repairs cost 20% less (up to 40%)." },
+            ["armory"] = new ConversionDef { Name = "Armory", Tag = "ARMORY", Icon = "⚔", Color = Gd.Hex("#9fb4ff"), Hours = 10, Desc = "Reloading bench: turns 0.5 metal + 0.3 plastic into 1.2 ammo/day, guards hit 3% more often (up to 9%)." },
+            ["garage"] = new ConversionDef { Name = "Garage", Tag = "GARAGE", Icon = "⚡", Color = Gd.Hex("#f0d060"), Hours = 8, Desc = "Siphons and stores fuel: +0.8 fuel/day, room for 2 vehicles." },
+            ["school"] = new ConversionDef { Name = "School", Tag = "SCHOOL", Icon = "★", Color = Gd.Hex("#ffe08a"), Hours = 10, Desc = "Lessons and a library: research 12% faster (up to 48%), +morale." },
+            ["kitchen"] = new ConversionDef { Name = "Kitchen", Tag = "KITCHEN", Icon = "♨", Color = Gd.Hex("#ffb070"), Hours = 6, Desc = "A mess hall with real stoves: its camp eats 12% less food (up to 24%), +morale." },
         };
-        public static readonly string[] CONV_ORDER = { "hospital", "farm", "water", "barracks", "storage", "workshop", "armory", "garage", "school" };
+        public static readonly string[] CONV_ORDER = { "hospital", "farm", "water", "barracks", "storage", "workshop", "armory", "garage", "school", "kitchen" };
 
         public static readonly Dictionary<string, string> CONV_AFFINITY = new Dictionary<string, string>
         {
             ["hospital"] = "hospital", ["clinic"] = "hospital", ["pharmacy"] = "hospital", ["church"] = "hospital",
             ["supermarket"] = "farm", ["farm"] = "farm", ["gas_station"] = "garage", ["fire_station"] = "garage", ["parking"] = "garage",
             ["gun_shop"] = "armory", ["police"] = "armory", ["checkpoint"] = "armory", ["hardware"] = "workshop", ["factory"] = "workshop",
-            ["warehouse"] = "storage", ["school"] = "school", ["office"] = "school", ["apartment"] = "barracks", ["house"] = "barracks",
+            ["warehouse"] = "storage", ["school"] = "school", ["shop"] = "kitchen", ["office"] = "school", ["apartment"] = "barracks", ["house"] = "barracks",
         };
         public static readonly Dictionary<string, double> CONV_COST = Gd.D(("wood", 8), ("nails", 4), ("furniture", 3));
         public static readonly Dictionary<string, Dictionary<string, double>> CONV_COSTS = new Dictionary<string, Dictionary<string, double>>
@@ -436,6 +438,7 @@ namespace DayZero.Core
             ["armory"] = Gd.D(("metal", 8), ("wood", 4), ("nails", 3)),
             ["garage"] = Gd.D(("metal", 6), ("elec", 3), ("copper", 3), ("plastic", 3)),
             ["school"] = Gd.D(("furniture", 6), ("wood", 4), ("elec", 2), ("cloth", 3)),
+            ["kitchen"] = Gd.D(("metal", 4), ("wood", 4), ("furniture", 3), ("plastic", 2)),
         };
 
         public static readonly TrapDef[] TRAPS =
@@ -448,7 +451,7 @@ namespace DayZero.Core
                 Desc = "Tin cans and a wind-up radio on a post. Draws wandering dead off their path and keeps them milling around it." },
             new TrapDef { Id = "tripwire", Name = "Tripwire alarm", Hp = 14, Kill = 0.2, Slow = 0.4, Cost = Gd.D(("wire", 3), ("metal", 2)), Unlock = "", Fx = "alarm", R = 4.0,
                 Desc = "Fishing line strung to a string of bells. Rings when something walks through, and the nearest guards come to put it down." },
-            new TrapDef { Id = "barbed", Name = "Barbed wire tangle", Hp = 16, Kill = 0.15, Slow = 1.4, Cost = Gd.D(("wire", 7), ("wood", 3)), Unlock = "fence_1",
+            new TrapDef { Id = "barbed", Name = "Barbed wire tangle", Hp = 16, Kill = 0.15, Slow = 1.4, Cost = Gd.D(("wire", 7), ("wood", 3)), Unlock = "",
                 Desc = "Loose barbed wire staked low across the ground. Snags legs and holds the dead for a long time; outlasts razor wire." },
             new TrapDef { Id = "fire", Name = "Fire trench", Hp = 4, Kill = 0.65, Slow = 0.3, Cost = Gd.D(("wood", 4), ("cloth", 2), ("fuel", 4)), Unlock = "fence_2", Fx = "fire", R = 1.5,
                 Desc = "A fuel-soaked trench with a flare on a pull line. Catches whatever walks in and the ones beside it; burns out fast." },

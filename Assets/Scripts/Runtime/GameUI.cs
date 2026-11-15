@@ -14,7 +14,7 @@ using UnityEngine;
 
 namespace DayZero.Runtime
 {
-    public sealed class GameUI
+    public sealed partial class GameUI
     {
         const float VH = 720f;          // virtual height (Godot viewport 1280x720)
         const float TAB_H = 52f;
@@ -200,6 +200,7 @@ namespace DayZero.Runtime
             if (G?.S == null || G.C == null) { Center(w, h, "DayZero", "No game running."); return; }
             var map = MapView.Instance;
             if (map != null && map.Ready) DrawMapLabels(map, w, h);
+            if (map != null && map.Ready && !_b.Picking && G.C.Started) { DrawConvLabels(map, w, h); DrawRepairMarks(map, w, h); }
             if (map != null && !string.IsNullOrEmpty(map.RenderWarning))
                 Shadowed(new Rect(12, h - 30, w - 24, 24), map.RenderWarning, _small);
             // v0.11.2a drew this every frame, so "Building the map 100%" never went away
@@ -218,7 +219,16 @@ namespace DayZero.Runtime
             if (Btn(Blk(new Rect(w / 2 - 80, 8, 160, 50)), "MENU", _darkButton)) _menuOpen = true;
             DrawTopRight(w);
             DrawCameraButtons(map);
-            DrawActions(w, map);
+            float by = 104f;
+            DrawAttackBanner(w, h, ref by);
+            DrawRepairChip(w, ref by);
+            if (!DrawSidePanel(w, map)) DrawActions(w, map);
+            if (map != null && !ModalOpen)
+            {
+                if (map.ActiveTool != MapView.Tool.None) DrawPlacementBar(w, h, map);
+                else if (map.BuildingLot >= 0) DrawBuildingSheet(w, h, map);
+                else if (map.SelectedRun >= 0) DrawWallSheet(w, h, map);
+            }
             DrawTimeControls(w, h);
 
             if (_b.Ended || G.S.Phase == "lost") DrawGameOver(w, h);
@@ -339,10 +349,10 @@ namespace DayZero.Runtime
             var hdr = new GUIStyle(_small) { fontStyle = FontStyle.Bold }; hdr.normal.textColor = AMBER;
             GUI.Label(new Rect(px + 12, py + 6, PW - 24, 24), "ACTIONS", hdr);
             float y = py + 34, bw = PW - 20, bh = 50, gap = 8;
-            if (Btn(new Rect(px + 10, y, bw, bh), "BUILD")) _b.Toast("Building placement is coming in a later build."); y += bh + gap;
+            if (Btn(new Rect(px + 10, y, bw, bh), "BUILD")) { _panel = Panel.Build; map?.CancelTool(); } y += bh + gap;
             if (Btn(new Rect(px + 10, y, bw, bh), "CAMP", _amberButton)) map?.Home(); y += bh + gap;
             if (Btn(new Rect(px + 10, y, bw, bh), "GATHER", _brownButton)) { _tab = 1; _menuOpen = true; } y += bh + gap;
-            if (Btn(new Rect(px + 10, y, bw, bh), "DEFENSE")) _b.Toast(G.RaidInfo() != null && (G.RaidInfo().On || G.RaidInfo().Warned) ? "Put Soldiers and Cops on guard in Crew & Jobs." : "No attack expected yet. Fences and towers come in a later build."); y += bh + gap;
+            if (Btn(new Rect(px + 10, y, bw, bh), "DEFENSE")) { _panel = Panel.Defense; map?.ClearBuilding(); } y += bh + gap;
             if (Btn(new Rect(px + 10, y, bw, bh), "CREW & JOBS")) { _tab = 1; _menuOpen = true; } y += bh + gap;
             if (Btn(new Rect(px + 10, y, bw, bh), "COLONY")) { _tab = 0; _menuOpen = true; } y += bh + gap;
             if (Btn(new Rect(px + 10, y, bw, bh), "LOG")) { _tab = 2; _menuOpen = true; }

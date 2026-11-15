@@ -700,7 +700,8 @@ namespace DayZero.Core
             if (ci < 0) ci = CurCol;
             var c = ColonyAt(ci);
             double d = Math.Max(0.0, (S.T - c.StartT) / 24.0);
-            double n = (2.0 + 1.6 * d + 0.06 * d * d) * RAID_DIFF[V.Clampi(S.Difficulty, 0, 2)];
+            // v0.12.0a: a visibly growing horde (normal: day 1 ~5, day 10 ~28, day 20 ~67, day 30 ~120)
+            double n = (3.0 + 1.7 * d + 0.075 * d * d) * RAID_DIFF[V.Clampi(S.Difficulty, 0, 2)];
             foreach (var cid in c.Pacts)
             {
                 var cp = CampById(cid);
@@ -773,6 +774,7 @@ namespace DayZero.Core
             int h = Hour();
             if (R0.On)
             {
+                CountRaidAtWall(R0);
                 if (h >= RAID_END_H && h < 12) EndNightRaid(R0);
                 return;
             }
@@ -788,10 +790,12 @@ namespace DayZero.Core
                 R0.N = RaidSize();
                 R0.Dir = RaidDir(tgt);
                 R0.NextT = Math.Floor(S.T / 24.0) * 24.0 + NIGHT_ATTACK_H + Rng.RandfRange(0.0, 2.0);
+                R0.Eta = R0.NextT;
+                R0.Major = R0.N >= RAID_MAJOR;
                 R0.Warned = false;
             }
             if (R0.NextT < 0.0) return;
-            if (!R0.Warned && S.T >= R0.NextT - Math.Max(RAID_WARN_H, RAID_TRAVEL_H))
+            if (!R0.Warned && S.T >= R0.NextT - RaidWarnLead())
             {
                 R0.Warned = true;
                 var tb = BaseById(R0.Bid) ?? MainBase();
@@ -800,8 +804,11 @@ namespace DayZero.Core
                 AutoGuards(true);
                 PostGuards(true);
                 int hh = (int)(R0.NextT % 24.0);
-                if (R0.N >= RAID_MAJOR)
+                if (R0.N >= RAID_MAJOR || HasSiren())
+                {
                     AddLog(string.Format("SIREN · Lookouts spotted about {0} of the dead moving on {1} from the {2}. Expect them at the wall around {3:00}:00. Guards to the line.", R0.N, tb.Name, DirName(R0.Dir), hh), "siren");
+                    PlaySfx("siren", V.F(tb.Pos));
+                }
                 else
                     AddLog(string.Format("Movement at dusk: a few of the dead are drifting toward {0} from the {1}. The night watch is ready.", tb.Name, DirName(R0.Dir)), "info");
             }
@@ -855,7 +862,7 @@ namespace DayZero.Core
                 }
                 if (made >= n) break;
             }
-            R0.On = true; R0.Spawned = made; R0.Breaks = 0; R0.Dmg = 0.0; R0.Nights++; R0.Start = S.T;
+            R0.On = true; R0.Spawned = made; R0.Breaks = 0; R0.Dmg = 0.0; R0.Nights++; R0.Start = S.T; R0.AtWall = 0;
             bool major = made >= RAID_MAJOR;
             AddLog(string.Format("{0} {1} of the dead are on the move toward {2} from the {3}, still a long way out. They'll be at the wall after dark.", major ? "They're coming:" : "Contact:", made, b.Name, DirName(R0.Dir)), major ? "death" : "loss");
             PlaySfx("groan", V.F(b.Pos));

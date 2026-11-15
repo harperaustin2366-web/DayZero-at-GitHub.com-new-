@@ -134,10 +134,35 @@ namespace DayZero.Core
                     }
                     continue;
                 }
+                bool yardPosts = !IsEnclosed(b) && S.Walls.Any(w => w.Starter && w.Bid == b.Id);
+                var yd = yardPosts ? YardOf(b) : default;
                 for (int i = 0; i < n; i++)
                 {
                     double ang = V.TAU * i / n;
                     if (focus) ang = R0.Dir + (i - (n - 1) * 0.5) * V.Clamp(1.6 / n, 0.18, 0.5);
+                    if (yardPosts)
+                    {
+                        // v0.12.0a: behind the palisade, toward the threat (the firing step the view draws)
+                        var dir = V.F(Math.Cos(ang), Math.Sin(ang));
+                        float m = Math.Max(Math.Abs(Vector2.Dot(dir, yd.U)), Math.Abs(Vector2.Dot(dir, yd.V)));
+                        var wantY = yd.C + dir * ((yd.Half - 0.8f) / Math.Max(0.3f, m));
+                        int bk = -1; double bdy = 1e9;
+                        int RY = (int)Math.Ceiling(yd.Half) + 1;
+                        var cq = V.I(yd.C);
+                        for (int dy = -RY; dy <= RY; dy++)
+                            for (int dx = -RY; dx <= RY; dx++)
+                            {
+                                var q = cq.Add(dx, dy);
+                                if (!D.InMap(q) || !D.Walkable(q)) continue;
+                                int k = Ti(q);
+                                if (Blocked(k) || used.Contains(k)) continue;
+                                var qc = V.F(q).Add(V.HALF) - yd.C;
+                                if (Math.Abs(Vector2.Dot(qc, yd.U)) > yd.Half - 0.3f || Math.Abs(Vector2.Dot(qc, yd.V)) > yd.Half - 0.3f) continue;
+                                double dd = V.F(q).Add(V.HALF).Dist2To(wantY);
+                                if (dd < bdy) { bdy = dd; bk = k; }
+                            }
+                        if (bk >= 0) { used.Add(bk); gs[i].Post = V.F(Tp(bk)).Add(V.HALF); continue; }
+                    }
                     var want = V.F(b.Pos).Add(V.HALF).Add(V.F(Math.Cos(ang), Math.Sin(ang)).Mul(rp));
                     var best = b.Pos; double bd = 1000000000.0;
                     int R2 = (int)Math.Ceiling(rp) + 2;
@@ -165,6 +190,8 @@ namespace DayZero.Core
             {
                 if (p.St != "base" || !p.Guard || !p.Post.HasValue) continue;
                 var near = ZombiesNear(p.Pos, 0.9, 3);
+                if (near.Count == 0) continue;
+                near.RemoveAll(zi => WallBetween(ZPos(zi), p.Pos));   // v0.12.0a: not through an intact wall
                 if (near.Count == 0) continue;
                 var b = BaseById(p.Base);
                 double atk = 0.18 * 30.0 / (30.0 + (b != null ? Defense(b) : 10.0));

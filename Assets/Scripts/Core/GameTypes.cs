@@ -109,7 +109,8 @@ namespace DayZero.Core
     {
         public double R = 26.0;
         public bool Scav = true, Rescue = true, Conv = true, Guards = true;
-        public bool Get(string k) => k == "scav" ? Scav : k == "rescue" ? Rescue : k == "conv" ? Conv : k == "guards" ? Guards : true;
+        public bool Repair = true;   // v0.12.0a: survivors patch walls / breaches on their own
+        public bool Get(string k) => k == "scav" ? Scav : k == "rescue" ? Rescue : k == "conv" ? Conv : k == "guards" ? Guards : k == "repair" ? Repair : true;
     }
 
     public sealed class CraftJob
@@ -180,6 +181,11 @@ namespace DayZero.Core
         public int Spawned, Breaks, Nights, LastDay;
         public double Start = -1.0;
         public double Dmg;
+        // v0.12.0a: expected arrival at the wall (kept after launch for the HUD countdown), major attack flag,
+        // most raiders seen at the wall at once
+        public double Eta = -1.0;
+        public bool Major;
+        public int AtWall;
     }
 
     public sealed class Fighter
@@ -306,7 +312,25 @@ namespace DayZero.Core
     public sealed class FenceSeg { public int Tier; public int Col; }
     public sealed class Tower { public int Tier; public double Hp; public int Col; public int Bid; }
     public sealed class Trap { public int Kind; public double Hp; public int Col; public int Lvl; }
-    public sealed class Conversion { public string Type; public int Col; public int Bid; public int Manual; public double T; }
+    public sealed class Conversion
+    {
+        public string Type; public int Col; public int Bid; public int Manual; public double T;
+        public double Ready;     // v0.12.0a: > 0 = still being set up until this game hour (0 = in use)
+        public string Prev;      // use it had before a change of use (kept working until Ready)
+    }
+
+    /// <summary>v0.12.0a: a straight wall the player placed (or the starter palisade). The sim still works on
+    /// fence tiles (S.Fences); the run is the line those tiles were rasterised from, so the view can draw a
+    /// straight wall at any angle and map each tile's hp onto it.</summary>
+    public sealed class WallRun
+    {
+        public int Id; public Vector2 A, B; public int Tier; public int Col; public int Bid = -1;
+        public bool Starter;
+        public float GapT = -1f, GapW;   // opening along the run (0..1 at A..B, half-width in tiles) where the camp gate stands
+    }
+
+    /// <summary>v0.12.0a: a fence tile the dead broke through; survivors rebuild it (or the player pays to).</summary>
+    public sealed class Breach { public int Tier; public int Col; public double T; public bool Gate; }
     public sealed class GutJob { public int Col; public double Left, Total; public int Bid; public int Manual = 1; }
     public sealed class PlayerInfo { public string Name = ""; public int Col; }
 
@@ -338,6 +362,10 @@ namespace DayZero.Core
         public ODict<int, int> Gut = new ODict<int, int>();
         public ODict<int, GutJob> Guts = new ODict<int, GutJob>();
         public int FenceVer = 1, NextId = 1, ConvVer = 1;
+        // v0.12.0a defenses: placed wall runs, breaches waiting for repair; WallsInit is false in older saves
+        public List<WallRun> Walls = new List<WallRun>();
+        public ODict<int, Breach> Breaches = new ODict<int, Breach>();
+        public bool WallsInit;
         public byte[] Ctrl;
         public float[] CtrlH, Scout, Loot, Zinf, Srch;
         public byte[] SrchC;

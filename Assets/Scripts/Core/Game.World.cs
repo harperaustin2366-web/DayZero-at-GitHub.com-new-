@@ -355,7 +355,7 @@ namespace DayZero.Core
                 {
                     if (Blocked(best))
                     {
-                        HitBlocker(best, mode == 3 ? 1.1 * Z_RAID_HIT : 0.9 / MOVE_MULT);
+                        HitBlocker(best, mode == 3 ? RAID_WALL_HIT * Z_RAID_HIT : 0.9 / MOVE_MULT);
                         return cur;
                     }
                     return best;

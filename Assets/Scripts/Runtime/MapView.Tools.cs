@@ -1,0 +1,290 @@
+// v0.12.0a "Defend the base": play-mode taps on the map. With a DEFENSE tool active a tap moves the
+// placement ghost (wall segment / gate / watchtower / trap / wall upgrade), which GameUI's placement bar
+// rotates, lengthens and confirms; with no tool a tap selects a building (conversion sheet) or a wall run
+// (upgrade / repair sheet). All checks and costs come from the sim (Game.PlanWall, CanGate, CanTower,
+// CanTrap, WallUpgradePlan), all changes go through Bootstrap.Act -> Game.DoAction.
+using System;
+using System.Collections.Generic;
+using DayZero.Core;
+using UnityEngine;
+
+namespace DayZero.Runtime
+{
+    public sealed partial class MapView
+    {
+        public enum Tool { None, Wall, Gate, Tower, Trap, Upgrade }
+
+        public Tool ActiveTool { get; private set; } = Tool.None;
+        public int WallTier { get; private set; }
+        public int TrapKind { get; private set; }
+        public float WallLen { get; private set; } = 6f;
+        public int WallDir { get; private set; }          // 0 along the street grid, 1 diagonal, 2 across, 3 other diagonal
+        public Vector2 GhostAt { get; private set; } = new Vector2(-1f, -1f);
+        public bool ToolOk { get; private set; }
+        public string ToolErr { get; private set; } = "";
+        public string ToolCost { get; private set; } = "";
+        public string ToolInfo { get; private set; } = "";
+        int _toolKey = -1;            // gate tile / run id the tool aims at
+        GameObject _ghostGo;
+        float _ghostT;
+        string _ghostSig = "";
+
+        public int BuildingLot { get; private set; } = -1;   // building tapped in play mode (conversion sheet)
+        public int SelectedRun { get; private set; } = -1;   // wall run tapped in play mode
+        GameObject _bselGo;
+
+        bool Playing => G?.S != null && G.C != null && G.C.Started && !Picking;
+
+        // ---------------- tools ----------------
+        public void StartTool(Tool t, int tier = 0, int trapKind = 0)
+        {
+            ClearBuilding();
+            ActiveTool = t; WallTier = tier; TrapKind = trapKind;
+            // start the ghost just outside the camp gate, or at the screen centre when the camera looks elsewhere
+            var c = new Vector2(_focus.x, -_focus.z);
+            var g = G; var b = g?.MainBase();
+            if (b != null && (c - HomeTile()).magnitude < 6f)
+            {
+                var y = g.YardOf(b);
+                c = y.C - y.V * (y.Half + 3f);
+                WallDir = 0;
+            }
+            GhostAt = c;
+            _ghostSig = "";
+            RefreshGhost();
+        }
+
+        public void SetWallTier(int t) { WallTier = t; RefreshGhost(); }
+        public void SetTrapKind(int k) { TrapKind = k; RefreshGhost(); }
+        public void Rotate() { WallDir = (WallDir + 1) & 3; RefreshGhost(); }
+        public void Longer() { WallLen = Mathf.Min(Game.WALL_MAX_LEN, WallLen + 2f); RefreshGhost(); }
+        public void Shorter() { WallLen = Mathf.Max(2f, WallLen - 2f); RefreshGhost(); }
+
+        public void CancelTool()
+        {
+            ActiveTool = Tool.None; _toolKey = -1; ToolErr = ToolCost = ToolInfo = ""; ToolOk = false;
+            if (_ghostGo != null) { DestroyChunk(_ghostGo); _ghostGo = null; }
+            _ghostSig = "";
+        }
+
+        Vector2 WallAxis()
+        {
+            double th = D.RgAngle * Math.PI / 180.0;
+            var u = new Vector2((float)Math.Cos(th), (float)Math.Sin(th)); var v = new Vector2(-u.y, u.x);
+            switch (WallDir & 3)
+            {
+                case 1: return (u + v).normalized;
+                case 2: return v;
+                case 3: return (v - u).normalized;
+                default: return u;
+            }
+        }
+
+        public void WallEnds(out Vector2 a, out Vector2 b)
+        {
+            var ax = WallAxis();
+            a = GhostAt - ax * (WallLen * 0.5f); b = GhostAt + ax * (WallLen * 0.5f);
+        }
+
+        /// <summary>Re-check the tool target against the sim and rebuild the ghost mesh if anything changed.</summary>
+        public void RefreshGhost()
+        {
+            var g = G;
+            if (ActiveTool == Tool.None || g?.S == null || _gen == null) return;
+            var tiles = new List<int>(); var state = new List<int>();
+            var kind = MapGen.GhostKind.Wall;
+            Vector2 a = GhostAt, b = GhostAt;
+            int tier = WallTier;
+            var tile = new Vector2Int(Mathf.FloorToInt(GhostAt.x), Mathf.FloorToInt(GhostAt.y));
+            int key = D.InMap(tile) ? tile.y * D.W + tile.x : -1;
+            switch (ActiveTool)
+            {
+                case Tool.Wall:
+                {
+                    WallEnds(out a, out b);
+                    var pl = g.PlanWall(a, b, WallTier);
+                    tiles = pl.Tiles; state = pl.State;
+                    ToolOk = pl.Build.Count > 0 && pl.CanAfford && pl.Err == "";
+                    ToolErr = pl.Err != "" ? pl.Err : (!pl.CanAfford && pl.Build.Count > 0 ? "Need " + Game.FmtCost(pl.Cost) + "." : "");
+                    if (pl.Build.Count > 0 && pl.Err != "" && pl.CanAfford) { ToolOk = true; ToolErr = "Some tiles are skipped: " + pl.Err; }
+                    ToolCost = pl.Build.Count > 0 ? Game.FmtCost(pl.Cost) : "-";
+                    ToolInfo = string.Format("{0} · {1:0} tiles long · {2} to build", Data.FENCES[WallTier].Name, WallLen, pl.Build.Count);
+                    break;
+                }
+                case Tool.Gate:
+                {
+                    kind = MapGen.GhostKind.Gate;
+                    int best = -1; float bd = 1.6f;
+                    for (int dy = -2; dy <= 2; dy++)
+                        for (int dx = -2; dx <= 2; dx++)
+                        {
+                            var q = new Vector2Int(tile.x + dx, tile.y + dy);
+                            if (!D.InMap(q)) continue;
+                            int k = q.y * D.W + q.x;
+                            if (!g.S.Fences.ContainsKey(k)) continue;
+                            float dd = (new Vector2(q.x + 0.5f, q.y + 0.5f) - GhostAt).magnitude;
+                            if (dd < bd) { bd = dd; best = k; }
+                        }
+                    _toolKey = best;
+                    if (best >= 0) { a = new Vector2(best % D.W + 0.5f, best / D.W + 0.5f); tiles.Add(best); }
+                    ToolErr = best < 0 ? "Tap a wall to put a gate in it." : g.CanGate(best);
+                    if (ToolErr == "" && !g.CanAfford(Data.GATE_COST)) ToolErr = "Need " + Game.FmtCost(Data.GATE_COST) + ".";
+                    ToolOk = ToolErr == ""; state.Add(ToolOk ? 0 : 2);
+                    ToolCost = Game.FmtCost(Data.GATE_COST);
+                    ToolInfo = "Reinforced gate: twice the wall's hp, survivors come and go";
+                    break;
+                }
+                case Tool.Tower:
+                {
+                    kind = MapGen.GhostKind.Tower;
+                    a = new Vector2(tile.x + 0.5f, tile.y + 0.5f);
+                    if (key >= 0) tiles.Add(key);
+                    ToolErr = g.CanTower(tile, 0);
+                    var cost = g.TowerCost(0);
+                    if (ToolErr == "" && !g.CanAfford(cost)) ToolErr = "Need " + Game.FmtCost(cost) + ".";
+                    ToolOk = ToolErr == ""; state.Add(ToolOk ? 0 : 2);
+                    ToolCost = Game.FmtCost(cost);
+                    ToolInfo = "Watchtower: one survivor shoots from it (range " + Data.TOWERS[0].Range.ToString("0.#") + "), no ammo";
+                    break;
+                }
+                case Tool.Trap:
+                {
+                    kind = MapGen.GhostKind.Trap;
+                    a = new Vector2(tile.x + 0.5f, tile.y + 0.5f);
+                    if (key >= 0) tiles.Add(key);
+                    ToolErr = g.CanTrap(tile, TrapKind);
+                    var cost = g.TrapCost(TrapKind);
+                    if (ToolErr == "" && !g.CanAfford(cost)) ToolErr = "Need " + Game.FmtCost(cost) + ".";
+                    ToolOk = ToolErr == ""; state.Add(ToolOk ? 0 : 2);
+                    ToolCost = Game.FmtCost(cost);
+                    ToolInfo = Data.TRAPS[TrapKind].Name + ": " + Data.TRAPS[TrapKind].Desc;
+                    break;
+                }
+                case Tool.Upgrade:
+                {
+                    kind = MapGen.GhostKind.Upgrade;
+                    var run = g.RunNear(GhostAt, 1.6f);
+                    _toolKey = run?.Id ?? -1;
+                    var up = g.WallUpgradePlan(run);
+                    if (run != null) { a = run.A; b = run.B; tiles = up.tiles; foreach (var _ in up.tiles) state.Add(up.err == "" ? 0 : 2); tier = up.next >= 0 ? up.next : run.Tier; }
+                    ToolErr = run == null ? "Tap one of your walls." : up.err;
+                    if (ToolErr == "" && !g.CanAfford(up.cost)) ToolErr = "Need " + Game.FmtCost(up.cost) + ".";
+                    ToolOk = ToolErr == "";
+                    ToolCost = up.next >= 0 ? Game.FmtCost(up.cost) : "-";
+                    ToolInfo = run == null ? "Upgrade: wood palisade → scrap metal → concrete" : string.Format("{0} → {1} ({2} tiles)", Data.FENCES[run.Tier].Name, up.next >= 0 ? Data.FENCES[up.next].Name : "max", up.tiles.Count);
+                    break;
+                }
+            }
+            // rebuild the ghost mesh only when what it shows changed
+            var sb = new System.Text.StringBuilder();
+            sb.Append((int)ActiveTool).Append(':').Append(a.x.ToString("0.00")).Append(',').Append(a.y.ToString("0.00")).Append(':').Append(b.x.ToString("0.00")).Append(',').Append(b.y.ToString("0.00")).Append(':').Append(tier).Append(ToolOk ? 'y' : 'n');
+            for (int i = 0; i < tiles.Count; i++) sb.Append(tiles[i]).Append(state.Count > i ? state[i] : 0);
+            string sig = sb.ToString();
+            if (sig == _ghostSig && _ghostGo != null) return;
+            _ghostSig = sig;
+            if (_ghostGo != null) DestroyChunk(_ghostGo);
+            var ch = _gen.Ghost(kind, a, b, tiles, state, tier, ToolOk, TrapKind);
+            _ghostGo = new GameObject("Placement ghost");
+            _ghostGo.transform.SetParent(transform, false);
+            if (ch.Mesh.Count > 0) MakeObject("Ghost", ToMesh("Ghost", ch.Mesh), _objMat, _ghostGo.transform);
+            if (_glowMat != null && ch.Shadow.Count > 0) MakeObject("Ghost tiles", ToMesh("Ghost tiles", ch.Shadow), _glowMat, _ghostGo.transform);
+        }
+
+        /// <summary>CONFIRM on the placement bar. Returns the sim's error ("" = built).</summary>
+        public string ConfirmTool()
+        {
+            var bs = Bootstrap.Instance; var g = G;
+            if (bs == null || g == null) return "No game.";
+            string e;
+            switch (ActiveTool)
+            {
+                case Tool.Wall: WallEnds(out var a, out var b); e = bs.Act("place_wall", a, b, WallTier); break;
+                case Tool.Gate: e = _toolKey >= 0 ? bs.Act("place_gate", _toolKey) : "Tap a wall to put a gate in it."; break;
+                case Tool.Tower: e = bs.Act("place_tower", new Vector2Int(Mathf.FloorToInt(GhostAt.x), Mathf.FloorToInt(GhostAt.y)), 0); break;
+                case Tool.Trap: e = bs.Act("place_trap", new Vector2Int(Mathf.FloorToInt(GhostAt.x), Mathf.FloorToInt(GhostAt.y)), TrapKind); break;
+                case Tool.Upgrade: e = _toolKey >= 0 ? bs.Act("upgrade_wall", _toolKey) : "Tap one of your walls."; break;
+                default: e = ""; break;
+            }
+            _ghostSig = "";
+            _dynKey = "";
+            RefreshGhost();
+            return e;
+        }
+
+        void UpdateTools()
+        {
+            if (!Playing) { if (ActiveTool != Tool.None) CancelTool(); if (BuildingLot >= 0) ClearBuilding(); return; }
+            if (ActiveTool == Tool.None) return;
+            _ghostT -= Time.unscaledDeltaTime;
+            if (_ghostT <= 0f) { _ghostT = 0.3f; RefreshGhost(); }
+        }
+
+        // ---------------- play-mode taps ----------------
+        void OnPlayTap(Vector2 screen)
+        {
+            if (_cam == null || _gen == null || G?.S == null) return;
+            var ray = _cam.ScreenPointToRay(new Vector3(screen.x, screen.y, 0f));
+            Vector2 gp = new Vector2(-1f, -1f);
+            if (Ground(screen, out var hit)) gp = new Vector2(hit.x, -hit.z);
+            if (ActiveTool != Tool.None)
+            {
+                if (gp.x < 0f) return;
+                GhostAt = gp;
+                RefreshGhost();
+                Bootstrap.Instance?.PlayClick();
+                return;
+            }
+            int lot = _gen.PickLot(ray.origin, ray.direction);
+            if (lot >= 0 && !G.InCampYard(lot)) { SelectBuilding(lot); return; }
+            var run = gp.x >= 0f ? G.RunNear(gp, 1.0f) : null;
+            if (run != null) { ClearBuilding(); SelectedRun = run.Id; Bootstrap.Instance?.PlayClick(); return; }
+            ClearBuilding();
+        }
+
+        public void SelectBuilding(int lot)
+        {
+            ClearBuilding();
+            BuildingLot = lot;
+            var g = G;
+            bool ok = g != null && g.ConvPlaceError(lot) == "";
+            var ch = _gen.Highlight(lot, ok);
+            _bselGo = new GameObject("Building selection");
+            _bselGo.transform.SetParent(transform, false);
+            if (ch.Mesh.Count > 0) MakeObject("Highlight", ToMesh("Highlight", ch.Mesh), _objMat, _bselGo.transform);
+            if (_glowMat != null && ch.Shadow.Count > 0) MakeObject("Glow", ToMesh("Glow", ch.Shadow), _glowMat, _bselGo.transform);
+            Bootstrap.Instance?.PlayClick();
+        }
+
+        public void ClearBuilding()
+        {
+            BuildingLot = -1; SelectedRun = -1;
+            if (_bselGo != null) { DestroyChunk(_bselGo); _bselGo = null; }
+        }
+
+        /// <summary>Building info for the conversion sheet.</summary>
+        public string BuildingType(int lot)
+        {
+            if (_gen == null) return "Building";
+            _gen.Describe(lot, out string type, out _, out _, out _);
+            return type;
+        }
+
+        /// <summary>Floating label anchors of converted buildings (world space).</summary>
+        public bool LabelAnchor(int lot, out Vector3 w)
+        {
+            w = default;
+            return _gen != null && _gen.LabelAnchor(lot, out w);
+        }
+
+        /// <summary>Glide the camera to a tile-space point.</summary>
+        public void FlyTo(Vector2 p)
+        {
+            _focusTarget = new Vector3(p.x, 0f, -p.y);
+            _animFocus = true;
+            if (_distTarget > 40f) _distTarget = 30f;
+        }
+
+        /// <summary>Force the dynamic layer (walls, conversions) to rebuild now.</summary>
+        public void DirtyDynamic() { _dynKey = ""; _dynT = 0f; }
+    }
+}

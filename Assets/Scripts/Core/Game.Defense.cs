@@ -1084,6 +1084,7 @@ namespace DayZero.Core
                 if (f.Hp <= 0.0)
                 {
                     int oc = f.Col;
+                    RecordBreach(k, f, IsGate(k));
                     S.Fences.Remove(k);
                     int lc = LogCol;
                     LogCol = oc;
@@ -1643,6 +1644,14 @@ namespace DayZero.Core
                 if (near.x >= 0f && p.DistTo(near) > 40f) continue;
                 o.Add(((1.0 - frac) * (g ? 3.0 : 1.5) + (p.DistTo(hot) < 40f ? 1.0 : 0.0), g ? "gate" : "fence", kv.Key, frac));
             }
+            foreach (var kv in S.Breaches)
+            {
+                var br = kv.Value;
+                if (br.Col != CurCol || S.Fences.Has(kv.Key)) continue;
+                var pb = V.F(Tp(kv.Key));
+                if (near.x >= 0f && pb.DistTo(near) > 40f) continue;
+                o.Add((4.0 + (br.Gate ? 1.0 : 0.0) + (pb.DistTo(hot) < 40f ? 1.0 : 0.0), "breach", kv.Key, 0.0));
+            }
             foreach (var kv in S.Towers)
             {
                 var t = kv.Value;
@@ -1683,12 +1692,16 @@ namespace DayZero.Core
                 case "trap":
                     if (!S.Traps.TryGetValue(k, out var tr)) return 0.0;
                     return MatSum(Data.TRAPS[tr.Kind].Cost) * (1.0 - tr.Hp / TrapHpMax(tr)) * RepairCostMult();
+                case "breach":
+                    if (!S.Breaches.TryGetValue(k, out var br)) return 0.0;
+                    return BreachCostMats(br);
             }
             return 0.0;
         }
 
         bool RepairUrgent(Base b)
         {
+            if (!C.Auto.Repair) return false;
             var q = RepairQueue(b);
             return q.Count > 0 && q[0].frac < 0.5 && MatsTotal() >= 2.0;
         }

@@ -63,6 +63,14 @@ namespace DayZero.Runtime
         readonly List<(Vector2 at, float t, bool shot)> _events = new List<(Vector2, float, bool)>();
         readonly List<(Vector2 at, float t)> _recentHits = new List<(Vector2, float)>();
         readonly List<MapGen.CampLayout> _camps = new List<MapGen.CampLayout>();
+        readonly List<Vector2> _breaches = new List<Vector2>();
+        ODict<int, Fence> _fences;
+
+        bool NearBreach(Vector2 p, float r)
+        {
+            for (int i = 0; i < _breaches.Count; i++) if ((_breaches[i] - p).sqrMagnitude < r * r) return true;
+            return false;
+        }
         readonly M34[] _bones = new M34[CharModel.BONES];
         float _time;
         int _nextZ = 1, _lastKills = -1;
@@ -102,6 +110,10 @@ namespace DayZero.Runtime
             // camp layouts (yard, building, fire, tower) for every base
             _camps.Clear();
             foreach (var b in g.AllBases()) if (_gen.Layout(b, out var lay)) _camps.Add(lay);
+            // v0.12.0a: breaches let the dead through the palisade; intact fence tiles of placed walls are attacked
+            _breaches.Clear();
+            if (g.S.Breaches != null) foreach (var kv in g.S.Breaches) if (!g.S.Fences.ContainsKey(kv.Key)) _breaches.Add(new Vector2(kv.Key % _gen.MapW + 0.5f, kv.Key / _gen.MapW + 0.5f));
+            _fences = g.S.Fences;
 
             foreach (var a in _surv.Values) a.Seen = false;
             SyncSurvivors(g, dt, focus, R, camDist);
@@ -443,7 +455,7 @@ namespace DayZero.Runtime
                 var d = tgt - y.C;
                 float du = Vector2.Dot(d, y.U), dv = Vector2.Dot(d, y.V);
                 float pad = 0.32f;
-                if (Mathf.Abs(du) < y.Hu + pad && Mathf.Abs(dv) < y.Hv + pad)
+                if (Mathf.Abs(du) < y.Hu + pad && Mathf.Abs(dv) < y.Hv + pad && !NearBreach(tgt, 1.3f))
                 {
                     float gu = y.Hu + pad - Mathf.Abs(du), gv = y.Hv + pad - Mathf.Abs(dv);
                     Vector2 inward;
@@ -453,6 +465,20 @@ namespace DayZero.Runtime
                     var along = new Vector2(-inward.y, inward.x);
                     tgt += along * ((MapGen.Hf(z.Key, 31) - 0.5f) * 1.6f) - inward * (MapGen.Hf(z.Key, 32) * 0.35f);
                     z.Attacking = true; z.AtWall = true; z.AttackYaw = YawOf(inward);
+                    break;
+                }
+            }
+            // v0.12.0a: right against a placed wall's tile: claw at it
+            if (!z.Attacking && _fences != null)
+            {
+                int tx = Mathf.FloorToInt(tgt.x), ty = Mathf.FloorToInt(tgt.y);
+                foreach (var dd in Game.DIRS)
+                {
+                    int k = (ty + dd.y) * _gen.MapW + tx + dd.x;
+                    if (k < 0 || !_fences.ContainsKey(k)) continue;
+                    var fc = new Vector2(tx + dd.x + 0.5f, ty + dd.y + 0.5f);
+                    if ((fc - tgt).sqrMagnitude > 1.0f) continue;
+                    z.Attacking = true; z.AtWall = true; z.AttackYaw = YawOf(fc - tgt);
                     break;
                 }
             }

@@ -32,7 +32,7 @@ namespace DayZero.Runtime
         public int Tier;          // 0 landmark, 1 minor landmark, 2 district
     }
 
-    public sealed class MapView : MonoBehaviour
+    public sealed partial class MapView : MonoBehaviour
     {
         public static MapView Instance { get; private set; }
 
@@ -165,11 +165,12 @@ namespace DayZero.Runtime
             _dynT -= Time.unscaledDeltaTime;
             if (_dynT <= 0f) { _dynT = 0.75f; UpdateDynamic(); }
             if (!Picking && SelectedLot >= 0) ClearSelection();
+            UpdateTools();
             UpdateCrowd(b);
         }
 
         /// <summary>Force a full rebuild on the next frame (new game / load may reuse the same world seed).</summary>
-        public void Invalidate() { _builtKey = ""; _pickFocus = new Vector2(-1f, -1f); ClearSelection(); }
+        public void Invalidate() { _builtKey = ""; _pickFocus = new Vector2(-1f, -1f); ClearSelection(); Game.YardProvider = null; CancelTool(); ClearBuilding(); }
 
         /// <summary>True while a new game waits for the player to pick the building for the camp.</summary>
         public bool Picking { get { var g = G; return g?.S != null && g.C != null && !g.C.Started && g.S.Phase == "pick"; } }
@@ -319,7 +320,8 @@ namespace DayZero.Runtime
         // ================= start-site selection =================
         void OnTap(Vector2 screen)
         {
-            if (!Picking || _cam == null || _gen == null) return;
+            if (!Picking) { OnPlayTap(screen); return; }
+            if (_cam == null || _gen == null) return;
             var ray = _cam.ScreenPointToRay(new Vector3(screen.x, screen.y, 0f));
             int lot = _gen.PickLot(ray.origin, ray.direction);
             if (lot < 0) { ClearSelection(); Bootstrap.Instance?.Toast("Tap a building to make it your base."); return; }
@@ -453,6 +455,8 @@ namespace DayZero.Runtime
             yield return null;
 
             _gen = new MapGen(d);
+            Game.YardProvider = _gen.YardFor;   // v0.12.0a: the sim's starter palisade follows the drawn yard
+            G?.EnsureWallsNow();
             _gen.SetCamps(G);
             if (_crowd != null && _sfxGame != null) _sfxGame.SfxRequested -= _crowd.OnSfx;
             _sfxGame = null;
@@ -727,6 +731,17 @@ namespace DayZero.Runtime
             foreach (var kv in conv) sb.Append(kv.Key).Append(':').Append(kv.Value.Col).Append(';');
             sb.Append('|');
             foreach (var kv in lit) sb.Append(kv.Key).Append(':').Append(kv.Value).Append(';');
+            // v0.12.0a: walls (tier + hp in quarters), breaches, towers, traps, conversions being set up
+            var S = g.S;
+            sb.Append('|').Append(S.Walls?.Count ?? 0).Append('w');
+            foreach (var kv in S.Fences) sb.Append(kv.Key).Append(kv.Value.Tier).Append((int)(kv.Value.Hp / Math.Max(1.0, g.FenceTileMax(kv.Key)) * 4.0)).Append(S.Gates.ContainsKey(kv.Key) ? 'g' : ',');
+            sb.Append('|');
+            if (S.Breaches != null) foreach (var kv in S.Breaches) sb.Append(kv.Key).Append(',');
+            sb.Append('|');
+            foreach (var kv in S.Towers) sb.Append(kv.Key).Append(kv.Value.Tier).Append(',');
+            foreach (var kv in S.Traps) sb.Append(kv.Key).Append(kv.Value.Kind).Append(kv.Value.Hp > 0 ? 'a' : 'x').Append(',');
+            sb.Append('|');
+            foreach (var kv in conv) sb.Append(kv.Value.Type).Append(kv.Value.Ready > S.T ? (int)(g.ConvProgress(kv.Key) * 5.0) : 9).Append(',');
             string key = sb.ToString();
             if (key == _dynKey) return;
             _dynKey = key;

@@ -474,6 +474,12 @@ namespace DayZero.Core
                         return SetGuard(pg, a.Count > 1 && B(a[1]));
                     }
                 case "place_gate": return PlaceGate(I(a[0]));
+                case "place_wall":
+                    if (a.Count < 2 || !(a[0] is Vector2) || !(a[1] is Vector2)) return "Drag out a wall first.";
+                    return PlaceWall((Vector2)a[0], (Vector2)a[1], a.Count > 2 ? I(a[2]) : 0);
+                case "upgrade_wall": return UpgradeWall(I(a[0]));
+                case "remove_wall": return RemoveWall(I(a[0]));
+                case "repair_all": return RepairAllNow().err;
                 case "remove_gate": return RemoveGate(I(a[0]));
                 case "place_trap":
                     if (a.Count < 2 || !(a[0] is Vector2Int)) return "Bad trap spot.";

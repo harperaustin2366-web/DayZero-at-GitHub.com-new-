@@ -154,7 +154,7 @@ namespace DayZero.Core
                 }
                 if (Hour() == 12) AddLog("People are going hungry. Send scavengers out or plant gardens.", "loss");
             }
-            else C.Morale = Math.Min(100.0, C.Morale + 0.15 + Rx("morale_add") + 0.05 * Math.Min(3, ConvN("school")) + WallsMorale());
+            else C.Morale = Math.Min(100.0, C.Morale + 0.15 + Rx("morale_add") + 0.05 * Math.Min(3, ConvN("school")) + 0.04 * Math.Min(2, ConvN("kitchen")) + WallsMorale());
         }
 
         public double WallsMorale()
@@ -480,7 +480,11 @@ namespace DayZero.Core
                 case "repair":
                     int k = Ti(p.Tgt);
                     double eff = (1.0 + Rx("repair_mult")) / RepairCostMult();
-                    if (S.Traps.Has(k) && !S.Fences.Has(k) && !S.Towers.Has(k)) RepairTrap(p, k);
+                    if (S.Breaches.Has(k) && !S.Fences.Has(k))
+                    {
+                        if (RebuildBreach(k)) { PlaySfx("hammer", p.Pos); AddLog(string.Format("{0} rebuilt the broken wall on {1}.", p.First, StreetName(Tp(k))), "good"); }
+                    }
+                    else if (S.Traps.Has(k) && !S.Fences.Has(k) && !S.Towers.Has(k)) RepairTrap(p, k);
                     else if (S.Fences.TryGetValue(k, out var f))
                     {
                         double mx = FenceTileMax(k);
@@ -713,6 +717,7 @@ namespace DayZero.Core
                         return true;
                     }
             int bestk = -1;
+            if (C.Auto.Repair)
             foreach (var it in RepairQueue(b))
             {
                 int kk = it.k;
@@ -774,6 +779,10 @@ namespace DayZero.Core
                     }
                     else PlaySfx("hit", p.Pos);
                 }
+                // v0.12.0a: on the firing step behind an intact wall the dead can't reach back: spears, axes and
+                // rifle butts over the top (no ammo needed), so the line holds better than in the open
+                bool overWall = duty && near.Count > 0 && WallBetween(ZPos(near[0]), p.Pos);
+                if (overWall) hit += 0.15;
                 for (int k = 0; k < Math.Min(wd.Multi, near.Count); k++)
                     if (Rng.Randf() < hit)
                     {
@@ -790,8 +799,10 @@ namespace DayZero.Core
                 var here = AtBase(b.Id);
                 if (here.Count == 0) continue;
                 double atk = 0.28 * 30.0 / (30.0 + Defense(b));
+                var door = V.F(b.Pos).Add(V.HALF);
                 foreach (int zi in near)
                 {
+                    if (WallBetween(ZPos(zi), door)) continue;   // v0.12.0a: the dead clawing at the outside of an intact wall can't reach anyone
                     if (Rng.Randf() < atk)
                     {
                         var v = here[Rng.RandiRange(0, here.Count - 1)];
@@ -1239,6 +1250,7 @@ namespace DayZero.Core
                 case "rescue": C.Auto.Rescue = Convert.ToBoolean(v); break;
                 case "conv": C.Auto.Conv = Convert.ToBoolean(v); break;
                 case "guards": C.Auto.Guards = Convert.ToBoolean(v); break;
+                case "repair": C.Auto.Repair = Convert.ToBoolean(v); break;
                 default: return "Unknown setting.";
             }
             EmitChanged();

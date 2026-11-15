@@ -350,6 +350,7 @@ namespace DayZero.Core
                 }
             }
             Use(ViewCol);
+            EnsureWalls();
             _wInf = new float[SW * SH];
             ResetWeights();
             UpdateWeights();

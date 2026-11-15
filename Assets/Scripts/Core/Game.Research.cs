@@ -211,8 +211,38 @@ namespace DayZero.Core
         {
             string e = ConvPlaceError(l, ci);
             if (e != "") return e;
-            if (ConvOf(l) == null && !IsGutted(l)) return GUT_FIRST;
+            if (ConvOf(l) == null && !IsGutted(l) && !ScavengedByMe(l, ci < 0 ? CurCol : ci)) return SCAV_FIRST;
             return "";
+        }
+
+        public const string SCAV_FIRST = "Scavenge it first (or GUT it to the shell), then it can be converted.";
+
+        /// <summary>v0.12.0a: a building the colony has already searched (or picked nearly clean) can be converted
+        /// without gutting it first.</summary>
+        public bool ScavengedByMe(int l, int ci = -1)
+        {
+            if (ci < 0) ci = CurCol;
+            if (l < 0 || l >= D.Lots.Count || S.Srch == null) return false;
+            return (S.Srch[l] >= 0f && S.SrchC[l] == ci + 1) || S.Loot[l] < 0.25f || IsGutted(l);
+        }
+
+        /// <summary>True while survivors are still setting the building up for its new use.</summary>
+        public bool ConvPending(int l) => S.Conv.TryGetValue(l, out var c) && c.Ready > 0.0 && c.Ready > S.T;
+
+        /// <summary>0..1 progress of a conversion being set up (1 when in use).</summary>
+        public double ConvProgress(int l)
+        {
+            if (!S.Conv.TryGetValue(l, out var c) || c.Ready <= 0.0) return 1.0;
+            double tot = Math.Max(0.01, c.Ready - c.T);
+            return V.Clamp((S.T - c.T) / tot, 0.0, 1.0);
+        }
+
+        public double ConvHours(string type, int l = -1)
+        {
+            double h = Data.CONVERSIONS.TryGetValue(type, out var cd) ? cd.Hours : 8.0;
+            if (l >= 0 && ConvOf(l) != null) h *= 0.5;                 // change of use: the shell is already cleared
+            if (ConvN("workshop") > 0) h *= 0.8;
+            return Math.Max(1.0, Math.Round(h, 1));
         }
 
         public string ConvPlaceError(int l, int ci = -1)
@@ -224,6 +254,7 @@ namespace DayZero.Core
             if (k == "farm" && D.Lots[l].Landmark == "") return "That's an open field.";
             if (D.Lots[l].Cells < 2) return "Too small to use.";
             if (LotOwnerBase(l) != null) return "That building is part of a camp.";
+            if (InCampYard(l)) return "That spot is inside your camp's yard (it was cleared for the palisade).";
             if (_factionLotsDirty) RefreshFactionLots();
             if (_factionLots.ContainsKey(l)) return "A faction holds that building.";
             var cv = ConvOf(l);
@@ -246,9 +277,11 @@ namespace DayZero.Core
             {
                 var c = kv.Value;
                 if (c.Col != ci) continue;
-                all[c.Type] = all.GetOr(c.Type, 0) + 1;
+                if (c.Ready > 0.0 && string.IsNullOrEmpty(c.Prev)) continue;   // still being set up (a change of use keeps the old one running)
+                string ty = c.Ready > 0.0 ? c.Prev : c.Type;
+                all[ty] = all.GetOr(ty, 0) + 1;
                 if (!per.ContainsKey(c.Bid)) per[c.Bid] = new Dictionary<string, int>();
-                per[c.Bid][c.Type] = per[c.Bid].GetOr(c.Type, 0) + 1;
+                per[c.Bid][ty] = per[c.Bid].GetOr(ty, 0) + 1;
             }
             var o = (all, per);
             _convCache[ci] = o;
@@ -264,6 +297,15 @@ namespace DayZero.Core
             return cc.per.TryGetValue(bid, out var d) ? d.GetOr(type, 0) : 0;
         }
 
+        /// <summary>Conversions of a type including those still being set up (the AI plans with these).</summary>
+        public int ConvNAll(string type, int ci = -1)
+        {
+            if (ci < 0) ci = CurCol;
+            int n = 0;
+            foreach (var kv in S.Conv) if (kv.Value.Col == ci && kv.Value.Type == type) n++;
+            return n;
+        }
+
         public List<int> ConvList(int ci = -1)
         {
             if (ci < 0) ci = CurCol;
@@ -273,12 +315,14 @@ namespace DayZero.Core
         void ConvBalance(Base b, ODict<string, double> r, double agri, double wm)
         {
             int ci = b.Col, bid = b.Id;
-            if (ConvN("hospital", bid, ci) + ConvN("farm", bid, ci) + ConvN("water", bid, ci) + ConvN("workshop", bid, ci) + ConvN("garage", bid, ci) + ConvN("armory", bid, ci) == 0) return;
+            if (ConvN("hospital", bid, ci) + ConvN("farm", bid, ci) + ConvN("water", bid, ci) + ConvN("workshop", bid, ci) + ConvN("garage", bid, ci) + ConvN("armory", bid, ci) + ConvN("kitchen", bid, ci) == 0) return;
             r["meds"] += 0.5 * ConvN("hospital", bid, ci);
             r["food"] += 5.0 * ConvN("farm", bid, ci) * agri;
             r["water"] += 4.0 * ConvN("water", bid, ci) * wm;
             r["materials"] += 1.5 * ConvN("workshop", bid, ci);
             r["fuel"] += 0.8 * ConvN("garage", bid, ci);
+            int nk = ConvN("kitchen", bid, ci);
+            if (nk > 0 && _balUp.Has("food")) r["food"] += Math.Min(0.24, 0.12 * nk) * _balUp["food"];
             int na = ConvN("armory", bid, ci);
             if (na > 0 && R("metal") > 3.0)
             {
@@ -312,6 +356,7 @@ namespace DayZero.Core
                 ["armory"] = (1.5 + (R("ammo") < 15.0 ? 5.0 : 0.0) + Math.Min(3.0, 0.4 * GuardsTotal()), R("ammo") < 15.0 ? "ammo is low" : "the guards need a reloading bench"),
                 ["garage"] = (1.0 + (R("fuel") < 5.0 ? 4.0 : 0.0), "fuel is low"),
                 ["school"] = (2.5 + (C.Research.Cur != "" ? 1.5 : 0.0), "things are steady enough to teach the kids"),
+                ["kitchen"] = (1.0 + (tot["food"] < 0.0 ? 5.0 : 0.0) + (pop >= 12 ? 2.0 : 0.0), "meals have to stretch further"),
             };
         }
 
@@ -322,7 +367,7 @@ namespace DayZero.Core
             string best = "school"; double bs = -1000000000.0;
             foreach (var t in Data.CONV_ORDER)
             {
-                double sc = needs[t].score / (1.0 + 0.8 * ConvN(t)) + (t == aff ? 2.5 : 0.0);
+                double sc = needs[t].score / (1.0 + 0.8 * ConvNAll(t)) + (t == aff ? 2.5 : 0.0);
                 if (sc > bs + 0.0001) { bs = sc; best = t; }
             }
             return (best, needs[best].why);
@@ -333,7 +378,10 @@ namespace DayZero.Core
         void ConvertLot(int l, string type, Base b, bool manual, string reason)
         {
             string was = ConvType(l);
-            S.Conv[l] = new Conversion { Type = type, Col = CurCol, Bid = b?.Id ?? -1, Manual = manual ? 1 : 0, T = S.T };
+            var old = ConvOf(l);
+            double hrs = ConvHours(type, l);
+            S.Conv[l] = new Conversion { Type = type, Col = CurCol, Bid = b?.Id ?? -1, Manual = manual ? 1 : 0, T = S.T, Ready = S.T + hrs,
+                Prev = old != null ? (old.Ready > 0.0 ? old.Prev : old.Type) : null };
             if (!S.Gut.Has(l)) S.Gut[l] = CurCol + 1;
             if (!Searched(l)) MarkSearched(l, CurCol + 1);
             S.Loot[l] = 0f;
@@ -342,10 +390,10 @@ namespace DayZero.Core
             string where = WhereName(l);
             if (manual)
             {
-                if (was != "") AddLog(string.Format("{0}: the {1} is now {2}.", b?.Name ?? "Camp", Data.CONVERSIONS[was].Name, A(cd.Name)), "good");
-                else AddLog(string.Format("{0}: survivors moved into {1} and set it up as {2}.", b?.Name ?? "Camp", where, A(cd.Name)), "good");
+                if (was != "") AddLog(string.Format("{0}: the {1} is being refitted as {2} (about {3:0} h).", b?.Name ?? "Camp", Data.CONVERSIONS[was].Name, A(cd.Name), hrs), "info");
+                else AddLog(string.Format("{0}: survivors moved into {1} and are setting it up as {2} (about {3:0} h).", b?.Name ?? "Camp", where, A(cd.Name), hrs), "info");
             }
-            else AddLog(string.Format("Inside {0}'s safe zone, survivors turned {1} into {2} ({3}).", b?.Name ?? "camp", where, A(cd.Name), reason), "good");
+            else AddLog(string.Format("Inside {0}'s safe zone, survivors are turning {1} into {2} ({3}).", b?.Name ?? "camp", where, A(cd.Name), reason), "info");
             PlaySfx("hammer", D.LotCenter(l));
             EmitChanged();
         }
@@ -380,6 +428,18 @@ namespace DayZero.Core
             var cv = S.Conv;
             foreach (var kv in cv)
             {
+                var pc = kv.Value;
+                if (pc.Col == CurCol && pc.Ready > 0.0 && S.T >= pc.Ready)
+                {
+                    pc.Ready = 0.0; pc.Prev = null;
+                    S.ConvVer++;
+                    var pb = BaseById(pc.Bid);
+                    AddLog(string.Format("{0}: the {1} in {2} is ready.", pb?.Name ?? "Camp", Data.CONVERSIONS.TryGetValue(pc.Type, out var pd) ? pd.Name : pc.Type, WhereName(kv.Key)), "good");
+                    EmitChanged();
+                }
+            }
+            foreach (var kv in cv)
+            {
                 var c = kv.Value;
                 if (c.Col != CurCol || BaseById(c.Bid) != null) continue;
                 var nb = NearestOwnBase(D.LotCenter(kv.Key));
@@ -410,7 +470,7 @@ namespace DayZero.Core
                     bool mine = (srch[l] >= 0f && srchC[l] == CurCol + 1) || S.Loot[l] < 0.25f || IsGutted(l);
                     if (!mine) continue;
                     if (ConvPlaceError(l) != "") continue;
-                    if (!IsGutted(l))
+                    if (!IsGutted(l) && !ScavengedByMe(l))
                     {
                         if (Gutting(l) || GutsOf(CurCol) >= Data.GUT_MAX) continue;
                         if (GutError(l) == "") BeginGut(l, ConvZoneBase(l), false);
