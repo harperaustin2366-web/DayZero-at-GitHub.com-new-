@@ -22,8 +22,8 @@ namespace DayZero.EditorTools
     {
         public const string COMPANY = "Austin Harper";
         public const string PRODUCT = "DayZero";
-        public const string VERSION = "0.11.0a";
-        public const int VERSION_CODE = 1;
+        public const string VERSION = "0.11.1a";
+        public const int VERSION_CODE = 2;
         public const string APP_ID = "com.austinharper.dayzero";
         public const string BOOT_SCENE = "Assets/Scenes/Boot.unity";
         public const string DEFAULT_APK = "Builds/Android/DayZero.apk";
