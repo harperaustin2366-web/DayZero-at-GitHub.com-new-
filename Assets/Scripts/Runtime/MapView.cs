@@ -435,14 +435,14 @@ namespace DayZero.Runtime
         static Color Hex(string s) { ColorUtility.TryParseHtmlString(s, out var c); return c; }
 
         // ---------------- ground painting ----------------
-        static readonly Color C_GRASS = new Color(0.47f, 0.55f, 0.33f);
-        static readonly Color C_GRASS_DRY = new Color(0.60f, 0.60f, 0.40f);
+        static readonly Color C_GRASS = new Color(0.40f, 0.47f, 0.27f);
+        static readonly Color C_GRASS_DRY = new Color(0.52f, 0.52f, 0.34f);
         static readonly Color C_FOREST = new Color(0.30f, 0.40f, 0.25f);
         static readonly Color C_DIRT = new Color(0.52f, 0.44f, 0.33f);
-        static readonly Color C_ASPHALT = new Color(0.30f, 0.30f, 0.31f);
-        static readonly Color C_AVE = new Color(0.35f, 0.35f, 0.355f);
+        static readonly Color C_ASPHALT = new Color(0.27f, 0.27f, 0.27f);
+        static readonly Color C_AVE = new Color(0.31f, 0.31f, 0.30f);
         static readonly Color C_WEED = new Color(0.42f, 0.48f, 0.28f);
-        static readonly Color C_WATER = new Color(0.22f, 0.33f, 0.36f);
+        static readonly Color C_WATER = new Color(0.20f, 0.32f, 0.31f);
         static readonly Color C_PAVE = new Color(0.62f, 0.60f, 0.55f);
         static readonly Color C_CONCRETE = new Color(0.55f, 0.53f, 0.49f);
         static readonly Color C_PIER = new Color(0.45f, 0.37f, 0.28f);
@@ -679,6 +679,7 @@ namespace DayZero.Runtime
             float ruin = Hf(l, 7);
             bool burnt = !landmark && ruin < 0.09f;
             bool collapsed = !landmark && !burnt && ruin < 0.15f;
+            bool broken = !landmark && !burnt && !collapsed && ruin < 0.27f && h > 0.9f;
             bool mossy = Hf(l, 8) < 0.4f;
             bool gable = k2 == "house" || k2 == "farmhouse" || k2 == "cabin" || k2 == "barn" || k2 == "church" || k2 == "shack";
 
@@ -701,6 +702,22 @@ namespace DayZero.Runtime
                 gable = false;
             }
 
+            if (broken)
+            {
+                // half-collapsed: one half stands, the other is sheared off low with rubble spilling out
+                var a = new[] { q[0], (q[0] + q[1]) * 0.5f, (q[3] + q[2]) * 0.5f, q[3] };
+                var b = new[] { (q[0] + q[1]) * 0.5f, q[1], q[2], (q[3] + q[2]) * 0.5f };
+                if (Hf(l, 15) < 0.5f) { var t = a; a = b; b = t; }
+                float hb = bh * (0.25f + Hf(l, 16) * 0.3f);
+                mb.Box(a, 0f, bh, wall, roof, MOSS, 0.5f);
+                mb.Box(b, 0f, hb, wall * 0.9f, Color.Lerp(roof, CHAR, 0.4f), MOSS, 0.5f);
+                Color glassB = Color.Lerp(wall, new Color(0.13f, 0.14f, 0.15f), 0.75f);
+                for (int f = 0; f * FL + FL * 0.72f < bh - 0.04f; f++) mb.WallBand(a, f * FL + FL * 0.38f, f * FL + FL * 0.72f, glassB, 0.1f);
+                AddRubble(mb, b, l, 6 + (int)(Hf(l, 9) * 5), wall * 0.8f, 0.3f);
+                if (Hf(l, 17) < 0.5f) AddTree(mb, Lerp4(b, 0.5f, 0.5f), l + 3, 0.6f);
+                return;
+            }
+
             // body (houses get a gable roof on top of the walls)
             float wallTop = gable ? bh * 0.62f : bh;
             mb.Box(q, 0f, wallTop, wall, gable ? wall : roof, mossy ? MOSS : (Color?)null, mossy ? 0.45f : 0f);
@@ -715,6 +732,13 @@ namespace DayZero.Runtime
                     var p = Lerp4(q, 0.2f + 0.6f * Hf(l, 14 + k), 0.2f + 0.6f * Hf(l, 18 + k));
                     float s = 0.12f + Hf(l, 22 + k) * 0.18f;
                     mb.Box(RectQuad(p, s, s * (0.7f + Hf(l, 26 + k) * 0.6f), ang), bh, bh + 0.08f + Hf(l, 30 + k) * 0.14f, rc, rc * 1.08f, null, 0f);
+                }
+                if (mossy || Hf(l, 19) < 0.35f)
+                {
+                    // overgrown roof: low green mats
+                    var p = Lerp4(q, 0.25f + 0.5f * Hf(l, 34), 0.25f + 0.5f * Hf(l, 35));
+                    float s = 0.2f + Hf(l, 36) * 0.35f;
+                    mb.Box(RectQuad(p, s, s * 0.8f, ang + Hf(l, 37)), bh, bh + 0.035f, MOSS, MOSS * 1.1f, null, 0f);
                 }
             }
 
@@ -759,7 +783,7 @@ namespace DayZero.Runtime
         void AddCar(MB mb, Vector2 p, float th, int salt)
         {
             Color body = Desat(CAR_COLS[(int)(Hf(salt, 1) * CAR_COLS.Length) % CAR_COLS.Length], 0.2f);
-            if (Hf(salt, 2) < 0.35f) body = Color.Lerp(body, new Color(0.45f, 0.28f, 0.18f), 0.5f);   // rust
+            if (Hf(salt, 2) < 0.6f) body = Color.Lerp(body, new Color(0.55f, 0.32f, 0.18f), 0.6f);    // rust
             if (Hf(salt, 3) < 0.15f) body = Color.Lerp(body, CHAR, 0.7f);                           // burnt out
             float L = 0.42f, Wd = 0.2f;
             mb.Box(RectQuad(p, L, Wd, th), 0.03f, 0.2f, body, body * 1.05f, null, 0f);
@@ -818,7 +842,17 @@ namespace DayZero.Runtime
                             if (r < 0.011f)
                                 AddCar(mb, p, cityAng + (Hf(x, y) > 0.5f ? 0f : Mathf.PI * 0.5f) + (Hf(x + 5, y) - 0.5f) * 0.6f, salt);
                             else if (t != Data.T_BRIDGE && r < 0.016f) AddTree(mb, p, salt, 0.65f);       // saplings in the cracks
-                            else if (r < 0.022f) mb.Box(RectQuad(p, 0.1f, 0.07f, r * 300f), 0f, 0.06f + jx * 0.1f, new Color(0.45f, 0.42f, 0.38f), new Color(0.5f, 0.47f, 0.42f), null, 0f);
+                            else if (r < 0.019f)
+                            {
+                                // a short run of concrete jersey barriers, some rust-streaked, a few knocked askew
+                                for (int k = 0; k < 3; k++)
+                                {
+                                    var bp = p + new Vector2(Mathf.Cos(cityAng), Mathf.Sin(cityAng)) * (k * 0.5f - 0.5f);
+                                    Color bc = Hf(salt, 80 + k) < 0.3f ? new Color(0.62f, 0.42f, 0.30f) : new Color(0.66f, 0.64f, 0.60f);
+                                    mb.Box(RectQuad(bp, 0.22f, 0.07f, cityAng + (Hf(salt, 90 + k) - 0.5f) * 0.7f), 0f, 0.2f, bc, bc * 1.05f, null, 0f);
+                                }
+                            }
+                            else if (r < 0.026f) mb.Box(RectQuad(p, 0.1f, 0.07f, r * 300f), 0f, 0.06f + jx * 0.1f, new Color(0.45f, 0.42f, 0.38f), new Color(0.5f, 0.47f, 0.42f), null, 0f);
                             break;
                     }
                 }
@@ -880,16 +914,73 @@ namespace DayZero.Runtime
                 float top = b.Lot >= 0 && b.Lot < _lotH.Length ? _lotH[b.Lot] : 0f;
                 mb.Box(RectQuad(p, 0.05f, 0.05f, 0f), top, top + pole, new Color(0.25f, 0.24f, 0.22f), new Color(0.3f, 0.3f, 0.28f), null, 0f);
                 mb.Box(RectQuad(p + new Vector2(0.45f, 0f), 0.42f, 0.03f, 0f), top + pole - 0.6f, top + pole - 0.05f, fc, fc, null, 0f);
-                // ring of barricade posts at ground level
-                int posts = b.Main ? 18 : 10; float rr = b.Main ? 3.0f : 2.0f;
-                for (int k = 0; k < posts; k++)
-                {
-                    float a = k * Mathf.PI * 2f / posts;
-                    var pp = p + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * rr;
-                    mb.Box(RectQuad(pp, 0.18f, 0.06f, a + Mathf.PI * 0.5f), 0f, 0.35f, fc * 0.8f, fc, null, 0f);
-                }
+                float half = b.Main ? 3.0f : 2.0f;
+                bool inBld = top > 0.3f;
+                if (inBld && b.Lot < d.Lots.Count) { var L = d.Lots[b.Lot]; half = Mathf.Max(half, Mathf.Max(L.W, L.H) * 0.5f + 0.9f); p = d.LotCenter(b.Lot); }
+                AddCampYard(mb, p, half, (float)(d.RgAngle * Math.PI / 180.0), b.Id, b.Main, inBld);
             }
             if (mb.V.Count > 0) MakeObject("Dynamic", mb.ToMesh("Dynamic"), _objMat, _dyn.transform);
+        }
+
+        static readonly Color WOOD = new Color(0.40f, 0.29f, 0.19f);
+        static readonly Color AMBER = new Color(1.0f, 0.72f, 0.30f);
+
+        /// <summary>Wooden palisade square with a watchtower, a hut with lit windows and a campfire.</summary>
+        void AddCampYard(MB mb, Vector2 p, float half, float th, int salt, bool main, bool inBuilding)
+        {
+            var U = new Vector2(Mathf.Cos(th), Mathf.Sin(th)); var V = new Vector2(-Mathf.Sin(th), Mathf.Cos(th));
+            int per = main ? 10 : 7;
+            for (int side = 0; side < 4; side++)
+            {
+                Vector2 dirA = side % 2 == 0 ? U : V, dirN = side % 2 == 0 ? V : U;
+                float sg = side < 2 ? 1f : -1f;
+                for (int k = 0; k < per; k++)
+                {
+                    if (side == 0 && (k == per / 2 || k == per / 2 - 1)) continue;   // gate gap
+                    float t = (k + 0.5f) / per * 2f - 1f;
+                    var pp = p + dirN * (half * sg) + dirA * (t * half);
+                    float hh = 0.55f + Hf(salt * 31 + side * 17, k) * 0.12f;
+                    mb.Box(RectQuad(pp, half / per, 0.06f, th + (side % 2 == 0 ? 0f : Mathf.PI * 0.5f)), 0f, hh, WOOD, WOOD * 1.15f, null, 0f);
+                }
+            }
+            if (inBuilding)
+            {
+                // camp is inside a building: fire in the yard by the gate, tower at the corner
+                var gp = p - U * half * 0.0f + V * (half - 0.6f);
+                mb.Box(RectQuad(gp, 0.45f, 0.45f, th + 0.785f), 0.005f, 0.012f, AMBER * 0.75f, Color.Lerp(AMBER, new Color(0.5f, 0.45f, 0.3f), 0.35f), null, 0f);
+                mb.Cone(gp, 0.13f, 0.012f, 0.3f, new Color(1f, 0.6f, 0.2f), 0.3f);
+            }
+            else
+            {
+            // hut with warm lit windows
+            var hp = p - U * half * 0.35f + V * half * 0.25f;
+            var hq = RectQuad(hp, half * 0.42f, half * 0.28f, th);
+            mb.Box(hq, 0f, 0.45f, WOOD * 1.1f, WOOD, null, 0f);
+            mb.Gable(hq, 0.45f, 0.75f, WOOD * 0.8f, WOOD * 1.1f);
+            mb.WallBand(hq, 0.16f, 0.32f, AMBER, half * 0.18f);
+            // campfire glow: amber disc + flame
+            var fp = p + U * half * 0.25f - V * half * 0.2f;
+            mb.Box(RectQuad(fp, 0.5f, 0.5f, th + 0.785f), 0.005f, 0.012f, AMBER * 0.75f, Color.Lerp(AMBER, new Color(0.5f, 0.45f, 0.3f), 0.35f), null, 0f);
+            mb.Cone(fp, 0.14f, 0.012f, 0.32f, new Color(1f, 0.6f, 0.2f), 0.3f);
+            // crates / barrels
+            for (int k = 0; k < 3; k++)
+            {
+                var cp = p + U * half * (0.55f - k * 0.18f) + V * half * 0.6f;
+                mb.Box(RectQuad(cp, 0.1f, 0.1f, th + k), 0f, 0.2f, WOOD * 1.3f, WOOD * 1.4f, null, 0f);
+            }
+            }
+            if (!main) return;
+            // watchtower in the back corner
+            var tp = p + U * half * 0.7f + V * half * 0.7f;
+            for (int k = 0; k < 4; k++)
+            {
+                float a = th + 0.785f + k * Mathf.PI * 0.5f;
+                var lp = tp + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * 0.3f;
+                mb.Box(RectQuad(lp, 0.04f, 0.04f, th), 0f, 1.6f, WOOD, WOOD, null, 0f);
+            }
+            var tq = RectQuad(tp, 0.32f, 0.32f, th);
+            mb.Box(tq, 1.5f, 1.75f, WOOD * 1.1f, WOOD * 1.2f, null, 0f);
+            mb.Cone(tp, 0.42f, 2.05f, 2.4f, WOOD * 0.8f, th + 0.785f);
         }
 
         void Cap(Data d, MB mb, int l, Color c)
