@@ -24,7 +24,7 @@ namespace DayZero.EditorTools
         public const string COMPANY = "Austin Harper";
         public const string PRODUCT = "DayZero";
         public const string VERSION = "0.11.2a";
-        public const int VERSION_CODE = 3;
+        public const int VERSION_CODE = 4;
         public const string APP_ID = "com.austinharper.dayzero";
         public const string BOOT_SCENE = "Assets/Scenes/Boot.unity";
         public const string DEFAULT_APK = "Builds/Android/DayZero.apk";
@@ -59,7 +59,9 @@ namespace DayZero.EditorTools
             PlayerSettings.runInBackground = false;
 
             EnsureBootSceneListed();
-            EnsureAlwaysIncludedShaders();
+            // Build #3 (v0.11.2a code 3) failed writing unity_builtin_extra after this forced built-in
+            // shaders (Hidden/Internal-Colored etc.) into Always Included Shaders. DayZeroMap.shader ships via
+            // Resources/, and the Shader.Find fallbacks are built-in, so the GraphicsSettings edit is no longer made.
             Debug.Log(string.Format("[BuildScript] Android settings applied: {0} {1} ({2}) id={3} IL2CPP ARM64 minSdk={4}",
                 PRODUCT, VERSION, VERSION_CODE, APP_ID, PlayerSettings.Android.minSdkVersion));
         }
