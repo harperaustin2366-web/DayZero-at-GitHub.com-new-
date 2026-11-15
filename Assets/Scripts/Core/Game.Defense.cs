@@ -866,6 +866,7 @@ namespace DayZero.Core
             double n = BaseLevelDef(b).Beds + 10.0 * b.U("barracks") + Rx("housing_add");
             n += Math.Min(30.0, EnclosedCount(b) / 10.0);
             n += 8.0 * ConvN("barracks", b.Id, b.Col);
+            n += 3.0 * Math.Min(4, YardLotCount(b));   // v0.12.0a: sheds and outbuildings inside the palisade yard
             return (int)(n * (1.0 + Rx("housing_mult")));
         }
 

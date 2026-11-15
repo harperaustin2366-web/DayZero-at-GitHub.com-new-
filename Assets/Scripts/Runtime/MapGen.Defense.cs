@@ -304,6 +304,7 @@ namespace DayZero.Runtime
         {
             if (l < 0 || l >= _info.Length || !_info[l].Valid) return;
             var inf = _info[l];
+            if (Cleared(inf.R.C)) return;   // cleared into a camp yard (older saves converted those)
             var R = inf.R; float top = inf.Top, wt = inf.WallTop > 0f ? inf.WallTop : top;
             FaceEdge(R, inf.Front, out var fa, out var fb, out var fo);
             float flen = (fb - fa).magnitude; var fd = (fb - fa) / Mathf.Max(0.01f, flen);
@@ -490,7 +491,7 @@ namespace DayZero.Runtime
         public bool LabelAnchor(int l, out Vector3 w)
         {
             w = default;
-            if (!LotBox(l, out var r, out float top)) return false;
+            if (!LotBox(l, out var r, out float top) || Cleared(r.C)) return false;
             w = Geo.W(r.C, top + 1.0f);
             return true;
         }

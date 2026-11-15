@@ -115,6 +115,32 @@ namespace DayZero.Core
         }
 
         // ---------------- yards & the starter palisade ----------------
+        readonly Dictionary<int, (int lot, int n)> _yardLots = new Dictionary<int, (int, int)>();
+
+        /// <summary>Other buildings whose centre is inside a camp's palisade yard (the view clears them into the
+        /// yard; they count as sheds and outbuildings, i.e. beds, instead of conversion targets).</summary>
+        public int YardLotCount(Base b)
+        {
+            if (b == null || S?.Walls == null || !S.Walls.Any(w => w.Starter && w.Bid == b.Id)) return 0;
+            if (_yardLots.TryGetValue(b.Id, out var c) && c.lot == b.Lot) return c.n;
+            var y = YardOf(b);
+            int n = 0;
+            var ct = V.I(y.C); int R = (int)Math.Ceiling(y.Half) + 2;
+            var seen = new HashSet<int>();
+            for (int dy = -R; dy <= R; dy++)
+                for (int dx = -R; dx <= R; dx++)
+                {
+                    var q = ct.Add(dx, dy);
+                    if (!D.InMap(q)) continue;
+                    int l = D.LotAt(q);
+                    if (l < 0 || l == b.Lot || !seen.Add(l) || D.Lots[l].Cells < 2) continue;
+                    var dd = D.LotCenter(l) - y.C;
+                    if (Math.Abs(Vector2.Dot(dd, y.U)) < y.Half + 0.2f && Math.Abs(Vector2.Dot(dd, y.V)) < y.Half + 0.2f) n++;
+                }
+            _yardLots[b.Id] = (b.Lot, n);
+            return n;
+        }
+
         /// <summary>Lot centre inside a camp yard (the view clears those buildings for the palisade yard).</summary>
         public bool InCampYard(int l)
         {
