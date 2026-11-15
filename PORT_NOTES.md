@@ -136,6 +136,24 @@ Result: all three build with 0 errors and 0 warnings. The smoke test matches the
 - Newtonsoft under IL2CPP with the generic `ODict<,>` state types (AOT generics). link.xml keeps the types, but a save/load on the device is the real test.
 - Speed: `new Game()` (world and forest generation) runs on the main thread during the loading frame. On desktop .NET, `new Game()` plus `NewRun` took about 0.3 s. A phone may be 5–10× slower.
 
+## v0.11.3a: map restyle toward the approved concept (Nov 2026)
+
+Target: `dayzero-style-concept.png` + `art/ART_BIBLE.md` (project workspace, not in the repo). Build #4 showed a per-tile checkerboard ground, cardboard-slab buildings, a camera too high, a stuck "Building the map 100%" overlay and a wrapped HOME button.
+
+- **Generator split out of MapView:** `MapGeo.cs` (mesh builder, baked lighting, shadow decals) and `MapGen.cs` / `MapGen.Buildings.cs` / `MapGen.Props.cs` (ground, roads, buildings, vegetation, wrecks, street furniture, camp). Pure C# on UnityEngine value types only, so the same code runs in the offline preview.
+- **Scale:** 1 tile is about 3.5 m. Floors are 3 m (0.857 tile; offices 3.6 m), cars 4.5 m, trees 7 to 10 m, palisade 3.2 m.
+- **Ground:** one shared-vertex grid per chunk. Colours blend the 4 tile types at each vertex plus large-scale noise only, with no per-tile random colour. Banks slope into the water, and a water plane sits on top.
+- **Roads:** the city is rotated 30 degrees but rasterised on the axis grid, which caused the staircase checkerboard. Roads, sidewalks and plazas are now resampled on a 0.5-tile grid aligned to the city angle. A direction-aware line filter plus `SnapRoads` (each cross-section takes the median edges of its neighbours) gives straight curbs. Asphalt has a worn centre, gutters, weed patches, cracks and potholes. There are lane dashes, double yellow centre lines on avenues, zebra crossings on avenues, raised sidewalks with curb faces, lamps, power poles with wires, hydrants, signs, wrecks in the lanes and barrier block-offs.
+- **Buildings:** archetypes are house (gable roof with overhang, trim, door, chimney, porch, fence), apartment, office, shop (shopfront, sign band, awning), civic, industrial (corrugated walls, roll-up doors, shallow metal roof), church, gas station, parking lot and farm. They have window grids with frames, a parapet and roof clutter (stair hut, water tank, AC units, vents, moss), ivy streaks and base grime/AO. Damage states 0 to 3 are rolled per building: roof holes and scorch, a collapsed corner with interior and rebar, or a shell with a tree inside.
+- **Lighting:** `Geo.Shade` bakes per-face light from the screen top-left: top faces ≈ 1.0, lit walls ≈ 0.89, walls facing away ≈ 0.57 with a cool shift. No outline pass (it looked cartoonish). A new alpha-blended `Resources/Shaders/DayZeroShadow.shader` draws sun-projected ground shadows, with a stencil so overlaps do not stack, faded by the same haze.
+- **LOD streaming:** LOD1 (massing, coarse ground; about 1.7 M verts for the whole map) is built behind the progress bar. LOD0 (full detail; up to about 360 k verts per chunk) streams in for at most 9 chunks around the camera, one chunk per frame, when zoomed in (dist < 75). It is dropped when the camera moves away.
+- **Camp:** `SetCamps` runs before the static build and clears the yard of other buildings, trees and road props. The camp building is never collapsed. The yard opens toward the default camera and has a log palisade with a gate, a watchtower, a cabin or tent, a campfire with a warm light pool, crates, barrels, sandbags, a flag, string lights, an MRAP outside, and lit windows on the camp building.
+- **Camera:** pitch 42, FOV 35, yaw 75 (streets run diagonally), HOME distance 24, min 7, max 200. HOME also resets the yaw.
+- **UI:** the "Building the map" overlay shows only while `!map.Ready`. The camera buttons are 76 px wide with no word wrap.
+
+### Offline preview (work/unity-verify/Preview, not committed)
+`bash work/unity-verify/preview.sh art/previews/<dir> [--export] [--all]`. It compiles Core + MapGeo/MapGen against `PreviewStubs.cs`, starts a game like the smoke test, builds the chunks, and rasterises PNGs from the game camera with the same haze and shadow blending. Views: `map_close`, `map_mid`, `map_far`, `map_rot`, `map_overview` (LOD1), `city_midtown`, `city_suburb`, `city_downtown`, plus `debug_roadgrid` (road grid classes). `--export` writes `camp_chunks.ply` (an OBJ exporter is also in Program.cs). `--all` prints LOD0/LOD1 vertex totals. Keep `Program.cs` camera constants in sync with `MapView` (FOV, PITCH, YAW, fog).
+
 ## v0.11.2a: map ground fix (Nov 2026)
 
 Device test of 0.11.1a (Android): buildings drew, but no ground and no roads; the forest zoomed in was a pale/white screen.

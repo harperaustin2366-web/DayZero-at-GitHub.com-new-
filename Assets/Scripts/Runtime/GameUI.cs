@@ -200,7 +200,8 @@ namespace DayZero.Runtime
             if (map != null && map.Ready) DrawMapLabels(map, w, h);
             if (map != null && !string.IsNullOrEmpty(map.RenderWarning))
                 Shadowed(new Rect(12, h - 30, w - 24, 24), map.RenderWarning, _small);
-            else Center(w, h, "Building the map", map != null ? string.Format("{0}%", (int)(map.Progress * 100f)) : "");
+            // v0.11.2a drew this every frame, so "Building the map 100%" never went away
+            if (map == null || !map.Ready) Center(w, h, "Building the map", map != null ? string.Format("{0}%", (int)(map.Progress * 100f)) : "");
 
             DrawStats();
             if (Btn(Blk(new Rect(w / 2 - 80, 8, 160, 50)), "MENU", _darkButton)) _menuOpen = true;
@@ -268,11 +269,13 @@ namespace DayZero.Runtime
 
         void DrawCameraButtons(MapView map)
         {
-            float x = 10, y = 214;
-            if (Btn(Blk(new Rect(x, y, 60, 54)), "HOME", new GUIStyle(_darkButton) { fontSize = 14 })) map?.Home(); y += 62;
-            if (Btn(Blk(new Rect(x, y, 60, 54)), "+", _darkButton)) map?.ZoomIn(); y += 62;
-            if (Btn(Blk(new Rect(x, y, 60, 54)), "-", _darkButton)) map?.ZoomOut(); y += 62;
-            if (Btn(Blk(new Rect(x, y, 60, 54)), "MAP", new GUIStyle(_darkButton) { fontSize = 14 })) map?.Overview();
+            // 76 wide + no word wrap: at 60 px "HOME" wrapped to "HOM/E" on phones (v0.11.2a)
+            float x = 10, y = 214, bw = 76;
+            var small = new GUIStyle(_darkButton) { fontSize = 15, wordWrap = false, clipping = TextClipping.Overflow };
+            if (Btn(Blk(new Rect(x, y, bw, 54)), "HOME", small)) map?.Home(); y += 62;
+            if (Btn(Blk(new Rect(x, y, bw, 54)), "+", _darkButton)) map?.ZoomIn(); y += 62;
+            if (Btn(Blk(new Rect(x, y, bw, 54)), "-", _darkButton)) map?.ZoomOut(); y += 62;
+            if (Btn(Blk(new Rect(x, y, bw, 54)), "MAP", small)) map?.Overview();
         }
 
         void DrawActions(float w, MapView map)

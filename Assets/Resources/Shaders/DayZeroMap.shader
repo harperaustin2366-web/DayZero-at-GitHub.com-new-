@@ -4,7 +4,7 @@
 // on Unity's fog variants being kept in the build. The haze is computed PER PIXEL from the
 // interpolated world position: v0.11.1a computed it per vertex, and on the old 4-vertex ground
 // quad (corners hundreds of tiles away) that fogged the whole ground into the clear colour.
-// Lives in Resources (and BuildScript adds it to Always Included Shaders) so the build ships it.
+// Lives in Resources (loaded with Resources.Load) so the build ships it.
 Shader "DayZero/Map"
 {
     Properties { }
