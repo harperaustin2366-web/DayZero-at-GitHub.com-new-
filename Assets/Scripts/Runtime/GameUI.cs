@@ -35,6 +35,10 @@ namespace DayZero.Runtime
 
         Game G => _b.Game;
 
+        // map input hooks (filled in by the HUD pass)
+        public bool ModalOpen => true;
+        public bool BlocksPointer(Vector2 screenTopLeft) => true;
+
         // ---------------- styles ----------------
         static Texture2D Solid(Color c)
         {

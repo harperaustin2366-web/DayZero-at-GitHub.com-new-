@@ -36,6 +36,8 @@ namespace DayZero.Runtime
         public bool Won;
 
         GameUI _ui;
+        public GameUI UI => _ui;
+        public MapView Map { get; private set; }
 
         // ---------------- fallback wiring ----------------
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -79,6 +81,7 @@ namespace DayZero.Runtime
 
             Game.DefaultSaveDir = Path.Combine(Application.persistentDataPath, "saves");
             _ui = new GameUI(this);
+            Map = gameObject.AddComponent<MapView>();
         }
 
         static Camera FindAnyCamera() => Camera.allCamerasCount > 0 ? Camera.allCameras[0] : null;
