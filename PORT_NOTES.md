@@ -136,6 +136,16 @@ Result: all three build with 0 errors and 0 warnings. The smoke test matches the
 - Newtonsoft under IL2CPP with the generic `ODict<,>` state types (AOT generics). link.xml keeps the types, but a save/load on the device is the real test.
 - Speed: `new Game()` (world and forest generation) runs on the main thread during the loading frame. On desktop .NET, `new Game()` plus `NewRun` took about 0.3 s. A phone may be 5–10× slower.
 
+## v0.11.2a: map ground fix (Nov 2026)
+
+Device test of 0.11.1a (Android): buildings drew, but no ground and no roads; the forest zoomed in was a pale/white screen.
+
+- **Root cause**: `DayZeroMap.shader` computed the distance haze per vertex. The ground was a single 4-vertex quad covering the whole ~886×938-tile map, so all its vertices sat hundreds of units from the camera at ~0.9 haze, and interpolation fogged the entire ground (and the roads painted into its texture) to ~90 % of the fog colour, which is also the camera clear colour. The ground was there but invisible; buildings survived because their triangles are small. The forest is mostly ground, so it read as a blank pale screen.
+- **Shader**: haze now per pixel from the interpolated world position; no texture any more, vertex colour only.
+- **Ground**: no texture, no ground plane. Each 64×64 chunk mesh now starts with its ground: one quad per road/avenue/bridge tile (asphalt with darker gutters, worn lighter crown, faded dashes on avenue interiors, cracks, weeds, silt), and merged runs of up to 16 tiles for everything else (corner-sampled colours from the old palette). Roads sit at y=0, other ground at 0.04 with concrete curb faces where they meet roads, water at −0.05 with dirt banks. Void skirt around the map in 64-unit cells. City estimate: ~134k ground quads + ~90k curb/bank quads (~0.9 M verts), culled with the chunks.
+- **Material**: one material for everything. `DayZero/Map` (Resources) → `Hidden/Internal-Colored` → `Sprites/Default`/`UI/Default`. A fallback shows a line at the bottom-left of the HUD (`MapView.RenderWarning`). `BuildScript.ApplyAndroidSettings` adds DayZero/Map, Hidden/Internal-Colored, Sprites/Default and UI/Default to GraphicsSettings > Always Included Shaders (via SerializedObject; no hand-written GraphicsSettings.asset).
+- Version 0.11.2a, Android versionCode 3.
+
 ## v0.11.1a: 3D map + HUD restyle (Nov 2026)
 
 ### Done

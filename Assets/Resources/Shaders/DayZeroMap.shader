@@ -1,13 +1,13 @@
-// Map shader for the runtime-generated city (MapView.cs). Unlit: lighting is baked into vertex
-// colours when the meshes are built. Texture * vertex colour, plus a distance haze driven by
+// Map shader for the runtime-generated city (MapView.cs). Unlit, vertex colour only (no texture):
+// lighting is baked into vertex colours when the meshes are built. Distance haze is driven by
 // globals MapView sets (_DZFogColor, _DZFogParams = start, end, strength) so it does not depend
-// on Unity's fog variants being kept in the build. Lives in Resources so the build always ships it.
+// on Unity's fog variants being kept in the build. The haze is computed PER PIXEL from the
+// interpolated world position: v0.11.1a computed it per vertex, and on the old 4-vertex ground
+// quad (corners hundreds of tiles away) that fogged the whole ground into the clear colour.
+// Lives in Resources (and BuildScript adds it to Always Included Shaders) so the build ships it.
 Shader "DayZero/Map"
 {
-    Properties
-    {
-        _MainTex ("Texture", 2D) = "white" {}
-    }
+    Properties { }
     SubShader
     {
         Tags { "RenderType"="Opaque" "Queue"="Geometry" }
@@ -21,31 +21,27 @@ Shader "DayZero/Map"
             #pragma fragment frag
             #include "UnityCG.cginc"
 
-            sampler2D _MainTex;
-            float4 _MainTex_ST;
             float4 _DZFogColor;
             float4 _DZFogParams;
 
-            struct appdata { float4 vertex : POSITION; float4 color : COLOR; float2 uv : TEXCOORD0; };
-            struct v2f { float4 pos : SV_POSITION; float4 color : COLOR; float2 uv : TEXCOORD0; float fog : TEXCOORD1; };
+            struct appdata { float4 vertex : POSITION; float4 color : COLOR; };
+            struct v2f { float4 pos : SV_POSITION; float4 color : COLOR; float3 wp : TEXCOORD0; };
 
             v2f vert (appdata v)
             {
                 v2f o;
                 o.pos = UnityObjectToClipPos(v.vertex);
                 o.color = v.color;
-                o.uv = TRANSFORM_TEX(v.uv, _MainTex);
-                float3 wp = mul(unity_ObjectToWorld, v.vertex).xyz;
-                float d = distance(wp, _WorldSpaceCameraPos.xyz);
-                o.fog = saturate((d - _DZFogParams.x) / max(0.001, _DZFogParams.y - _DZFogParams.x)) * _DZFogParams.z;
+                o.wp = mul(unity_ObjectToWorld, v.vertex).xyz;
                 return o;
             }
 
-            fixed4 frag (v2f i) : SV_Target
+            float4 frag (v2f i) : SV_Target
             {
-                float3 c = tex2D(_MainTex, i.uv).rgb * i.color.rgb;
-                c = lerp(c, _DZFogColor.rgb, i.fog);
-                return fixed4(c, 1.0);
+                float d = distance(i.wp, _WorldSpaceCameraPos.xyz);
+                float f = saturate((d - _DZFogParams.x) / max(0.001, _DZFogParams.y - _DZFogParams.x)) * _DZFogParams.z;
+                float3 c = lerp(i.color.rgb, _DZFogColor.rgb, f);
+                return float4(c, 1.0);
             }
             ENDCG
         }

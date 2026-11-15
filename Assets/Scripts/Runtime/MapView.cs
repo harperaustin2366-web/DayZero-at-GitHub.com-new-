@@ -1,8 +1,9 @@
 // Procedural 3D city map, generated entirely at runtime from the ported map data (no editor
 // assets beyond Resources/Shaders/DayZeroMap.shader). Port of the look of view3d.gd, restyled as
 // a ruined, overgrown low-poly city:
-//   * ground: one textured plane, texture painted from Data.Tiles (2 px per tile) with grass,
-//     dirt patches, water, cracked/weedy asphalt, paving, fields
+//   * ground: vertex-coloured mesh per 64x64-tile chunk, built from Data.Tiles (no texture):
+//     one quad per road tile, merged runs for everything else; roads sit at y=0 with curbs up
+//     to the raised verges/lots (0.04), water sunk to -0.05 with banks
 //   * buildings: one box (or gable house) per lot, oriented by Data.LotAngle like Godot's _quad,
 //     height by kind like Godot's _lot_height, desaturated palette, window bands, roof clutter;
 //     some burnt (dark, lower, rubble) or collapsed (rubble heap)
@@ -45,8 +46,9 @@ namespace DayZero.Runtime
 
         Camera _cam;
         Light _sun;
-        Material _objMat, _groundMat;
-        Texture2D _groundTex;
+        Material _objMat;
+        /// <summary>Non-empty when the map is not drawn with DayZero/Map (GameUI shows it on screen).</summary>
+        public string RenderWarning { get; private set; } = "";
         GameObject _root, _dyn;
         readonly List<GameObject> _chunks = new List<GameObject>();
         readonly List<Vector3> _chunkCenters = new List<Vector3>();
@@ -298,20 +300,8 @@ namespace DayZero.Runtime
             _lotH = new float[d.Lots.Count];
             for (int l = 0; l < d.Lots.Count; l++) _lotH[l] = LotHeight(l);
 
-            // --- ground texture, painted in row bands across frames ---
-            int tw = d.W * 2, th = d.H * 2;
-            var px = new Color32[tw * th];
-            for (int ty = 0; ty < d.H; ty++)
-            {
-                PaintRow(d, ty, px, tw, th);
-                if (sw.ElapsedMilliseconds > 14) { Progress = 0.25f * ty / d.H; sw.Restart(); yield return null; }
-            }
-            _groundTex = new Texture2D(tw, th, TextureFormat.RGBA32, true) { name = "MapGround", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, anisoLevel = 2 };
-            _groundTex.SetPixels32(px);
-            _groundTex.Apply(true, true);   // mipmaps, then drop the CPU copy
-            px = null;
-            _groundMat.mainTexture = _groundTex;
-            MakeGround(d);
+            // --- void skirt around the map (the per-chunk ground covers 0..W x 0..H) ---
+            MakeSkirt(d);
             yield return null;
 
             // --- lots bucketed per chunk ---
@@ -331,7 +321,7 @@ namespace DayZero.Runtime
                 {
                     BuildChunk(d, cx, cy, buckets[cy * ncx + cx]);
                     done++;
-                    if (sw.ElapsedMilliseconds > 14) { Progress = 0.25f + 0.75f * done / total; sw.Restart(); yield return null; }
+                    if (sw.ElapsedMilliseconds > 14) { Progress = (float)done / total; sw.Restart(); yield return null; }
                 }
 
             BuildLabels(d);
@@ -350,7 +340,6 @@ namespace DayZero.Runtime
             _chunks.Clear(); _chunkCenters.Clear();
             if (_root != null) Destroy(_root);
             if (_dyn != null) Destroy(_dyn);
-            if (_groundTex != null) Destroy(_groundTex);
             Labels.Clear();
         }
 
@@ -358,22 +347,35 @@ namespace DayZero.Runtime
         {
             if (_objMat != null) return;
             var sh = Resources.Load<Shader>("Shaders/DayZeroMap");
+            if (sh == null) sh = Shader.Find("DayZero/Map");
             if (sh != null && sh.isSupported)
             {
                 _objMat = new Material(sh) { name = "MapObjects" };
-                _groundMat = new Material(sh) { name = "MapGround" };
+                RenderWarning = "";
+                Debug.Log("[MapView] using shader DayZero/Map");
                 return;
             }
-            Debug.LogWarning("[MapView] DayZero/Map shader missing or unsupported; using built-in fallbacks (no haze).");
+            string why = sh == null ? "missing" : "unsupported on this GPU";
+            // Every mesh is vertex-coloured, so any shader that multiplies vertex colour works (no haze).
             var ic = Shader.Find("Hidden/Internal-Colored");
-            _objMat = new Material(ic);
-            _objMat.SetInt("_SrcBlend", (int)BlendMode.One);
-            _objMat.SetInt("_DstBlend", (int)BlendMode.Zero);
-            _objMat.SetInt("_Cull", (int)CullMode.Off);
-            _objMat.SetInt("_ZWrite", 1);
-            _objMat.SetInt("_ZTest", (int)CompareFunction.LessEqual);
-            var sp = Shader.Find("Sprites/Default");
-            _groundMat = new Material(sp != null ? sp : ic) { renderQueue = 1000 };
+            if (ic != null && ic.isSupported)
+            {
+                _objMat = new Material(ic) { name = "MapObjects (fallback)" };
+                _objMat.SetInt("_SrcBlend", (int)BlendMode.One);
+                _objMat.SetInt("_DstBlend", (int)BlendMode.Zero);
+                _objMat.SetInt("_Cull", (int)CullMode.Off);
+                _objMat.SetInt("_ZWrite", 1);
+                _objMat.SetInt("_ZTest", (int)CompareFunction.LessEqual);
+                RenderWarning = "Map shader " + why + ": fallback Hidden/Internal-Colored (no haze)";
+            }
+            else
+            {
+                var sp = Shader.Find("Sprites/Default");
+                if (sp == null) sp = Shader.Find("UI/Default");
+                if (sp != null) { _objMat = new Material(sp) { name = "MapObjects (fallback)", renderQueue = 2000 }; RenderWarning = "Map shader " + why + ": fallback " + sp.name + " (no depth, no haze)"; }
+                else { _objMat = new Material(Shader.Find("Standard")); RenderWarning = "Map shader " + why + ": no vertex-colour fallback found"; }
+            }
+            Debug.LogWarning("[MapView] " + RenderWarning);
         }
 
         GameObject MakeObject(string name, Mesh m, Material mat, Transform parent)
@@ -390,23 +392,133 @@ namespace DayZero.Runtime
             return go;
         }
 
-        void MakeGround(Data d)
+        /// <summary>Flat void-coloured border around the map so the edge fades into the haze. Four strips,
+        /// split into 64-unit cells so no triangle is huge (keeps clipping and fallback shaders sane).</summary>
+        void MakeSkirt(Data d)
         {
-            var m = new Mesh { name = "Ground" };
-            float W = d.W, H = d.H, pad = 400f;
-            // the centre quad carries the texture; a skirt of void colour runs out into the haze
-            m.SetVertices(new List<Vector3> {
-                new Vector3(0, 0, 0), new Vector3(W, 0, 0), new Vector3(W, 0, -H), new Vector3(0, 0, -H),
-                new Vector3(-pad, -0.01f, pad), new Vector3(W + pad, -0.01f, pad), new Vector3(W + pad, -0.01f, -H - pad), new Vector3(-pad, -0.01f, -H - pad) });
-            m.SetUVs(0, new List<Vector2> {
-                new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0),
-                new Vector2(0.0005f, 0.0005f), new Vector2(0.0005f, 0.0005f), new Vector2(0.0005f, 0.0005f), new Vector2(0.0005f, 0.0005f) });
-            var white = new Color32(255, 255, 255, 255);
-            var edge = (Color32)new Color(0.62f, 0.66f, 0.56f);
-            m.SetColors(new List<Color32> { white, white, white, white, edge, edge, edge, edge });
-            m.SetTriangles(new List<int> { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 }, 0);
-            m.RecalculateBounds();
-            MakeObject("Ground", m, _groundMat, _root.transform);
+            var mb = new MB();
+            float W = d.W, H = d.H, pad = 384f, y = -0.06f, step = 64f;
+            Color c = new Color(0.30f, 0.34f, 0.26f);
+            for (float z0 = -pad; z0 < H + pad; z0 += step)
+                for (float x0 = -pad; x0 < W + pad; x0 += step)
+                {
+                    float x1 = Mathf.Min(x0 + step, W + pad), z1 = Mathf.Min(z0 + step, H + pad);
+                    // skip cells fully inside the map
+                    if (x0 >= 0f && x1 <= W && z0 >= 0f && z1 <= H) continue;
+                    // clip partially-overlapping cells to the outside parts (map size is not a multiple of 64)
+                    AddSkirtRect(mb, x0, x1, z0, z1, W, H, y, c);
+                }
+            if (mb.V.Count > 0) MakeObject("Ground Skirt", mb.ToMesh("Ground Skirt"), _objMat, _root.transform);
+        }
+
+        static void AddSkirtRect(MB mb, float x0, float x1, float y0, float y1, float W, float H, float h, Color c)
+        {
+            // outside = rect minus [0,W]x[0,H]; emit up to 4 pieces
+            float ix0 = Mathf.Max(x0, 0f), ix1 = Mathf.Min(x1, W), iy0 = Mathf.Max(y0, 0f), iy1 = Mathf.Min(y1, H);
+            if (ix0 >= ix1 || iy0 >= iy1) { mb.Flat(x0, x1, y0, y1, h, c, c, c, c); return; }
+            if (y0 < iy0) mb.Flat(x0, x1, y0, iy0, h, c, c, c, c);
+            if (iy1 < y1) mb.Flat(x0, x1, iy1, y1, h, c, c, c, c);
+            if (x0 < ix0) mb.Flat(x0, ix0, iy0, iy1, h, c, c, c, c);
+            if (ix1 < x1) mb.Flat(ix1, x1, iy0, iy1, h, c, c, c, c);
+        }
+
+        // ---------------- ground mesh (per chunk, vertex colours) ----------------
+        static bool IsRoad(int t) => t == Data.T_ROAD || t == Data.T_AVE || t == Data.T_BRIDGE;
+
+        static float GroundH(int t)
+        {
+            if (t == Data.T_WATER) return -0.05f;
+            if (IsRoad(t)) return 0f;
+            return 0.04f;
+        }
+
+        static readonly Color C_CURB = new Color(0.60f, 0.58f, 0.53f);
+        static readonly Color C_BANK = new Color(0.36f, 0.32f, 0.25f);
+
+        int TileAt(Data d, int x, int y) => x < 0 || y < 0 || x >= d.W || y >= d.H ? -1 : d.Tiles[y * d.W + x];
+
+        /// <summary>Asphalt per tile: darker gutters along the edges, a worn lighter crown on interior tiles,
+        /// faint dashed lane paint on avenue interiors, cracks, weeds and silt.</summary>
+        Color RoadColor(Data d, int t, int i, int x, int y)
+        {
+            float px = x * 2 + 1, py = y * 2 + 1;
+            float j = Hf((long)px * 7 + 3, (long)py * 13 + 1);
+            Color c = GroundColor(d, t, i, x, y, px, py, j);
+            if (t == Data.T_BRIDGE) return c;
+            bool l = IsRoad(TileAt(d, x - 1, y)), r = IsRoad(TileAt(d, x + 1, y)), u = IsRoad(TileAt(d, x, y - 1)), dn = IsRoad(TileAt(d, x, y + 1));
+            if (!(l && r && u && dn)) c *= 0.9f;                          // gutter / road edge
+            else
+            {
+                c *= 1.06f;                                                // worn crown
+                if (t == Data.T_AVE && Hf(x * 5 + 1, y * 3 + 7) > 0.55f)
+                {
+                    bool alongX = l && r && !(u && dn && Hf(x, y * 3) > 0.5f);
+                    int k = alongX ? x : y;
+                    if ((k & 3) < 2) c = Color.Lerp(c, new Color(0.62f, 0.58f, 0.44f), 0.22f); // faded dashes
+                }
+            }
+            c.a = 1f;
+            return c;
+        }
+
+        void AddGround(Data d, MB mb, int cx, int cy)
+        {
+            int x0 = cx * CH, y0 = cy * CH, x1 = Mathf.Min(d.W, x0 + CH), y1 = Mathf.Min(d.H, y0 + CH);
+            for (int y = y0; y < y1; y++)
+            {
+                int x = x0;
+                while (x < x1)
+                {
+                    int i = y * d.W + x;
+                    int t = d.Tiles[i];
+                    float h = GroundH(t);
+                    int xe = x + 1;
+                    if (IsRoad(t))
+                    {
+                        Color c = RoadColor(d, t, i, x, y);
+                        mb.Flat(x, x + 1, y, y + 1, h, c, c, c, c);
+                    }
+                    else
+                    {
+                        int lot = t == Data.T_BLD ? d.LotId[i] : -1;
+                        while (xe < x1 && xe - x < 16 && d.Tiles[y * d.W + xe] == t && (t != Data.T_BLD || d.LotId[y * d.W + xe] == lot)) xe++;
+                        Color c00 = CornerColor(d, t, i, x, y), c10 = CornerColor(d, t, i, xe, y);
+                        Color c11 = CornerColor(d, t, i, xe, y + 1), c01 = CornerColor(d, t, i, x, y + 1);
+                        mb.Flat(x, xe, y, y + 1, h, c00, c10, c11, c01);
+                    }
+                    // curbs / banks: right edge of the run and the lower edge of every tile in it
+                    AddStep(d, mb, t, h, xe, y, true);
+                    for (int k = x; k < xe; k++) AddStep(d, mb, t, h, k, y, false);
+                    x = xe;
+                }
+            }
+        }
+
+        Color CornerColor(Data d, int t, int i, int x, int y)
+        {
+            float px = x * 2, py = y * 2;
+            float j = Hf((long)px * 7 + 3, (long)py * 13 + 1);
+            Color c = GroundColor(d, t, i, x, y, px, py, j);
+            c.a = 1f;
+            return c;
+        }
+
+        /// <summary>Vertical face between tile (ax, ay) [type t, height h] and its neighbour to the right
+        /// (vertical edge at x = ex) or below (edge at y = ay + 1).</summary>
+        void AddStep(Data d, MB mb, int t, float h, int ex, int ay, bool right)
+        {
+            int nx = ex, ny = right ? ay : ay + 1;
+            int nt = TileAt(d, nx, ny);
+            if (nt < 0) return;
+            float nh = GroundH(nt);
+            if (Mathf.Abs(nh - h) < 0.001f) return;
+            int hiT = h > nh ? t : nt;
+            int loT = h > nh ? nt : t;
+            Color c = loT == Data.T_WATER ? C_BANK : (IsRoad(loT) ? C_CURB : CornerColor(d, hiT, 0, nx, ny) * 0.8f);
+            c *= right ? 0.82f : 0.72f; c.a = 1f;
+            float top = Mathf.Max(h, nh), bot = Mathf.Min(h, nh);
+            if (right) mb.Step(new Vector2(ex, ay), new Vector2(ex, ay + 1), bot, top, c);
+            else mb.Step(new Vector2(ex, ay + 1), new Vector2(ex + 1, ay + 1), bot, top, c);
         }
 
         // ---------------- hashing / noise ----------------
@@ -434,7 +546,7 @@ namespace DayZero.Runtime
 
         static Color Hex(string s) { ColorUtility.TryParseHtmlString(s, out var c); return c; }
 
-        // ---------------- ground painting ----------------
+        // ---------------- ground colours ----------------
         static readonly Color C_GRASS = new Color(0.40f, 0.47f, 0.27f);
         static readonly Color C_GRASS_DRY = new Color(0.52f, 0.52f, 0.34f);
         static readonly Color C_FOREST = new Color(0.30f, 0.40f, 0.25f);
@@ -449,24 +561,6 @@ namespace DayZero.Runtime
         static readonly Color C_FIELD = new Color(0.66f, 0.60f, 0.38f);
         static readonly Color C_ROCK = new Color(0.50f, 0.49f, 0.46f);
         static readonly Color C_VOID = new Color(0.20f, 0.23f, 0.20f);
-
-        void PaintRow(Data d, int ty, Color32[] px, int tw, int th)
-        {
-            for (int tx = 0; tx < d.W; tx++)
-            {
-                int i = ty * d.W + tx;
-                int t = d.Tiles[i];
-                for (int sy = 0; sy < 2; sy++)
-                    for (int sx = 0; sx < 2; sx++)
-                    {
-                        float x = tx * 2 + sx, y = ty * 2 + sy;
-                        float j = Hf((long)x * 7 + 3, (long)y * 13 + 1);      // per-pixel jitter
-                        Color c = GroundColor(d, t, i, tx, ty, x, y, j);
-                        int row = th - 1 - (int)y;
-                        px[row * tw + (int)x] = c;
-                    }
-            }
-        }
 
         Color GroundColor(Data d, int t, int i, int tx, int ty, float x, float y, float j)
         {
@@ -598,6 +692,7 @@ namespace DayZero.Runtime
         void BuildChunk(Data d, int cx, int cy, List<int> lots)
         {
             var mb = new MB();
+            AddGround(d, mb, cx, cy);
             foreach (int l in lots) AddLot(d, mb, l);
             AddScatter(d, mb, cx, cy);
             if (mb.V.Count == 0) return;
@@ -1020,6 +1115,18 @@ namespace DayZero.Runtime
                 V.Add(a); V.Add(b); V.Add(c); V.Add(d);
                 C.Add(ca); C.Add(cb); C.Add(cc); C.Add(cd);
                 T.Add(i); T.Add(i + 1); T.Add(i + 2); T.Add(i); T.Add(i + 2); T.Add(i + 3);
+            }
+
+            /// <summary>Horizontal rectangle in tile space [x0,x1] x [y0,y1] at height h, colours per corner.</summary>
+            public void Flat(float x0, float x1, float y0, float y1, float h, Color c00, Color c10, Color c11, Color c01)
+            {
+                Quad(new Vector3(x0, h, -y0), new Vector3(x1, h, -y0), new Vector3(x1, h, -y1), new Vector3(x0, h, -y1), c00, c10, c11, c01);
+            }
+
+            /// <summary>Vertical strip from a to b (tile space) between heights y0 and y1 (curbs, banks).</summary>
+            public void Step(Vector2 a, Vector2 b, float y0, float y1, Color c)
+            {
+                Quad(W(a, y0), W(b, y0), W(b, y1), W(a, y1), c, c, c, c);
             }
 
             public void Tri(Vector3 a, Vector3 b, Vector3 c, Color col)

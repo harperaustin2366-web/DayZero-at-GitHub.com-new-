@@ -198,6 +198,8 @@ namespace DayZero.Runtime
             if (G?.S == null || G.C == null) { Center(w, h, "DayZero", "No game running."); return; }
             var map = MapView.Instance;
             if (map != null && map.Ready) DrawMapLabels(map, w, h);
+            if (map != null && !string.IsNullOrEmpty(map.RenderWarning))
+                Shadowed(new Rect(12, h - 30, w - 24, 24), map.RenderWarning, _small);
             else Center(w, h, "Building the map", map != null ? string.Format("{0}%", (int)(map.Progress * 100f)) : "");
 
             DrawStats();

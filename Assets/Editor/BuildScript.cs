@@ -15,6 +15,7 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace DayZero.EditorTools
 {
@@ -22,11 +23,14 @@ namespace DayZero.EditorTools
     {
         public const string COMPANY = "Austin Harper";
         public const string PRODUCT = "DayZero";
-        public const string VERSION = "0.11.1a";
-        public const int VERSION_CODE = 2;
+        public const string VERSION = "0.11.2a";
+        public const int VERSION_CODE = 3;
         public const string APP_ID = "com.austinharper.dayzero";
         public const string BOOT_SCENE = "Assets/Scenes/Boot.unity";
         public const string DEFAULT_APK = "Builds/Android/DayZero.apk";
+        public const string MAP_SHADER = "Assets/Resources/Shaders/DayZeroMap.shader";
+        /// <summary>Shaders MapView loads by name at runtime; forced into the build (GraphicsSettings > Always Included Shaders).</summary>
+        static readonly string[] RUNTIME_SHADERS = { "Hidden/Internal-Colored", "Sprites/Default", "UI/Default" };
 
         /// <summary>Apply every Player / build setting the Android build needs. Safe to call repeatedly.</summary>
         public static void ApplyAndroidSettings()
@@ -55,6 +59,7 @@ namespace DayZero.EditorTools
             PlayerSettings.runInBackground = false;
 
             EnsureBootSceneListed();
+            EnsureAlwaysIncludedShaders();
             Debug.Log(string.Format("[BuildScript] Android settings applied: {0} {1} ({2}) id={3} IL2CPP ARM64 minSdk={4}",
                 PRODUCT, VERSION, VERSION_CODE, APP_ID, PlayerSettings.Android.minSdkVersion));
         }
@@ -71,6 +76,36 @@ namespace DayZero.EditorTools
             scenes.RemoveAll(s => s.path == BOOT_SCENE);
             scenes.Insert(0, new EditorBuildSettingsScene(BOOT_SCENE, true));
             EditorBuildSettings.scenes = scenes.ToArray();
+        }
+
+        /// <summary>Add the map shader (and the fallbacks MapView finds with Shader.Find) to
+        /// GraphicsSettings' Always Included Shaders, so they are compiled into the player even though
+        /// no scene material references them.</summary>
+        static void EnsureAlwaysIncludedShaders()
+        {
+            var gs = GraphicsSettings.GetGraphicsSettings();
+            if (gs == null) { Debug.LogWarning("[BuildScript] GraphicsSettings not found; cannot add Always Included Shaders."); return; }
+            var so = new SerializedObject(gs);
+            var list = so.FindProperty("m_AlwaysIncludedShaders");
+            if (list == null || !list.isArray) { Debug.LogWarning("[BuildScript] m_AlwaysIncludedShaders not found."); return; }
+            var want = new System.Collections.Generic.List<Shader>();
+            var map = AssetDatabase.LoadAssetAtPath<Shader>(MAP_SHADER);
+            if (map != null) want.Add(map); else Debug.LogWarning("[BuildScript] " + MAP_SHADER + " did not import as a shader.");
+            foreach (var n in RUNTIME_SHADERS) { var sh = Shader.Find(n); if (sh != null) want.Add(sh); }
+            bool changed = false;
+            foreach (var sh in want)
+            {
+                bool has = false;
+                for (int i = 0; i < list.arraySize; i++)
+                    if (list.GetArrayElementAtIndex(i).objectReferenceValue == sh) { has = true; break; }
+                if (has) continue;
+                int at = list.arraySize;
+                list.InsertArrayElementAtIndex(at);
+                list.GetArrayElementAtIndex(at).objectReferenceValue = sh;
+                changed = true;
+                Debug.Log("[BuildScript] Always Included Shaders += " + sh.name);
+            }
+            if (changed) { so.ApplyModifiedPropertiesWithoutUndo(); AssetDatabase.SaveAssets(); }
         }
 
         static string[] EnabledScenes()
