@@ -92,7 +92,7 @@ Nobody opens this project in the Unity editor, so everything the build needs is 
 | Path | What |
 |---|---|
 | `ProjectSettings/ProjectVersion.txt` | 6000.3.28f1 (8f082d2fe476) |
-| `ProjectSettings/ProjectSettings.asset` | company Austin Harper, product DayZero, version 0.11.0a, version code 1, `com.austinharper.dayzero`, auto-rotation landscape left+right only, IL2CPP, ARM64, min SDK 25, target SDK auto (highest installed), stripping Minimal, old Input Manager (`activeInputHandler: 0`, nothing uses input APIs), built-in render pipeline |
+| `ProjectSettings/ProjectSettings.asset` | company Austin Harper, product DayZero, version 0.11.4a, version code 6, `com.austinharper.dayzero`, auto-rotation landscape left+right only, IL2CPP, ARM64, min SDK 25, target SDK auto (highest installed), stripping Minimal, old Input Manager (`activeInputHandler: 0`, nothing uses input APIs), built-in render pipeline |
 | `ProjectSettings/EditorBuildSettings.asset` | one scene: `Assets/Scenes/Boot.unity` |
 | `ProjectSettings/EditorSettings.asset` | force-text serialization, visible meta files |
 | `Packages/manifest.json` | newtonsoft-json 3.2.1, ugui 2.0.0 (core package, pinned to the editor), and the modules used: audio, imgui, jsonserialize, unitywebrequest (DataLoader), androidjni, ui, uielements, animation, physics, physics2d, imageconversion |
@@ -113,7 +113,7 @@ Nobody opens this project in the Unity editor, so everything the build needs is 
 
 ### Runtime UI (IMGUI, everything built in code)
 Virtual 720-px-high canvas, scaled to the screen inside the safe area.
-- **Title:** Continue (if a save exists), New game: Easy, Normal or Hard. The camp site is picked automatically with `SuggestStart(0)` because there's no map view yet.
+- **Title:** DAY ZERO: OUTBREAK + tagline, Continue (if a save exists), New game: Easy, Normal or Hard. Since v0.11.4a the player picks the camp building on the map (see v0.11.4a).
 - **Top bar:** clock (day, time, night), phase line (infection %, the Fall countdown, night-attack warnings), food, water, meds, ammo, fuel, materials, population, morale. Pause/Play, speed x1/x2/x4 (`Process` calls per frame), +1h and +6h (`Advance`).
 - **Colony tab:** name, survivors, camps, zombies, kills, rescued; camps list; stockpile; job counts; raid warning.
 - **Jobs tab:** survivors 7 per page (name, state, hp, life stage), with < > buttons that cycle `Data.JOBS` through `DoAction("set_job")`. A job the survivor can't take is skipped, and the reason is shown.
@@ -135,6 +135,54 @@ Result: all three build with 0 errors and 0 warnings. The smoke test matches the
 - That IMGUI looks right on a phone (font size, safe area, button sizes), and that touch maps to IMGUI clicks (it does by default).
 - Newtonsoft under IL2CPP with the generic `ODict<,>` state types (AOT generics). link.xml keeps the types, but a save/load on the device is the real test.
 - Speed: `new Game()` (world and forest generation) runs on the main thread during the loading frame. On desktop .NET, `new Game()` plus `NewRun` took about 0.3 s. A phone may be 5–10× slower.
+
+## v0.11.4a: gameplay milestone — pick your base, procedural survivors and zombies (Nov 2026)
+
+Austin's asks: "selecting any building is your starting point" and "actual AI character models and zombie models". Design compass: `design/GAME_DEFINITION.md` (DAY ZERO: OUTBREAK — survive, build, defend, expand). Title screen now shows the tagline under the title.
+
+### Start-site selection
+- **New game** (`Bootstrap.NewGame`) runs `NewRun` and stops in the game's `"pick"` phase (no camp, `Running = false`); the map is built with no camp yard and the camera looks at the game's `SuggestStart` site so there are buildings in view. GameUI hides the clock / actions / stats and shows the banner **"Tap any building to make it your base"**.
+- **Tap vs pan/pinch** (`MapView.HandleInput`): a touch is a tap only when it starts off the HUD, stays one finger, moves less than ~1.6 mm (`TapSlop`, dpi-aware, min 12 px) and lifts within 0.45 s; any second finger cancels it. Mouse works the same in the editor.
+- **Picking** (`MapGen.PickLot`): the tap ray is marched in 0.12-tile steps against every building box (footprint + roof height); a ray that reaches the ground picks the nearest footprint within 0.45 tiles. Any building archetype can be picked.
+- **Highlight** (`MapGen.Highlight`): unshaded amber outline on roof and base edges, corner posts, a floating marker over the roof and an alpha ground glow (shadow shader, own material at renderQueue 2009 so the shadow stencil lets it win). It turns red when the game refuses the site.
+- **Info + Confirm/Cancel** (GameUI `DrawStartPick`): type (landmark tagged), footprint in metres, floors, district, and the game's own refusal reason from `Game.CanStartAt` (e.g. too big / faction-held / no street access; CONFIRM is disabled then). With seed 12345, 15,347 of 15,614 buildings can be started in (every apartment/house/office/church/factory/shop type has startable buildings); the refusals come from the sim's rules (`TakeError` / `LotTakeable`: size limits, no street access, faction-held), not from the viewer. Farm stands (0/30) and the grain elevator are refused by those rules.
+- **Confirm** (`Bootstrap.ConfirmStart`) calls `Game.StartAt(tile)` — the same path as the Godot `start_at` action — then `MapView.OnCampFounded()`: `MapGen.SetCamps` again, LOD1 rebuilt for the chunks within the yard + 12 tiles (lots are bucketed by centre), every LOD0 chunk dropped so they re-stream with the yard cleared, dynamic camp layer refreshed (palisade, firing step, fire, watchtower, lit windows), camera to HOME. The game is saved right after.
+- **Save/load** keeps the site: it is the main `Base` (lot + door tile) in the save. `LoadSaved` and `NewGame` call `MapView.Invalidate()` so a reused world seed still rebuilds. No save is written during the pick phase (`SaveGame` refuses it). Harness `UiFlow` now picks a non-suggested office/house, starts there, saves, loads and checks the main base lot and door are identical (`siteKept=True`).
+- `MapGen.ClearedRect` now uses an oriented-rect overlap test (it only tested corners), so big neighbours crossing the yard edge are cleared too.
+
+### Characters (`Runtime/CharGen.cs`)
+- Rigid-part humanoids built from boxes in metres (+Y up, +Z forward), 12 bones: hips, torso, head, upper/lower arms, thighs, shins, rifle. Hip height 0.84 m, total ~1.75 m (= 0.5 tile). Flat-shaded per face at batch time from the world normal (`Geo.Shade`, same key light as the map). Small details (eyes, gore, collar, medic cross) are single quads, bottoms of boxes are skipped.
+- **Survivors**: job sets the silhouette (Soldier helmet + plate carrier + mil pack, Cop cap + dark vest, Medic grey + medic pack, Engineer hard hat + vest + tool pack, Farmer straw hat, Scavenger hood/beanie + big pack + bandana, Civilian mixed); person id picks skin (5), hair (6) and the clothing colourway (art bible §8 palette). Mustard armband on everyone. A long gun (`Wpn` rifle/hunting/shotgun) adds a procedural rifle (no Quaternius pack is in the project, so nothing is imported); `Carry` adds a loot sack. 412 verts plain, 532 with rifle, 552 with rifle + sack.
+- **Zombies**: 8 variants (bloated, runner, riot, ex-worker, one-arm-down...), skin #7a8068/#4a4e3e, clothes desaturated 60 % and darkened 25 %, torn sleeves with bare forearms, gore patches, unshaded yellow eyes, hunched spine + head tilt. 400–432 verts.
+- **Distant LOD**: 3 boxes (60 verts) for figures beyond the full-detail budget.
+- **Procedural animation** (`CharGen.Animate`): idle (breathing, look-around), walk (phase advanced by distance so feet don't slide; capped for fast-forward), guard (low ready + scan), aim (shouldered rifle / two-hand pistol), search (crouched rummaging = scavenging/gathering), chop (hammer/axe swing = building, repairs, yard work), wave (waiting survivors calling for rescue), zombie shamble (stiff steps, dragged foot, lurch, arms forward), attack (clawing/pounding), dead (falls backwards over 0.55 s, lies, sinks after 5.5 s).
+
+### Crowd / AI (`Runtime/Crowd.cs`)
+Everything follows the simulation; nothing in the viewer changes it.
+- **Survivors** come from `Colony.People`: position = `Person.Pos` (the sim already moves people along its own A* paths over walkable tiles, runs daily routines, posts guards), smoothed (critically damped, snaps beyond 3.5 tiles). Hidden when the sim has them inside a building (`IsInside`), in a vehicle or travelling to another map. Animation from the sim state: walking when moving, `St == "work"` + `Goal` (scav/tf/sq → search, build/repair → chop, hunt/patrol → guard), guards on duty (`Guard && Post && OnDuty()`) → guard, routine `"y"` yard work → chop / sort supplies / stand by the fire, a sim gunshot → aim.
+- **Guards** stand on the new **firing step** (plank walkway 0.6 tiles up inside the palisade, `MapGen.FiringStep`) in the direction of their sim post; the first guard of the main camp mans the watchtower platform.
+- **Zombies** = sim zombies (`Game.Zc/Zn/Zp/Zh`, `ZPos`) near the camera, nearest first, capped. Visual identities are matched frame to frame by nearest sim position (spatial hash) so variants don't swap. Night-raid / horde zombies that reach a camp are held at the palisade (spread along the wall) and play the attack; a zombie next to a survivor in the open attacks them.
+- **Gunfire**: `Game.SfxRequested("gunshot"/"rifle", pos)` is the sim's shot event → nearest visible survivor aims, muzzle flash (crossed camera-facing quads) and a tracer to the nearest zombie. A zombie that leaves the sim right after a shot/hit nearby falls — but only as many as the colonies' kill counters rose that frame.
+- **Recruit loop**: survivor groups waiting for rescue (`S.Groups`, `St == "wait"`) show one survivor waving at the door of the building they hide in.
+- **Rendering**: the whole crowd is CPU-batched into ONE dynamic mesh (+ one blob-shadow mesh) per frame with the existing map material: two draw calls, no instancing shader variants, nothing new to strip. Caps: 120 full-detail + 260 low figures; full detail only when the camera distance is ≤ 55, nothing beyond 125. The mesh switches to 32-bit indices above 65 k verts.
+
+### Cosmetic vs sim-driven
+| Sim-driven | Cosmetic (the sim has no value) |
+|---|---|
+| who exists, where they are, walking, scavenging/building/guarding states, who's inside, carried loot, long guns, guard posts, zombie positions and modes, raid timing and size, every shot and kill, survivor groups waiting | exact spot inside the yard (the sim's camp scatter compressed onto the drawn yard, pushed out of the building and away from the fire), guards drawn on the firing step / tower instead of at their post tile, zombies held at the palisade (the sim lets raiders reach the door), tracer target (nearest zombie), corpse time, outfits/colours |
+
+### Offline previews
+`bash work/unity-verify/preview.sh art/previews/gameplay --gameplay` (then `python3 work/unity-verify/Preview/overlay_select.py art/previews/gameplay` paints a mock of the GameUI pick overlay, since IMGUI can't run offline). Writes `start_select(.png|_raw.png)`, `characters_lineup.png`, `characters_actions.png`, `base_survivors.png`, `base_wide.png`, `horde_palisade(_close).png`, `horde_palisade_major(_close).png` (suggested apartment site, raids of 31 and 72) and `house_raid_day13/18/24(_close).png` (house picked in Millbrook). It also prints a tap test (a ray through the screen centre picks the highlighted building), startable counts by building kind, vertex counts and the crowd's per-frame cost. `preview.sh` now stops when the preview fails to build instead of rendering with the old binary.
+
+Measured (desktop .NET, preview harness): crowd Update + Build 0.2–0.3 ms/frame for 15–25 k verts; 1.0 ms at the worst case seen (61 k verts, day-24 raid at a house camp).
+
+### Not verifiable without a device / risks
+- Phone CPU: expect 5–10× the desktop figures, i.e. ~2–10 ms/frame at the worst case. If it stutters, lower `Crowd.MaxFull` (120) / `MaxLow` (260) or `FullDist` (55).
+- Per-frame mesh upload of up to ~60 k verts (`Mesh.SetVertices/SetColors/SetTriangles`, `MarkDynamic`).
+- Real scale (1.75 m = 0.5 tile) makes figures ~12 px tall at the default HOME distance (24); they read from distance ~13 down (zoom in). The game stays faithful to scale as asked; a readability scale-up would be a one-line change in `Crowd.Build` (root scale).
+- Night has no darkening yet (day lighting at night in the previews).
+- Tap threshold and timing feel are untested on a phone.
+- Raids in the sim trickle in over ~2 hours and guards kill most of them before the wall, so "hordes at the palisade" are a handful to a dozen at once until the big late raids.
 
 ## v0.11.3a: map restyle toward the approved concept (Nov 2026)
 
@@ -182,6 +230,6 @@ Device test of 0.11.1a (Android): buildings drew, but no ground and no roads; th
 ### Left to do
 - **Fog of war** (Godot `sight` / `last_seen`): darken unseen chunks/tiles, e.g. a second low-res texture multiplied into the ground and a per-lot darkening of the overlay.
 - **SOS markers** (rescue calls, "SOS n" labels in the video) and tapping them to send a rescue; zombies/survivors/squads as moving markers.
-- **Picking the start site** on the map (still auto `SuggestStart`), **building placement** (outposts, fences, towers, traps), tapping lots to take over / convert / gut.
+- ~~**Picking the start site**~~ done in v0.11.4a; **building placement** (outposts, fences, towers, traps), tapping lots to take over / convert / gut.
 - **Props**: decode `recovered/assets/3d/props.bin` (Godot's prop meshes: cars, trees `fpine_a`…, rubble) and replace the procedural boxes/cones; hilltop smoke, fires, night lights (`LIGHTS`), day/night tint.
 - Not verified without a device: shader compile on the phone GPU (the fallback covers it), build time for about 210 chunks on a phone (several seconds is likely), and the vertex budget. Roughly 2–3 M verts over the whole map, with about a quarter active at the default zoom. Fully zoomed out shows all of it, so lower `MAX_DIST` or thin the window bands if it stutters.

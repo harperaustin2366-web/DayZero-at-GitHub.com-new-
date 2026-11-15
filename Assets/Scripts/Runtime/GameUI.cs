@@ -173,7 +173,9 @@ namespace DayZero.Runtime
         void DrawTitle(float w, float h)
         {
             GUI.Label(new Rect(60, 50, w - 120, 60), "DAY ZERO: OUTBREAK", _title);
-            GUI.Label(new Rect(60, 105, w - 120, 40), "v" + Application.version + " · Unity port", _small);
+            var tag = new GUIStyle(_label) { fontSize = 22, fontStyle = FontStyle.Bold }; tag.normal.textColor = OLIVE_INK;
+            GUI.Label(new Rect(60, 98, w - 120, 34), "SURVIVE. BUILD. DEFEND. EXPAND.", tag);
+            GUI.Label(new Rect(60, 132, w - 120, 30), "v" + Application.version + " · Unity port", _small);
             float y = 190;
             bool has = _b.HasSave();
             GUI.enabled = has;
@@ -187,7 +189,7 @@ namespace DayZero.Runtime
                 if (Btn(new Rect(60 + d * 220, y, 200, 72), Game.DIFF_NAMES[d], _bigButton)) _b.NewGame(d);
             }
             GUI.Label(new Rect(60, h - 90, w - 120, 60),
-                "Starting a new game replaces the current save. The camp site is picked automatically in this build.", _small);
+                "Starting a new game replaces the current save. You pick the building for your base on the map.", _small);
         }
 
         // ---------------- in game ----------------
@@ -203,6 +205,15 @@ namespace DayZero.Runtime
             // v0.11.2a drew this every frame, so "Building the map 100%" never went away
             if (map == null || !map.Ready) Center(w, h, "Building the map", map != null ? string.Format("{0}%", (int)(map.Progress * 100f)) : "");
 
+            if (_b.Picking)
+            {
+                // new game: choose the building for the base (no camp, no clock yet)
+                if (Btn(Blk(new Rect(w / 2 - 80, 8, 160, 50)), "MENU", _darkButton)) _menuOpen = true;
+                DrawCameraButtons(map);
+                if (map != null && map.Ready && !ModalOpen) DrawStartPick(w, h, map);
+                if (_menuOpen) DrawMenuOverlay(w, h);
+                return;
+            }
             DrawStats();
             if (Btn(Blk(new Rect(w / 2 - 80, 8, 160, 50)), "MENU", _darkButton)) _menuOpen = true;
             DrawTopRight(w);
@@ -213,6 +224,41 @@ namespace DayZero.Runtime
             if (_b.Ended || G.S.Phase == "lost") DrawGameOver(w, h);
             else if (_b.Pending.Count > 0) DrawDecision(w, h, _b.Pending[0]);
             else if (_menuOpen) DrawMenuOverlay(w, h);
+        }
+
+        /// <summary>Start-site selection: banner, then the selected building's info with Confirm / Cancel.</summary>
+        void DrawStartPick(float w, float h, MapView map)
+        {
+            var ban = Blk(new Rect(w / 2 - 330, 66, 660, 78));
+            GUI.Box(ban, GUIContent.none, _box);
+            var bt = new GUIStyle(_title) { fontSize = 28, alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            Shadowed(new Rect(ban.x, ban.y + 6, ban.width, 40), "Tap any building to make it your base", bt);
+            var bs = new GUIStyle(_small) { alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            GUI.Label(new Rect(ban.x, ban.y + 46, ban.width, 26), "Drag to look around · pinch to zoom · HOME returns to the suggested site", bs);
+            if (map.SelectedLot < 0 || !map.SelectionInfo(out string type, out string size, out int floors, out string district)) return;
+            string err = map.SelectError;
+            float pw = 600, ph = err != "" ? 210 : 180, px = w / 2 - pw / 2, py = h - ph - 14;
+            var panel = Blk(new Rect(px, py, pw, ph));
+            GUI.Box(panel, GUIContent.none, _box);
+            var tt = new GUIStyle(_title) { fontSize = 26, wordWrap = false };
+            Shadowed(new Rect(px + 20, py + 10, pw - 40, 36), type.ToUpperInvariant(), tt);
+            GUI.Label(new Rect(px + 20, py + 50, pw - 40, 28), string.Format("Size {0}  ·  {1} floor{2}  ·  {3}", size, floors, floors == 1 ? "" : "s", district), _label);
+            float y = py + 82;
+            if (err != "")
+            {
+                var es = new GUIStyle(_warn) { wordWrap = true };
+                GUI.Label(new Rect(px + 20, y, pw - 40, 30), err, es);
+                y += 32;
+            }
+            else
+            {
+                GUI.Label(new Rect(px + 20, y, pw - 40, 26), "Your palisade, fire and watchtower will go up around it.", _small);
+                y += 30;
+            }
+            GUI.enabled = err == "";
+            if (Btn(new Rect(px + 20, y + 4, 270, 60), "CONFIRM", _amberButton)) _b.ConfirmStart();
+            GUI.enabled = true;
+            if (Btn(new Rect(px + pw - 290, y + 4, 270, 60), "CANCEL", _darkButton)) map.ClearSelection();
         }
 
         void Shadowed(Rect r, string text, GUIStyle st)

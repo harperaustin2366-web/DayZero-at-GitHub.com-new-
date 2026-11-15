@@ -10,6 +10,9 @@
 //   * dynamic layer: survivor camps (palisade, watchtower, cabin, campfire, lit windows), markers on
 //     converted / lit lots
 //   * touch camera: one-finger pan, pinch zoom, two-finger twist; pitch 42, FOV 35
+//   * v0.11.4a: start-site selection (tap a building -> highlight -> GameUI Confirm founds the camp
+//     there via Bootstrap.ConfirmStart; the chunks around the yard are rebuilt so it forms around it)
+//     and the crowd layer (Crowd.cs: procedural survivors / zombies batched into one dynamic mesh)
 // World space: tile (x, y) -> Vector3(x, height, -y), 1 unit = 1 tile (~3.5 m).
 using System;
 using System.Collections;
@@ -67,6 +70,23 @@ namespace DayZero.Runtime
         string _dynKey = "";
         float _dynT;
 
+        // start-site selection (phase "pick")
+        public int SelectedLot { get; private set; } = -1;
+        public Vector2Int SelectedTile { get; private set; } = new Vector2Int(-1, -1);
+        public string SelectError { get; private set; } = "";
+        GameObject _selGo;
+        Material _glowMat;
+        Vector2 _tapStart; float _tapT; bool _tapOk;
+        Vector2 _pickFocus = new Vector2(-1f, -1f);
+
+        // crowd layer
+        Crowd _crowd;
+        GameObject _crowdGo;
+        Mesh _crowdMesh, _crowdShadowMesh;
+        readonly MeshData _cm = new MeshData(), _cs = new MeshData();
+        Game _sfxGame;
+        public Crowd Crowd => _crowd;
+
         static readonly Color FOG = new Color(0x6e / 255f, 0x74 / 255f, 0x66 / 255f);
 
         void Awake()
@@ -112,6 +132,16 @@ namespace DayZero.Runtime
                 foreach (var b in g.C.Bases)
                     if (b.Main) return b.Lot >= 0 && b.Lot < d.Lots.Count ? d.LotCenter(b.Lot) : new Vector2(b.Pos.x + 0.5f, b.Pos.y + 0.5f);
             if (g?.C != null && g.C.Bases.Count > 0) return new Vector2(g.C.Bases[0].Pos.x, g.C.Bases[0].Pos.y);
+            if (Picking)
+            {
+                // no camp yet: look at the game's suggested start so there are buildings to tap
+                if (_pickFocus.x < 0f)
+                {
+                    var st = g.SuggestStart(Math.Max(0, g.CurCol));
+                    _pickFocus = st.x >= 0 ? new Vector2(st.x + 0.5f, st.y + 0.5f) : new Vector2(d.CityRect.x + d.CityRect.width * 0.5f, d.CityRect.y + d.CityRect.height * 0.5f);
+                }
+                return _pickFocus;
+            }
             return new Vector2(d.CityRect.x + d.CityRect.width * 0.5f, d.CityRect.y + d.CityRect.height * 0.5f);
         }
 
@@ -134,7 +164,15 @@ namespace DayZero.Runtime
             if (!_streaming) StartCoroutine(StreamLod0());
             _dynT -= Time.unscaledDeltaTime;
             if (_dynT <= 0f) { _dynT = 0.75f; UpdateDynamic(); }
+            if (!Picking && SelectedLot >= 0) ClearSelection();
+            UpdateCrowd(b);
         }
+
+        /// <summary>Force a full rebuild on the next frame (new game / load may reuse the same world seed).</summary>
+        public void Invalidate() { _builtKey = ""; _pickFocus = new Vector2(-1f, -1f); ClearSelection(); }
+
+        /// <summary>True while a new game waits for the player to pick the building for the camp.</summary>
+        public bool Picking { get { var g = G; return g?.S != null && g.C != null && !g.C.Started && g.S.Phase == "pick"; } }
 
         void EnsureCamera()
         {
@@ -164,6 +202,7 @@ namespace DayZero.Runtime
                 Vector2 mid = (t0.position + t1.position) * 0.5f;
                 float d = Mathf.Max(1f, Vector2.Distance(t0.position, t1.position));
                 float a = Mathf.Atan2(t1.position.y - t0.position.y, t1.position.x - t0.position.x) * Mathf.Rad2Deg;
+                _tapOk = false;   // two fingers: never a tap
                 if (!_pinch)
                 {
                     // start a pinch only if the gesture did not begin on the HUD
@@ -188,11 +227,18 @@ namespace DayZero.Runtime
                 {
                     _drag = ui == null || !ui.BlocksPointer(TopLeft(t.position));
                     _last = t.position;
+                    _tapStart = t.position; _tapT = Time.unscaledTime; _tapOk = _drag;
                 }
                 else if (_drag && (t.phase == TouchPhase.Moved || t.phase == TouchPhase.Stationary))
                 {
+                    if ((t.position - _tapStart).magnitude > TapSlop()) _tapOk = false;
                     Pan(_last, t.position);
                     _last = t.position;
+                }
+                if (t.phase == TouchPhase.Ended)
+                {
+                    if (_tapOk && Time.unscaledTime - _tapT < 0.45f && (t.position - _tapStart).magnitude <= TapSlop()) OnTap(t.position);
+                    _tapOk = false;
                 }
                 if (t.phase == TouchPhase.Ended || t.phase == TouchPhase.Canceled) _drag = false;
                 return;
@@ -200,9 +246,13 @@ namespace DayZero.Runtime
             _pinch = false;
             // mouse (editor / desktop)
             Vector2 mp = Input.mousePosition;
-            if (Input.GetMouseButtonDown(0)) { _drag = ui == null || !ui.BlocksPointer(TopLeft(mp)); _last = mp; }
-            else if (_drag && Input.GetMouseButton(0)) { Pan(_last, mp); _last = mp; }
-            if (Input.GetMouseButtonUp(0)) _drag = false;
+            if (Input.GetMouseButtonDown(0)) { _drag = ui == null || !ui.BlocksPointer(TopLeft(mp)); _last = mp; _tapStart = mp; _tapT = Time.unscaledTime; _tapOk = _drag; }
+            else if (_drag && Input.GetMouseButton(0)) { if ((mp - _tapStart).magnitude > TapSlop()) _tapOk = false; Pan(_last, mp); _last = mp; }
+            if (Input.GetMouseButtonUp(0))
+            {
+                if (_tapOk && Time.unscaledTime - _tapT < 0.45f && (mp - _tapStart).magnitude <= TapSlop()) OnTap(mp);
+                _tapOk = false; _drag = false;
+            }
             float wheel = Input.mouseScrollDelta.y;
             if (Mathf.Abs(wheel) > 0.01f) _distTarget = Mathf.Clamp(_distTarget * Mathf.Pow(0.88f, wheel), MIN_DIST, MAX_DIST);
             if (Input.touchCount == 0 && !Input.GetMouseButton(0)) _drag = false;
@@ -263,6 +313,133 @@ namespace DayZero.Runtime
             _cam.farClipPlane = _dist * 4.5f + 250f;
         }
 
+        /// <summary>Finger travel (pixels) below which a touch counts as a tap, not a pan (~1.6 mm).</summary>
+        static float TapSlop() => Mathf.Max(12f, (UnityEngine.Screen.dpi > 0f ? UnityEngine.Screen.dpi : 320f) * 0.065f);
+
+        // ================= start-site selection =================
+        void OnTap(Vector2 screen)
+        {
+            if (!Picking || _cam == null || _gen == null) return;
+            var ray = _cam.ScreenPointToRay(new Vector3(screen.x, screen.y, 0f));
+            int lot = _gen.PickLot(ray.origin, ray.direction);
+            if (lot < 0) { ClearSelection(); Bootstrap.Instance?.Toast("Tap a building to make it your base."); return; }
+            Select(lot);
+        }
+
+        /// <summary>Highlight a lot as the candidate camp site and ask the game whether it can start there.</summary>
+        public void Select(int lot)
+        {
+            var g = G;
+            if (g?.S == null || _gen == null) return;
+            ClearSelection();
+            SelectedLot = lot;
+            SelectedTile = _gen.LotTile(lot);
+            SelectError = SelectedTile.x >= 0 ? g.CanStartAt(SelectedTile, Math.Max(0, g.CurCol)) : "Tap a building.";
+            var ch = _gen.Highlight(lot, SelectError == "");
+            _selGo = new GameObject("Selection");
+            _selGo.transform.SetParent(transform, false);
+            if (ch.Mesh.Count > 0) MakeObject("Highlight", ToMesh("Highlight", ch.Mesh), _objMat, _selGo.transform);
+            if (_glowMat != null && ch.Shadow.Count > 0) MakeObject("Glow", ToMesh("Glow", ch.Shadow), _glowMat, _selGo.transform);
+            Bootstrap.Instance?.PlayClick();
+        }
+
+        public void ClearSelection()
+        {
+            SelectedLot = -1; SelectedTile = new Vector2Int(-1, -1); SelectError = "";
+            if (_selGo != null) { DestroyChunk(_selGo); _selGo = null; }
+        }
+
+        /// <summary>Type / size / floors / district of the selected lot for the GameUI panel.</summary>
+        public bool SelectionInfo(out string type, out string size, out int floors, out string district)
+        {
+            type = size = district = ""; floors = 0;
+            if (SelectedLot < 0 || _gen == null) return false;
+            _gen.Describe(SelectedLot, out type, out float w, out float dd, out floors);
+            size = string.Format("{0:0} x {1:0} m", w, dd);
+            district = SelectedTile.x >= 0 ? D.DistrictAt(SelectedTile).Name : "";
+            return true;
+        }
+
+        /// <summary>Called by Bootstrap after Game.StartAt succeeded: clear the yard around the new camp in the
+        /// static chunks (LOD1 rebuilt now, LOD0 re-streams), refresh the dynamic layer and centre the camera.</summary>
+        public void OnCampFounded()
+        {
+            ClearSelection();
+            _pickFocus = new Vector2(-1f, -1f);
+            var g = G;
+            if (g?.S == null || _gen == null || _root == null) return;
+            _gen.SetCamps(g);
+            var rebuild = new HashSet<int>();
+            foreach (var b in g.AllBases())
+            {
+                if (!_gen.Layout(b, out var lay)) continue;
+                float r = lay.Yard.Hu * 1.5f + 12f;   // lots are bucketed by centre: reach neighbours that overlap the yard
+                int cx0 = Mathf.Clamp(Mathf.FloorToInt((lay.Yard.C.x - r) / CH), 0, _ncx - 1), cx1 = Mathf.Clamp(Mathf.FloorToInt((lay.Yard.C.x + r) / CH), 0, _ncx - 1);
+                int cy0 = Mathf.Clamp(Mathf.FloorToInt((lay.Yard.C.y - r) / CH), 0, _ncy - 1), cy1 = Mathf.Clamp(Mathf.FloorToInt((lay.Yard.C.y + r) / CH), 0, _ncy - 1);
+                for (int cy = cy0; cy <= cy1; cy++) for (int cx = cx0; cx <= cx1; cx++) rebuild.Add(cy * _ncx + cx);
+            }
+            foreach (int c in rebuild)
+            {
+                if (c < 0 || c >= _lod1.Length) continue;
+                if (_lod1[c] != null) DestroyChunk(_lod1[c]);
+                var ch = _gen.BuildChunk(c % _ncx, c / _ncx, _buckets[c], 1);
+                _lod1[c] = MakeChunk("Chunk " + (c % _ncx) + "," + (c / _ncx) + " LOD1", ch);
+            }
+            // drop all full-detail chunks: they re-stream (one per frame) with the yard cleared
+            foreach (var kv in _lod0) if (kv.Value != null) DestroyChunk(kv.Value);
+            _lod0.Clear();
+            for (int c = 0; c < _lod1.Length; c++) if (_lod1[c] != null) _lod1[c].SetActive(true);
+            _dynKey = "";
+            _crowd?.Clear();
+            Home();
+            Debug.Log("[MapView] camp founded: rebuilt " + rebuild.Count + " LOD1 chunks around the yard");
+        }
+
+        // ================= crowd =================
+        void UpdateCrowd(Bootstrap b)
+        {
+            var g = G;
+            if (_crowd == null || g?.S == null || _cam == null) return;
+            if (_sfxGame != g)
+            {
+                if (_sfxGame != null) _sfxGame.SfxRequested -= _crowd.OnSfx;
+                g.SfxRequested += _crowd.OnSfx;
+                _sfxGame = g;
+            }
+            bool running = !b.Paused && b.Pending.Count == 0 && !b.Ended && !Picking;
+            float dt = running ? Mathf.Min(Time.unscaledDeltaTime, 0.1f) : 0f;
+            var focus = new Vector2(_focus.x, -_focus.z);
+            _crowd.Update(g, dt, focus, _dist);
+            _crowd.Build(_cm, _cs, _cam.transform.position, _dist);
+            if (_crowdGo == null)
+            {
+                _crowdGo = new GameObject("Crowd");
+                _crowdGo.transform.SetParent(transform, false);
+                _crowdMesh = new Mesh { name = "Crowd" }; _crowdMesh.MarkDynamic();
+                var go = MakeObject("Figures", _crowdMesh, _objMat, _crowdGo.transform);
+                if (_shadowMat != null)
+                {
+                    _crowdShadowMesh = new Mesh { name = "Crowd shadows" }; _crowdShadowMesh.MarkDynamic();
+                    MakeObject("Blob shadows", _crowdShadowMesh, _shadowMat, _crowdGo.transform);
+                }
+            }
+            _crowdGo.SetActive(Ready);
+            Upload(_crowdMesh, _cm);
+            if (_crowdShadowMesh != null) Upload(_crowdShadowMesh, _cs);
+        }
+
+        static readonly Bounds CROWD_BOUNDS = new Bounds(Vector3.zero, new Vector3(1e5f, 1e3f, 1e5f));
+
+        static void Upload(Mesh m, MeshData md)
+        {
+            m.Clear(false);
+            m.indexFormat = md.V.Count > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16;
+            m.SetVertices(md.V);
+            m.SetColors(md.C);
+            m.SetTriangles(md.T, 0, false);
+            m.bounds = CROWD_BOUNDS;   // figures are spread over the view; skip per-frame bounds and never cull
+        }
+
         // ================= build =================
         IEnumerator Build(string key)
         {
@@ -277,6 +454,10 @@ namespace DayZero.Runtime
 
             _gen = new MapGen(d);
             _gen.SetCamps(G);
+            if (_crowd != null && _sfxGame != null) _sfxGame.SfxRequested -= _crowd.OnSfx;
+            _sfxGame = null;
+            _crowd = new Crowd(_gen);
+            _pickFocus = new Vector2(-1f, -1f);
             MakeSkirt(d);
             Progress = 0.05f;
             yield return null;
@@ -333,6 +514,10 @@ namespace DayZero.Runtime
             _lod1 = new GameObject[0]; _lod0.Clear();
             if (_root != null) Destroy(_root);
             if (_dyn != null) Destroy(_dyn);
+            ClearSelection();
+            if (_crowdGo != null) { Destroy(_crowdGo); _crowdGo = null; }
+            if (_crowdMesh != null) { Destroy(_crowdMesh); _crowdMesh = null; }
+            if (_crowdShadowMesh != null) { Destroy(_crowdShadowMesh); _crowdShadowMesh = null; }
             Labels.Clear();
         }
 
@@ -431,7 +616,12 @@ namespace DayZero.Runtime
             if (sh == null) sh = Shader.Find("DayZero/Map");
             var ss = Resources.Load<Shader>("Shaders/DayZeroShadow");
             if (ss == null) ss = Shader.Find("DayZero/MapShadow");
-            if (ss != null && ss.isSupported) _shadowMat = new Material(ss) { name = "MapShadows" };
+            if (ss != null && ss.isSupported)
+            {
+                _shadowMat = new Material(ss) { name = "MapShadows" };
+                // selection glow: same alpha decal shader, drawn just before the shadows so the stencil lets it win
+                _glowMat = new Material(ss) { name = "SelectionGlow", renderQueue = 2009 };
+            }
             if (sh != null && sh.isSupported)
             {
                 _objMat = new Material(sh) { name = "MapObjects" };
@@ -459,7 +649,7 @@ namespace DayZero.Runtime
                 if (sp != null) { _objMat = new Material(sp) { name = "MapObjects (fallback)", renderQueue = 2000 }; RenderWarning = "Map shader " + why + ": fallback " + sp.name + " (no depth, no haze)"; }
                 else { _objMat = new Material(Shader.Find("Standard")); RenderWarning = "Map shader " + why + ": no vertex-colour fallback found"; }
             }
-            _shadowMat = null;
+            _shadowMat = null; _glowMat = null;
             Debug.LogWarning("[MapView] " + RenderWarning);
         }
 

@@ -118,6 +118,8 @@ namespace DayZero.Runtime
         }
 
         // ---------------- commands from the UI ----------------
+        /// <summary>New game: build the world and show the map with no camp yet ("pick" phase). The player taps a
+        /// building (MapView) and confirms (GameUI -> ConfirmStart), which founds the colony there.</summary>
         public void NewGame(int difficulty)
         {
             try
@@ -125,15 +127,32 @@ namespace DayZero.Runtime
                 Pending.Clear(); Ended = false; Won = false; Paused = false; Speed = 1;
                 Game.NewRun(difficulty, -1, 1);
                 Game.Use(0);
-                var tile = Game.SuggestStart(0);
-                string err = Game.StartAt(tile);
-                if (err != "") { Toast("Could not start: " + err); return; }
-                Game.Use(0);
-                Game.Running = true;
+                Game.Running = false;
+                Map?.Invalidate();
                 State = Screen2.Playing;
-                Game.SaveGame();
             }
             catch (Exception e) { Fail("Could not start a new game.", e); }
+        }
+
+        /// <summary>True while the new game waits for the player to choose the building for the camp.</summary>
+        public bool Picking => State == Screen2.Playing && Game?.S != null && Game.C != null && !Game.C.Started && Game.S.Phase == "pick";
+
+        /// <summary>Found the colony in the building selected on the map (Godot: DoAction "start_at" -> StartAt).</summary>
+        public void ConfirmStart()
+        {
+            if (!Picking || Map == null || Map.SelectedLot < 0) return;
+            try
+            {
+                Game.Use(0);
+                string err = Game.StartAt(Map.SelectedTile);
+                if (err != "") { Toast("Can't set up camp there: " + err); return; }
+                Game.Use(0);
+                Game.Running = true;
+                Map.OnCampFounded();
+                Game.SaveGame();
+                Toast("Camp founded. Survive. Build. Defend. Expand.");
+            }
+            catch (Exception e) { Fail("Could not found the camp.", e); }
         }
 
         public void LoadSaved()
@@ -142,6 +161,7 @@ namespace DayZero.Runtime
             {
                 Pending.Clear(); Ended = false; Won = false; Paused = false;
                 if (!Game.LoadGame()) { Toast(Game.LastLoadError != "" ? Game.LastLoadError : "No save found."); return; }
+                Map?.Invalidate();   // camp yards come from the loaded bases (the chosen start site is a saved Base)
                 Game.Use(Math.Max(0, Game.ViewCol));
                 Game.Running = true;
                 Ended = Game.S.Phase == "lost";

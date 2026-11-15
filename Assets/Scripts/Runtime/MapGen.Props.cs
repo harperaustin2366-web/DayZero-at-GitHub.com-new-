@@ -380,9 +380,22 @@ namespace DayZero.Runtime
         bool ClearedRect(ORect r)
         {
             if (_clear.Count == 0) return false;
-            if (Cleared(r.C)) return true;
-            foreach (var q in r.Quad()) if (Cleared(q)) return true;
+            for (int i = 0; i < _clear.Count; i++) if (Overlap(_clear[i], r)) return true;
             return false;
+        }
+
+        /// <summary>Oriented rectangles overlap (separating axis test). v0.11.4a: any building can become the camp,
+        /// so big neighbours that cross the yard edge without a corner inside it must be cleared too.</summary>
+        static bool Overlap(ORect a, ORect b)
+        {
+            var d = b.C - a.C;
+            foreach (var ax in new[] { a.U, a.V, b.U, b.V })
+            {
+                float ra = a.Hu * Mathf.Abs(Vector2.Dot(a.U, ax)) + a.Hv * Mathf.Abs(Vector2.Dot(a.V, ax));
+                float rb = b.Hu * Mathf.Abs(Vector2.Dot(b.U, ax)) + b.Hv * Mathf.Abs(Vector2.Dot(b.V, ax));
+                if (Mathf.Abs(Vector2.Dot(d, ax)) > ra + rb) return false;
+            }
+            return true;
         }
 
         void CampRect(Base b, out Vector2 c, out float half, out ORect? bld)
@@ -479,14 +492,7 @@ namespace DayZero.Runtime
             var V = -CampFront(); var U = new Vector2(V.y, -V.x);
             var yard = new ORect(c, U, half, half);
             // fire position: centre of the yard, or between the building front and the gate
-            Vector2 fire;
-            if (bld.HasValue)
-            {
-                var b = bld.Value;
-                float front = Mathf.Abs(Vector2.Dot(b.C - c, V)) + Mathf.Abs(Vector2.Dot(b.U, V)) * b.Hu + Mathf.Abs(Vector2.Dot(b.V, V)) * b.Hv;
-                fire = c - V * ((front + half) * 0.5f) + U * 0.6f;
-            }
-            else fire = c + U * 0.3f - V * 0.4f;
+            var fire = CampFireAt(c, half, U, V, bld);   // shared with Layout() (MapGen.Select.cs)
             // yard ground: packed dirt with a warm pool around the fire
             const int N = 10;
             float y = 0.049f;
@@ -526,6 +532,8 @@ namespace DayZero.Runtime
                 var e0 = c + nrm * (half * sg) - along * half; var e1 = c + nrm * (half * sg) + along * half;
                 g.Shadow(new[] { e0, e1, e1 + nrm * 0.05f, e0 + nrm * 0.05f }, 0.95f, 0.34f);
             }
+            // firing step (v0.11.4a): plank walkway inside the palisade so guards on duty can shoot over it
+            FiringStep(g, c, half, U, V);
             // gate: tall posts, doors swung open, plank sign
             var gc = c - V * half;
             foreach (int s in new[] { -1, 1 })
@@ -595,6 +603,34 @@ namespace DayZero.Runtime
                 }
                 // armoured truck parked outside the gate
                 MRAP(g, gc - V * 1.1f + U * 1.6f, U, salt);
+            }
+        }
+
+        public const float STEP_H = 0.6f, STEP_IN = 0.2f;
+
+        void FiringStep(Geo g, Vector2 c, float half, Vector2 U, Vector2 V)
+        {
+            Color plank = Hex("#6a5038"), plankTop = Hex("#7a5e42");
+            float w = 0.13f, r = half - STEP_IN;
+            for (int side = 0; side < 4; side++)
+            {
+                Vector2 along = side % 2 == 0 ? U : V, nrm = side % 2 == 0 ? V : U;
+                float sg = side < 2 ? -1f : 1f;
+                var mid = c + nrm * (r * sg);
+                float len = r;
+                if (side == 0)
+                {
+                    // leave the gate open: two runs either side of it
+                    foreach (int k in new[] { -1, 1 })
+                    {
+                        float a = 0.6f, b = r; var m2 = mid + along * (k * (a + b) * 0.5f);
+                        g.BoxAt(m2, along, (b - a) * 0.5f, w, STEP_H - 0.04f, STEP_H, plank, plankTop);
+                        for (float t = a + 0.2f; t < b; t += 0.9f) g.Beam(Geo.W(mid + along * (k * t), 0.05f), Geo.W(mid + along * (k * t), STEP_H - 0.04f), 0.025f, TIMBER);
+                    }
+                    continue;
+                }
+                g.BoxAt(mid, along, len, w, STEP_H - 0.04f, STEP_H, plank, plankTop);
+                for (float t = -len + 0.3f; t < len; t += 0.9f) g.Beam(Geo.W(mid + along * t, 0.05f), Geo.W(mid + along * t, STEP_H - 0.04f), 0.025f, TIMBER);
             }
         }
 
