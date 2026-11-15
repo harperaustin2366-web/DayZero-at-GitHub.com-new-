@@ -801,7 +801,7 @@ namespace DayZero.Runtime
             bool dead = Hf(salt, 72) < 0.08f;
             Color c = dead ? new Color(0.45f, 0.40f, 0.33f) : TREE_COLS[(int)(Hf(salt, 73) * TREE_COLS.Length) % TREE_COLS.Length];
             float rot = Hf(salt, 74) * 1.57f;
-            mb.Box(RectQuad(p, 0.05f * s, 0.05f * s, rot), 0f, 0.35f * s, TRUNK, TRUNK, null, 0f);
+            if (scale < 1.2f) mb.Box(RectQuad(p, 0.05f * s, 0.05f * s, rot), 0f, 0.35f * s, TRUNK, TRUNK, null, 0f); // forest trees skip the trunk (vertex budget)
             if (dead) { mb.Cone(p, 0.12f * s, 0.3f * s, 1.0f * s, c, rot); return; }
             if (Hf(salt, 75) < 0.4f)
             {
