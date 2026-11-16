@@ -107,7 +107,7 @@ namespace DayZero.Runtime
         float _offX, _offY, _scale = 1f;
 
         /// <summary>True when a modal (menu, decision, game over) covers the map or we are not in a game.</summary>
-        public bool ModalOpen => _b.State != Bootstrap.Screen2.Playing || _menuOpen || _b.Pending.Count > 0 || _b.Ended;
+        public bool ModalOpen => _b.State != Bootstrap.Screen2.Playing || _menuOpen || SideOpen || _b.Pending.Count > 0 || _b.Ended;
 
         /// <summary>Screen position (top-left origin, pixels) is over a HUD element.</summary>
         public bool BlocksPointer(Vector2 screenTopLeft)
@@ -215,6 +215,12 @@ namespace DayZero.Runtime
                 if (_menuOpen) DrawMenuOverlay(w, h);
                 return;
             }
+            // A sheet on top (side menu, menu overlay, decision, game over) gets the touches: IMGUI hands a press to
+            // the first button drawn under it, so the HUD underneath must not see mouse events while one is up.
+            bool sheet = SideOpen || _menuOpen || _b.Pending.Count > 0 || _b.Ended || G.S.Phase == "lost";
+            var evType = Event.current.type;
+            bool swallow = sheet && (evType == EventType.MouseDown || evType == EventType.MouseUp || evType == EventType.MouseDrag || evType == EventType.ScrollWheel);
+            if (swallow) Event.current.type = EventType.Ignore;
             DrawStats();
             if (Btn(Blk(new Rect(w / 2 - 80, 8, 160, 50)), "MENU", _darkButton)) _menuOpen = true;
             DrawTopRight(w);
@@ -222,6 +228,7 @@ namespace DayZero.Runtime
             float by = 104f;
             DrawAttackBanner(w, h, ref by);
             DrawRepairChip(w, ref by);
+            DrawResearchNote(w, ref by, map);
             if (!DrawSidePanel(w, map)) DrawActions(w, map);
             if (map != null && !ModalOpen)
             {
@@ -230,10 +237,12 @@ namespace DayZero.Runtime
                 else if (map.SelectedRun >= 0) DrawWallSheet(w, h, map);
             }
             DrawTimeControls(w, h);
+            if (swallow) Event.current.type = evType;
 
             if (_b.Ended || G.S.Phase == "lost") DrawGameOver(w, h);
             else if (_b.Pending.Count > 0) DrawDecision(w, h, _b.Pending[0]);
             else if (_menuOpen) DrawMenuOverlay(w, h);
+            else if (SideOpen) DrawSideMenu(w, h);
         }
 
         /// <summary>Start-site selection: banner, then the selected building's info with Confirm / Cancel.</summary>
@@ -336,26 +345,33 @@ namespace DayZero.Runtime
 
         void DrawActions(float w, MapView map)
         {
-            const float PW = 200f;
-            float px = w - PW - 8, py = 108;
+            var panel = SideMenus.ActionsPanel(w);
             if (!_actionsOpen)
             {
                 if (Btn(Blk(new Rect(w - 52, 300, 44, 64)), "<", _darkButton)) _actionsOpen = true;
                 return;
             }
-            if (Btn(Blk(new Rect(px - 48, 300, 44, 64)), ">", _darkButton)) _actionsOpen = false;
-            var panel = Blk(new Rect(px, py, PW, 440));
+            if (Btn(Blk(new Rect(panel.x - 48, 300, 44, 64)), ">", _darkButton)) _actionsOpen = false;
+            Blk(panel);
             GUI.Box(panel, GUIContent.none, _box);
             var hdr = new GUIStyle(_small) { fontStyle = FontStyle.Bold }; hdr.normal.textColor = AMBER;
-            GUI.Label(new Rect(px + 12, py + 6, PW - 24, 24), "ACTIONS", hdr);
-            float y = py + 34, bw = PW - 20, bh = 50, gap = 8;
-            if (Btn(new Rect(px + 10, y, bw, bh), "BUILD")) { _panel = Panel.Build; map?.CancelTool(); } y += bh + gap;
-            if (Btn(new Rect(px + 10, y, bw, bh), "CAMP", _amberButton)) map?.Home(); y += bh + gap;
-            if (Btn(new Rect(px + 10, y, bw, bh), "GATHER", _brownButton)) { _tab = 1; _menuOpen = true; } y += bh + gap;
-            if (Btn(new Rect(px + 10, y, bw, bh), "DEFENSE")) { _panel = Panel.Defense; map?.ClearBuilding(); } y += bh + gap;
-            if (Btn(new Rect(px + 10, y, bw, bh), "CREW & JOBS")) { _tab = 1; _menuOpen = true; } y += bh + gap;
-            if (Btn(new Rect(px + 10, y, bw, bh), "COLONY")) { _tab = 0; _menuOpen = true; } y += bh + gap;
-            if (Btn(new Rect(px + 10, y, bw, bh), "LOG")) { _tab = 2; _menuOpen = true; }
+            GUI.Label(new Rect(panel.x + 12, panel.y + 6, panel.width - 24, 24), "ACTIONS", hdr);
+            for (int i = 0; i < SideMenus.ACTIONS.Length; i++)
+            {
+                var (label, style) = SideMenus.ACTIONS[i];
+                if (!Btn(SideMenus.ActionButton(w, i), label, MButton(style, 19))) continue;
+                switch (label)
+                {
+                    case "BUILD": _panel = Panel.Build; map?.CancelTool(); break;
+                    case "CAMP": map?.Home(); break;
+                    case "GATHER": case "CREW & JOBS": _tab = 1; _menuOpen = true; break;
+                    case "DEFENSE": _panel = Panel.Defense; map?.ClearBuilding(); break;
+                    case "COLONY": _tab = 0; _menuOpen = true; break;
+                    case "TRADE": OpenSide("trade", map); break;
+                    case "RESEARCH": OpenSide("research", map); break;
+                    case "LOG": _tab = 2; _menuOpen = true; break;
+                }
+            }
         }
 
         void DrawTimeControls(float w, float h)
