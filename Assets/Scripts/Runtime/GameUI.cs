@@ -31,6 +31,12 @@ namespace DayZero.Runtime
         GUIStyle _amberButton, _brownButton, _darkButton, _hud, _hudR, _shadow, _mapLabel, _mapDistrict, _mapCamp, _labelShadow;
         Texture2D _bgTex, _panelTex, _chipTex, _dimTex;
         bool _menuOpen, _actionsOpen = true;
+        // v0.14.0a skin (UiSkin.cs): cached textures / styles, nothing built per frame
+        Texture2D _glowTex, _scrimTex, _accentTex, _lineTex, _amberLineTex, _sheetDimTex;
+        GUIStyle _hudBox, _tintBox, _camSmall, _hdrAmber, _phaseSt, _colonySt, _tagSt, _bannerT, _bannerS, _pickT, _pickErr;
+        GUIStyle _mapLabelSh, _mapDistrictSh, _mapCampSh, _chipTxt;
+        readonly GUIContent _gc = new GUIContent();
+        readonly Dictionary<GUIStyle, GUIStyle> _shadowOf = new Dictionary<GUIStyle, GUIStyle>();
 
         public GameUI(Bootstrap b) { _b = b; }
 
@@ -43,6 +49,14 @@ namespace DayZero.Runtime
         static readonly Color AMBER = new Color(0.95f, 0.70f, 0.28f);
         static readonly Color OLIVE_INK = new Color(0.72f, 0.80f, 0.48f);
         static readonly Color RED_INK = new Color(0.95f, 0.42f, 0.32f);
+        static readonly Color SUN = new Color(1f, 0.80f, 0.36f), MOON = new Color(0.72f, 0.80f, 0.98f), RED_GLYPH = new Color(0.95f, 0.35f, 0.28f);
+        // resource chips (v0.14.0a): key, glyph, glyph colour
+        static readonly string[] CHIP_KEYS = { "food", "water", "meds", "ammo", "fuel", "mats", "morale" };
+        static readonly Color[] CHIP_COL =
+        {
+            new Color(0.86f, 0.42f, 0.28f), new Color(0.40f, 0.66f, 0.90f), new Color(0.92f, 0.36f, 0.34f), new Color(0.90f, 0.72f, 0.34f),
+            new Color(0.62f, 0.70f, 0.36f), new Color(0.78f, 0.58f, 0.38f), new Color(0.95f, 0.55f, 0.48f),
+        };
 
         static Texture2D Solid(Color c)
         {
@@ -54,11 +68,12 @@ namespace DayZero.Runtime
 
         GUIStyle MakeButton(Color normal, Color hover, Color active, int size)
         {
+            // v0.14.0a: rounded 9-slice textures (gradient, keyline, top highlight, drop shadow), pressed = darker with an
+            // amber inner glow; same colours, padding and text as before. Textures are cached per colour in UiSkin.
             var st = new GUIStyle(GUI.skin.button) { fontSize = size, wordWrap = true, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            st.normal.background = Solid(normal); st.hover.background = Solid(hover); st.active.background = Solid(active);
-            st.focused.background = st.normal.background; st.onNormal.background = Solid(active);
+            UiSkin.SkinButton(st, normal, hover, active);
             st.normal.textColor = st.hover.textColor = st.active.textColor = st.focused.textColor = st.onNormal.textColor = INK;
-            st.border = new RectOffset(0, 0, 0, 0);
+            st.onHover.textColor = st.onActive.textColor = INK;
             st.padding = new RectOffset(8, 8, 4, 4);
             return st;
         }
@@ -67,7 +82,7 @@ namespace DayZero.Runtime
         {
             if (_styled) return;
             _styled = true;
-            _bgTex = Solid(new Color(0.09f, 0.10f, 0.08f, 1f));
+            _bgTex = UiSkin.ToTex(UiSkin.Backdrop());
             _panelTex = Solid(new Color(0.09f, 0.10f, 0.08f, 0.80f));
             _chipTex = Solid(new Color(0.07f, 0.08f, 0.06f, 0.82f));
             _dimTex = Solid(new Color(0f, 0f, 0f, 0.45f));
@@ -86,9 +101,21 @@ namespace DayZero.Runtime
             _darkButton = MakeButton(new Color(0.09f, 0.10f, 0.08f, 0.82f), new Color(0.18f, 0.20f, 0.14f, 0.9f), new Color(0.70f, 0.50f, 0.18f, 1f), 22);
             _bigButton = new GUIStyle(_button) { fontSize = 26 };
             _box = new GUIStyle(GUI.skin.box);
-            _box.normal.background = _panelTex;
+            UiSkin.Apply(_box, UiSkin.Panel());
+            _hudBox = new GUIStyle(_box);
+            UiSkin.Apply(_hudBox, UiSkin.HudPanel());
+            _tintBox = new GUIStyle(_box);
+            UiSkin.Apply(_tintBox, UiSkin.TintChip());
             _chip = new GUIStyle(_label) { fontSize = 18, alignment = TextAnchor.MiddleCenter, wordWrap = false };
-            _chip.normal.background = _chipTex;
+            UiSkin.Apply(_chip, UiSkin.Chip());
+            _chipTxt = new GUIStyle(_chip);
+            _chipTxt.normal.background = null; _chipTxt.overflow = new RectOffset(0, 0, 0, 0);
+            _glowTex = UiSkin.ToTex(UiSkin.Glow());
+            _scrimTex = UiSkin.ToTex(UiSkin.ScrimRight());
+            _accentTex = UiSkin.ToTex(UiSkin.AccentBar());
+            _lineTex = Solid(new Color(0.85f, 0.66f, 0.32f, 0.35f));
+            _amberLineTex = Solid(new Color(0.95f, 0.70f, 0.28f, 0.9f));
+            _sheetDimTex = Solid(new Color(0.04f, 0.045f, 0.035f, 0.80f));
             _hud = new GUIStyle(_label) { fontSize = 21, fontStyle = FontStyle.Bold, wordWrap = false, richText = true };
             _hudR = new GUIStyle(_hud) { alignment = TextAnchor.UpperRight };
             _shadow = new GUIStyle(_hud); _shadow.normal.textColor = new Color(0, 0, 0, 0.75f);
@@ -99,6 +126,18 @@ namespace DayZero.Runtime
             _mapCamp = new GUIStyle(_mapLabel) { fontSize = 18, fontStyle = FontStyle.Bold };
             _mapCamp.normal.textColor = AMBER;
             _labelShadow = new GUIStyle(_mapLabel); _labelShadow.normal.textColor = new Color(0, 0, 0, 0.8f);
+            _mapLabelSh = new GUIStyle(_labelShadow) { fontSize = _mapLabel.fontSize, fontStyle = _mapLabel.fontStyle };
+            _mapDistrictSh = new GUIStyle(_labelShadow) { fontSize = _mapDistrict.fontSize, fontStyle = _mapDistrict.fontStyle };
+            _mapCampSh = new GUIStyle(_labelShadow) { fontSize = _mapCamp.fontSize, fontStyle = FontStyle.Bold };
+            _camSmall = new GUIStyle(_darkButton) { fontSize = 15, wordWrap = false, clipping = TextClipping.Overflow };
+            _hdrAmber = new GUIStyle(_small) { fontStyle = FontStyle.Bold }; _hdrAmber.normal.textColor = AMBER;
+            _phaseSt = new GUIStyle(_small) { wordWrap = false }; _phaseSt.normal.textColor = AMBER;
+            _colonySt = new GUIStyle(_small) { wordWrap = false }; _colonySt.normal.textColor = OLIVE_INK;
+            _tagSt = new GUIStyle(_label) { fontSize = 22, fontStyle = FontStyle.Bold }; _tagSt.normal.textColor = OLIVE_INK;
+            _bannerT = new GUIStyle(_title) { fontSize = 28, alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            _bannerS = new GUIStyle(_small) { alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            _pickT = new GUIStyle(_title) { fontSize = 26, wordWrap = false };
+            _pickErr = new GUIStyle(_warn) { wordWrap = true };
         }
 
         // ---------------- map input hooks ----------------
@@ -151,6 +190,17 @@ namespace DayZero.Runtime
 
         bool Btn(Rect r, string text, GUIStyle st = null)
         {
+            // v0.14.0a press feedback: while a finger holds this button it sinks a little (inset 1.5 / 2 px) over a soft
+            // amber halo; the pressed texture itself is darker with an inner glow. Paint only: hit-testing keeps the full rect.
+            var ev = Event.current;
+            if (ev.type == EventType.Repaint && GUIUtility.hotControl != 0 && GUI.enabled && r.Contains(ev.mousePosition))
+            {
+                var oc = GUI.color;
+                GUI.color = new Color(1f, 0.72f, 0.30f, 0.30f * oc.a);
+                GUI.DrawTexture(new Rect(r.x - 10f, r.y - 10f, r.width + 20f, r.height + 20f), _glowTex);
+                GUI.color = oc;
+                r = new Rect(r.x + 1.5f, r.y + 2f, r.width - 3f, r.height - 4f);
+            }
             if (!GUI.Button(r, text, st ?? _button)) return false;
             _b.PlayClick();
             return true;
@@ -172,9 +222,9 @@ namespace DayZero.Runtime
 
         void DrawTitle(float w, float h)
         {
-            GUI.Label(new Rect(60, 50, w - 120, 60), "DAY ZERO: OUTBREAK", _title);
-            var tag = new GUIStyle(_label) { fontSize = 22, fontStyle = FontStyle.Bold }; tag.normal.textColor = OLIVE_INK;
-            GUI.Label(new Rect(60, 98, w - 120, 34), "SURVIVE. BUILD. DEFEND. EXPAND.", tag);
+            Shadowed(new Rect(60, 50, w - 120, 60), "DAY ZERO: OUTBREAK", _title);
+            GUI.DrawTexture(new Rect(60, 92, 420, 3), _accentTex);
+            GUI.Label(new Rect(60, 98, w - 120, 34), "SURVIVE. BUILD. DEFEND. EXPAND.", _tagSt);
             GUI.Label(new Rect(60, 132, w - 120, 30), "v" + Application.version + " · Unity port", _small);
             float y = 190;
             bool has = _b.HasSave();
@@ -212,7 +262,7 @@ namespace DayZero.Runtime
                 if (Btn(Blk(new Rect(w / 2 - 80, 8, 160, 50)), "MENU", _darkButton)) _menuOpen = true;
                 DrawCameraButtons(map);
                 if (map != null && map.Ready && !ModalOpen) DrawStartPick(w, h, map);
-                if (_menuOpen) DrawMenuOverlay(w, h);
+                if (_menuOpen) { BeginAnim(ref _modalAnim, 3, null, 0f, 18f); DrawMenuOverlay(w, h); EndAnim(); }
                 return;
             }
             // A sheet on top (side menu, menu overlay, decision, game over) gets the touches: IMGUI hands a press to
@@ -230,9 +280,13 @@ namespace DayZero.Runtime
             DrawRepairChip(w, ref by);
             DrawResearchNote(w, ref by, map);
             DrawWarHud(w, ref by, map);   // GameUI.Factions.cs
-            if (!DrawSidePanel(w, map)) DrawActions(w, map);
+            BeginAnim(ref _sideAnim, _panel != Panel.None ? 1 + (int)_panel : _actionsOpen ? 1 : 0, null, 28f, 0f);
+            bool sidePanel = DrawSidePanel(w, map);
+            EndAnim();
+            if (!sidePanel) DrawActions(w, map);
             if (map != null && !ModalOpen)
             {
+                BeginAnim(ref _sheetAnim, SheetKey(map), map.SelectedCamp, 0f, 22f);
                 if (DrawCampSheets(w, h, map)) { }   // GameUI.Camp.cs: outpost bar, trap line, camp / trap sheets
                 else if (map.TargetTool) DrawTargetBar(w, h, map);
                 else if (map.ActiveTool != MapView.Tool.None) DrawPlacementBar(w, h, map);
@@ -243,44 +297,88 @@ namespace DayZero.Runtime
                 else if (map.SelectedFence >= 0) DrawFenceSheet(w, h, map);
                 else if (map.SelectedTower >= 0) DrawTowerSheet(w, h, map);
                 else if (map.SelectedRun >= 0) DrawWallSheet(w, h, map);
+                EndAnim();
             }
             DrawTimeControls(w, h);
             if (swallow) Event.current.type = evType;
 
-            if (_b.Ended || G.S.Phase == "lost") DrawGameOver(w, h);
+            // modal sheets fade and slide in (v0.14.0a); a new decision or another side menu restarts the animation
+            bool over = _b.Ended || G.S.Phase == "lost";
+            int mk = over ? 1 : _b.Pending.Count > 0 ? 2 : _menuOpen ? 3 : SideOpen ? 4 : 0;
+            BeginAnim(ref _modalAnim, mk, mk == 2 ? (object)_b.Pending[0] : mk == 4 ? _side.Open : null, 0f, 18f);
+            if (over) DrawGameOver(w, h);
             else if (_b.Pending.Count > 0 && DrawWarDemand(w, h, _b.Pending[0])) { }   // GameUI.Factions.cs
             else if (_b.Pending.Count > 0) DrawDecision(w, h, _b.Pending[0]);
             else if (_menuOpen) DrawMenuOverlay(w, h);
             else if (SideOpen) DrawSideMenu(w, h);
+            EndAnim();
+        }
+
+        // ---------------- v0.14.0a open animations ----------------
+        // Paint-only: a sheet that just opened starts slightly offset and translucent and eases in over ~0.2 s via
+        // GUI.matrix / GUI.color (IMGUI maps touches through the same matrix, so taps still land on what is drawn).
+        struct Anim { public int Key; public object Obj; public float T0; }
+        Anim _modalAnim, _sideAnim, _sheetAnim;
+        Matrix4x4 _animM; Color _animC; bool _animOn;
+        const float ANIM_S = 0.22f;
+
+        void BeginAnim(ref Anim a, int key, object obj, float dx, float dy)
+        {
+            float now = Time.unscaledTime;
+            if (key != a.Key || !ReferenceEquals(obj, a.Obj)) { a.Key = key; a.Obj = obj; a.T0 = now; }
+            _animM = GUI.matrix; _animC = GUI.color; _animOn = true;
+            if (key == 0) return;
+            float t = Mathf.Clamp01((now - a.T0) / ANIM_S);
+            if (t >= 1f) return;
+            float k = 1f - (1f - t) * (1f - t) * (1f - t);   // ease-out cubic
+            GUI.matrix = _animM * Matrix4x4.Translate(new Vector3(dx * (1f - k), dy * (1f - k), 0f));
+            GUI.color = new Color(_animC.r, _animC.g, _animC.b, _animC.a * (0.25f + 0.75f * k));
+        }
+
+        void EndAnim()
+        {
+            if (!_animOn) return;
+            GUI.matrix = _animM; GUI.color = _animC; _animOn = false;
+        }
+
+        static int SheetKey(MapView map)
+        {
+            if (map.TargetTool) return 2;
+            if (map.ActiveTool != MapView.Tool.None) return 3 + (int)map.ActiveTool;
+            if (map.BuildingLot >= 0) return 100000 + map.BuildingLot;
+            if (map.SelectedGroup >= 0) return 200000 + map.SelectedGroup;
+            if (map.SelectedCamp != "") return 50;
+            if (map.SelectedWreck >= 0) return 300000 + map.SelectedWreck;
+            if (map.SelectedFence >= 0) return 400000 + map.SelectedFence;
+            if (map.SelectedTower >= 0) return 500000 + map.SelectedTower;
+            if (map.SelectedRun >= 0) return 600000 + map.SelectedRun;
+            return 1;
         }
 
         /// <summary>Start-site selection: banner, then the selected building's info with Confirm / Cancel.</summary>
         void DrawStartPick(float w, float h, MapView map)
         {
             var ban = Blk(new Rect(w / 2 - 330, 66, 660, 78));
-            GUI.Box(ban, GUIContent.none, _box);
-            var bt = new GUIStyle(_title) { fontSize = 28, alignment = TextAnchor.MiddleCenter, wordWrap = false };
-            Shadowed(new Rect(ban.x, ban.y + 6, ban.width, 40), "Tap any building to make it your base", bt);
-            var bs = new GUIStyle(_small) { alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            GUI.Box(ban, GUIContent.none, _hudBox);
+            var bs = _bannerS;
+            Shadowed(new Rect(ban.x, ban.y + 6, ban.width, 40), "Tap any building to make it your base", _bannerT);
             GUI.Label(new Rect(ban.x, ban.y + 46, ban.width, 26), "Drag to look around · pinch to zoom · HOME returns to the suggested site", bs);
             if (map.SelectedLot < 0 || !map.SelectionInfo(out string type, out string size, out int floors, out string district)) return;
             string err = map.SelectError;
             float pw = 600, ph = err != "" ? 210 : 180, px = w / 2 - pw / 2, py = h - ph - 14;
             var panel = Blk(new Rect(px, py, pw, ph));
             GUI.Box(panel, GUIContent.none, _box);
-            var tt = new GUIStyle(_title) { fontSize = 26, wordWrap = false };
-            Shadowed(new Rect(px + 20, py + 10, pw - 40, 36), type.ToUpperInvariant(), tt);
+            Shadowed(new Rect(px + 20, py + 10, pw - 40, 36), type.ToUpperInvariant(), _pickT);
             GUI.Label(new Rect(px + 20, py + 50, pw - 40, 28), string.Format("Size {0}  ·  {1} floor{2}  ·  {3}", size, floors, floors == 1 ? "" : "s", district), _label);
             float y = py + 82;
             if (err != "")
             {
-                var es = new GUIStyle(_warn) { wordWrap = true };
-                GUI.Label(new Rect(px + 20, y, pw - 40, 30), err, es);
+                GUI.Label(new Rect(px + 20, y, pw - 40, 30), err, _pickErr);
                 y += 32;
             }
             else
             {
-                GUI.Label(new Rect(px + 20, y, pw - 40, 26), "Your palisade, fire and watchtower will go up around it.", _small);
+                GUI.Label(new Rect(px + 20, y, pw - 40, 26), "Your people move in. Fence the block in from DEFENSE, then add a gate.", _small);
                 y += 30;
             }
             GUI.enabled = err == "";
@@ -291,12 +389,19 @@ namespace DayZero.Runtime
 
         void Shadowed(Rect r, string text, GUIStyle st)
         {
-            var sh = new GUIStyle(st); sh.normal.textColor = new Color(0, 0, 0, 0.75f); sh.richText = false;
+            // shadow styles are cached per source style (v0.14.0a: was a new GUIStyle per call, every frame); callers
+            // that build a style per frame would grow the cache, so it is simply reset when it gets large
+            if (!_shadowOf.TryGetValue(st, out var sh))
+            {
+                if (_shadowOf.Count > 48) _shadowOf.Clear();
+                sh = new GUIStyle(st); sh.normal.textColor = new Color(0, 0, 0, 0.75f); sh.richText = false;
+                _shadowOf[st] = sh;
+            }
             GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), StripTags(text), sh);
             GUI.Label(r, text, st);
         }
 
-        static string StripTags(string s) => System.Text.RegularExpressions.Regex.Replace(s, "<.*?>", "");
+        static string StripTags(string s) => s.IndexOf('<') < 0 ? s : System.Text.RegularExpressions.Regex.Replace(s, "<.*?>", "");
         static string Col(Color c, string s) => "<color=#" + ColorUtility.ToHtmlStringRGB(c) + ">" + s + "</color>";
 
         void DrawStats()
@@ -308,35 +413,107 @@ namespace DayZero.Runtime
             int dead = c.People.Count(p => p.St == "dead");
             int z = G.ZombieCount();
             var panel = Blk(new Rect(8, 8, 330, 190));
-            GUI.Box(panel, GUIContent.none, _box);
+            GUI.Box(panel, GUIContent.none, _hudBox);
             float y = 14, x = 20;
             Shadowed(new Rect(x, y, 310, 28), "SURVIVORS: " + Col(OLIVE_INK, alive.Count.ToString()), _hud); y += 27;
             Shadowed(new Rect(x, y, 310, 28), "BEDS: " + Col(used > beds ? RED_INK : OLIVE_INK, used + "/" + beds), _hud); y += 27;
             Shadowed(new Rect(x, y, 310, 28), "ZOMBIES: " + Col(z > 0 ? RED_INK : OLIVE_INK, z.ToString()), _hud); y += 27;
             Shadowed(new Rect(x, y, 310, 28), "DEAD: " + dead, _hud); y += 27;
-            Shadowed(new Rect(x, y, 310, 28), "TIME: " + G.ClockText() + (G.IsNight() ? "  " + Col(AMBER, "night") : ""), _hud); y += 30;
-            var ph = new GUIStyle(_small) { wordWrap = false }; ph.normal.textColor = AMBER;
-            GUI.Label(new Rect(x, y, 310, 22), PhaseText(), ph); y += 20;
-            var cl = new GUIStyle(_small) { wordWrap = false }; cl.normal.textColor = OLIVE_INK;
-            GUI.Label(new Rect(x, y, 310, 22), string.Format("{0}  ·  {1} survivors  ·  {2} kills", c.Name, alive.Count, c.Stat("kills")), cl);
+            string timeText = "TIME: " + G.ClockText() + (G.IsNight() ? "  " + Col(AMBER, "night") : "");
+            DrawClockChip(new Rect(13, y + 1, 320, 27), x, timeText);
+            Shadowed(new Rect(x, y, 310, 28), timeText, _hud); y += 30;
+            GUI.DrawTexture(new Rect(x, y - 1, 306, 1), _lineTex);
+            var ri = G.RaidInfo();
+            bool alert = ri != null && (ri.On || ri.Warned);
+            if (alert) DrawAlertPulse(new Rect(x + 284, y + 1, 22, 20), ri.On);
+            GUI.Label(new Rect(x, y, alert ? 280 : 310, 22), PhaseText(), _phaseSt); y += 20;
+            GUI.Label(new Rect(x, y, 310, 22), string.Format("{0}  ·  {1} survivors  ·  {2} kills", c.Name, alive.Count, c.Stat("kills")), _colonySt);
+        }
+
+        /// <summary>v0.14.0a: the TIME row sits on a soft chip tinted by the hour (warm day, orange dusk / dawn, blue
+        /// night) with a sun / moon glyph at its right end.</summary>
+        void DrawClockChip(Rect r, float textX, string timeText)
+        {
+            float hour = (float)(G.S.T % 24.0);
+            var oldBg = GUI.backgroundColor;
+            GUI.backgroundColor = UiSkin.SkyTint(hour);
+            GUI.Box(r, GUIContent.none, _tintBox);
+            GUI.backgroundColor = oldBg;
+            bool night = hour >= 19.5f || hour < 5.5f;
+            _gc.text = timeText;
+            if (textX + _hud.CalcSize(_gc).x + 6f + 21f <= r.xMax - 4f)   // only where the text leaves room
+                GUI.DrawTexture(new Rect(r.xMax - 26, r.y + 3, 21, 21), night ? Icons.GlyphTex("moon", MOON) : Icons.GlyphTex("sun", SUN));
+        }
+
+        /// <summary>v0.14.0a: pulsing siren glyph with a red halo (attack warned: slow, attack on: fast).</summary>
+        void DrawAlertPulse(Rect r, bool on)
+        {
+            float p = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * (on ? 7f : 3.5f));
+            var oc = GUI.color;
+            GUI.color = new Color(1f, 0.28f, 0.2f, (0.35f + 0.45f * p) * oc.a);
+            float g = 10f + 6f * p;
+            GUI.DrawTexture(new Rect(r.x - g, r.y - g, r.width + g * 2f, r.height + g * 2f), _glowTex);
+            GUI.color = oc;
+            GUI.DrawTexture(r, Icons.GlyphTex("siren", RED_GLYPH), ScaleMode.ScaleToFit, true);
+        }
+
+        // ticking resource counters: shown value eases toward the real one; text is rebuilt only when the shown
+        // integer changes, so a steady HUD allocates nothing
+        readonly float[] _chipShown = new float[7];
+        readonly int[] _chipInt = new int[7];
+        readonly string[] _chipText = new string[7];
+        readonly float[] _chipFlashT = new float[7];
+        readonly int[] _chipDir = new int[7];
+        object _chipState;
+        float _chipLastT;
+
+        void TickChips()
+        {
+            var c = G.C;
+            float now = Time.unscaledTime, dt = Mathf.Clamp(now - _chipLastT, 0f, 0.25f);
+            _chipLastT = now;
+            bool snap = !ReferenceEquals(_chipState, G.S);
+            _chipState = G.S;
+            float ease = 1f - Mathf.Exp(-dt * 7f);
+            for (int i = 0; i < CHIP_KEYS.Length; i++)
+            {
+                float target = i < 5 ? (float)c.Res.Get(CHIP_KEYS[i], 0.0) : i == 5 ? (float)G.MatsTotal() : (float)c.Morale;
+                if (snap) { _chipShown[i] = target; _chipDir[i] = 0; }
+                else if ((int)target != (int)_chipShown[i] && Mathf.Abs(target - _chipShown[i]) >= 1f)
+                {
+                    int dir = target > _chipShown[i] ? 1 : -1;
+                    if (dir != _chipDir[i] || now - _chipFlashT[i] > 0.6f) { _chipFlashT[i] = now; _chipDir[i] = dir; }
+                }
+                float v = _chipShown[i] + (target - _chipShown[i]) * ease;
+                if (Mathf.Abs(target - v) < 0.5f) v = target;
+                _chipShown[i] = v;
+                int n = (int)v;
+                if (_chipText[i] == null || n != _chipInt[i]) { _chipInt[i] = n; _chipText[i] = CHIP_KEYS[i] + " " + n; }
+            }
         }
 
         void DrawTopRight(float w)
         {
             var c = G.C;
+            GUI.DrawTexture(new Rect(w - 360, 4, 356, 60), _scrimTex);
             Shadowed(new Rect(w - 330, 8, 320, 28), Col(AMBER, c.Stat("kills").ToString()) + " : ZOMBIES KILLED", _hudR);
             Shadowed(new Rect(w - 330, 34, 320, 28), Col(OLIVE_INK, c.Stat("rescued").ToString()) + " : RESCUED", _hudR);
-            // resource chips, right-aligned
-            var items = new List<string>();
-            foreach (var k in RES_KEYS) items.Add(k + " " + (int)c.Res.Get(k, 0.0));
-            items.Add("mats " + (int)G.MatsTotal());
-            items.Add("morale " + (int)c.Morale);
-            float x = w - 8;
-            for (int i = items.Count - 1; i >= 0; i--)
+            // resource chips, right-aligned: glyph + "name value"; a change flashes the text green / red for a moment
+            if (Event.current.type == EventType.Layout || _chipText[0] == null) TickChips();
+            float x = w - 8, now = Time.unscaledTime;
+            var ink = _chip.normal.textColor;
+            for (int i = CHIP_KEYS.Length - 1; i >= 0; i--)
             {
-                float cw = Mathf.Max(64f, _chip.CalcSize(new GUIContent(items[i])).x + 14f);
+                _gc.text = _chipText[i];
+                float cw = Mathf.Max(64f, _chip.CalcSize(_gc).x + 14f + 22f);
                 x -= cw;
-                GUI.Label(Blk(new Rect(x, 66, cw, 32)), items[i], _chip);
+                var r = Blk(new Rect(x, 66, cw, 32));
+                GUI.Box(r, GUIContent.none, _chip);
+                GUI.DrawTexture(new Rect(r.x + 6, r.y + 5, 22, 22), Icons.GlyphTex(CHIP_KEYS[i], CHIP_COL[i]), ScaleMode.ScaleToFit, true);
+                float f = _chipDir[i] == 0 ? 0f : Mathf.Clamp01(1f - (now - _chipFlashT[i]) / 0.9f);
+                if (f > 0f) _chipTxt.normal.textColor = Color.Lerp(ink, _chipDir[i] > 0 ? new Color(0.62f, 0.92f, 0.45f) : new Color(1f, 0.45f, 0.35f), f);
+                GUI.Label(new Rect(r.x + 22, r.y, r.width - 22, r.height), _gc, _chipTxt);
+                _chipTxt.normal.textColor = ink;
                 x -= 4;
             }
         }
@@ -345,7 +522,7 @@ namespace DayZero.Runtime
         {
             // 76 wide + no word wrap: at 60 px "HOME" wrapped to "HOM/E" on phones (v0.11.2a)
             float x = 10, y = 214, bw = 76;
-            var small = new GUIStyle(_darkButton) { fontSize = 15, wordWrap = false, clipping = TextClipping.Overflow };
+            var small = _camSmall;
             if (Btn(Blk(new Rect(x, y, bw, 54)), "HOME", small)) map?.Home(); y += 62;
             if (Btn(Blk(new Rect(x, y, bw, 54)), "+", _darkButton)) map?.ZoomIn(); y += 62;
             if (Btn(Blk(new Rect(x, y, bw, 54)), "-", _darkButton)) map?.ZoomOut(); y += 62;
@@ -363,8 +540,8 @@ namespace DayZero.Runtime
             if (Btn(Blk(new Rect(panel.x - 48, 300, 44, 64)), ">", _darkButton)) _actionsOpen = false;
             Blk(panel);
             GUI.Box(panel, GUIContent.none, _box);
-            var hdr = new GUIStyle(_small) { fontStyle = FontStyle.Bold }; hdr.normal.textColor = AMBER;
-            GUI.Label(new Rect(panel.x + 12, panel.y + 6, panel.width - 24, 24), "ACTIONS", hdr);
+            GUI.Label(new Rect(panel.x + 12, panel.y + 6, panel.width - 24, 24), "ACTIONS", _hdrAmber);
+            GUI.DrawTexture(new Rect(panel.x + 10, panel.y + 27, 90, 3), _accentTex);
             for (int i = 0; i < SideMenus.ACTIONS.Length; i++)
             {
                 var (label, style) = SideMenus.ACTIONS[i];
@@ -393,10 +570,22 @@ namespace DayZero.Runtime
         void DrawTimeControls(float w, float h)
         {
             float bw = 86, total = bw * 4 + 18, x = w / 2 - total / 2, y = h - 62;
+            if (_b.Paused) DrawHalo(new Rect(x, y, bw + 16, 52), new Color(1f, 0.72f, 0.30f), 2.6f);   // paused: PLAY breathes amber
             if (Btn(Blk(new Rect(x, y, bw + 16, 52)), _b.Paused ? "PLAY" : "PAUSE", _darkButton)) _b.Paused = !_b.Paused; x += bw + 22;
             if (Btn(Blk(new Rect(x, y, bw, 52)), "x" + _b.Speed, _darkButton)) _b.Speed = _b.Speed >= 4 ? 1 : _b.Speed * 2; x += bw + 6;
             if (Btn(Blk(new Rect(x, y, bw, 52)), "+1h", _darkButton)) _b.Skip(1); x += bw + 6;
             if (Btn(Blk(new Rect(x, y, bw, 52)), "+6h", _darkButton)) _b.Skip(6);
+        }
+
+        /// <summary>Soft pulsing halo behind a control (v0.14.0a).</summary>
+        void DrawHalo(Rect r, Color c, float speed)
+        {
+            float p = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * speed);
+            var oc = GUI.color;
+            GUI.color = new Color(c.r, c.g, c.b, (0.18f + 0.30f * p) * oc.a);
+            float g = 12f + 6f * p;
+            GUI.DrawTexture(new Rect(r.x - g, r.y - g, r.width + g * 2f, r.height + g * 2f), _glowTex);
+            GUI.color = oc;
         }
 
         void DrawMapLabels(MapView map, float w, float h)
@@ -411,7 +600,7 @@ namespace DayZero.Runtime
                 if (v.x < -100 || v.x > w + 100 || v.y < 0 || v.y > h) continue;
                 var st = lb.Tier == 2 ? _mapDistrict : _mapLabel;
                 var r = new Rect(v.x - 160, v.y - 14, 320, 28);
-                GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), lb.Text, new GUIStyle(_labelShadow) { fontSize = st.fontSize, fontStyle = st.fontStyle });
+                GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), lb.Text, lb.Tier == 2 ? _mapDistrictSh : _mapLabelSh);
                 GUI.Label(r, lb.Text, st);
                 if (++drawn >= 60) break;
             }
@@ -423,7 +612,7 @@ namespace DayZero.Runtime
                 var v = new Vector2((sp.x - _offX) / _scale, (sp.y - _offY) / _scale);
                 string t = G.BaseLabel(b);
                 var r = new Rect(v.x - 180, v.y - 16, 360, 30);
-                GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), t, new GUIStyle(_labelShadow) { fontSize = _mapCamp.fontSize, fontStyle = FontStyle.Bold });
+                GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), t, _mapCampSh);
                 GUI.Label(r, t, _mapCamp);
             }
         }
@@ -434,9 +623,11 @@ namespace DayZero.Runtime
             var panel = new Rect(24, 24, w - 48, h - 48);
             GUI.Box(panel, GUIContent.none, _box);
             GUI.Box(panel, GUIContent.none, _box);   // double up for a darker sheet
+            GUI.DrawTexture(new Rect(panel.x + 12, panel.y + TAB_H + 6, panel.width - 24, 1), _lineTex);
             for (int i = 0; i < TABS.Length; i++)
             {
                 var r = new Rect(panel.x + 12 + i * 170, panel.y + 10, 160, TAB_H - 8);
+                if (_tab == i) GUI.DrawTexture(new Rect(r.x - 6, r.yMax + 1, r.width + 12, 6), _accentTex);   // selected tab: glowing underline
                 if (Btn(r, TABS[i].ToUpperInvariant(), _tab == i ? _amberButton : _button)) _tab = i;
             }
             if (Btn(new Rect(panel.xMax - 132, panel.y + 10, 120, TAB_H - 8), "CLOSE", _darkButton)) { _menuOpen = false; return; }
@@ -620,9 +811,10 @@ namespace DayZero.Runtime
             var choices = ev["choices"] as JArray ?? new JArray();
             float pw = Mathf.Min(900f, w - 60), ph = Mathf.Min(h - 60, 230f + choices.Count * 84f);
             var p = new Rect((w - pw) / 2, (h - ph) / 2, pw, ph);
-            GUI.Box(new Rect(0, 0, w, h), GUIContent.none, _box);
-            GUI.Box(p, GUIContent.none, _box);
-            GUI.Label(new Rect(p.x + 24, p.y + 16, pw - 48, 44), (string)ev["title"] ?? "Event", _title);
+            GUI.DrawTexture(new Rect(0, 0, w, h), _sheetDimTex);
+            GUI.Box(p, GUIContent.none, _hudBox);
+            Shadowed(new Rect(p.x + 24, p.y + 16, pw - 48, 44), (string)ev["title"] ?? "Event", _title);
+            GUI.DrawTexture(new Rect(p.x + 24, p.y + 60, Mathf.Min(320f, pw - 48), 3), _accentTex);
             GUI.Label(new Rect(p.x + 24, p.y + 66, pw - 48, 140), (string)ev["text"] ?? "", _label);
             float y = p.y + 210;
             for (int i = 0; i < choices.Count; i++)
@@ -639,9 +831,10 @@ namespace DayZero.Runtime
         {
             float pw = Mathf.Min(760f, w - 60);
             var p = new Rect((w - pw) / 2, h / 2 - 170, pw, 340);
-            GUI.Box(new Rect(0, 0, w, h), GUIContent.none, _box);
-            GUI.Box(p, GUIContent.none, _box);
-            GUI.Label(new Rect(p.x + 24, p.y + 20, pw - 48, 44), _b.Won ? "You held out" : "Your colony has fallen", _title);
+            GUI.DrawTexture(new Rect(0, 0, w, h), _sheetDimTex);
+            GUI.Box(p, GUIContent.none, _hudBox);
+            Shadowed(new Rect(p.x + 24, p.y + 20, pw - 48, 44), _b.Won ? "You held out" : "Your colony has fallen", _title);
+            GUI.DrawTexture(new Rect(p.x + 24, p.y + 66, Mathf.Min(320f, pw - 48), 3), _accentTex);
             var c = G.C;
             GUI.Label(new Rect(p.x + 24, p.y + 80, pw - 48, 100), string.Format("Day {0}. {1} zombies killed, {2} survivors rescued.",
                 G.Day(), c?.Stat("kills") ?? 0, c?.Stat("rescued") ?? 0), _label);
@@ -655,10 +848,12 @@ namespace DayZero.Runtime
             float y = h - 16;
             for (int i = _b.Toasts.Count - 1; i >= 0; i--)
             {
-                float th = Mathf.Max(40f, _small.CalcHeight(new GUIContent(_b.Toasts[i]), w * 0.6f) + 12f);
+                _gc.text = _b.Toasts[i];
+                float th = Mathf.Max(40f, _small.CalcHeight(_gc, w * 0.6f) + 12f);
                 y -= th + 6;
                 var r = new Rect(w * 0.2f, y, w * 0.6f, th);
                 GUI.Box(r, GUIContent.none, _box);
+                GUI.DrawTexture(new Rect(r.x + 4, r.y + 8, 3, r.height - 16), _amberLineTex);
                 GUI.Label(new Rect(r.x + 10, r.y + 6, r.width - 20, r.height - 8), _b.Toasts[i], _small);
             }
         }
