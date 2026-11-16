@@ -351,7 +351,7 @@ namespace DayZero.Runtime
             foreach (var b in game.AllBases())
             {
                 CampRect(b, out var c, out float half, out _);
-                _clear.Add(new ORect(c, GU, half + 0.15f, half + 0.15f));
+                if (!PlainCamp) _clear.Add(new ORect(c, GU, half + 0.15f, half + 0.15f));   // v0.14.0a: no compound, nothing cleared
                 if (b.Lot >= 0 && b.Lot < _info.Length)
                 {
                     _campLots.Add(b.Lot);
@@ -434,6 +434,7 @@ namespace DayZero.Runtime
                 bool mine = b.Col == me;
                 CampRect(b, out var c, out float half, out var bld);
                 if (bld.HasValue && mine) LitWindows(g, b.Lot);
+                if (PlainCamp) { DrawPlainCamp(g, b, mine); continue; }   // v0.14.0a (MapGen.Defense.cs): no pre-built compound
                 Camp(g, c, half, b.Id, b.Main, bld, mine, walled.Contains(b.Id));
             }
             DrawWalls(g, game);
@@ -616,7 +617,8 @@ namespace DayZero.Runtime
             }
         }
 
-        public const float STEP_H = 0.6f, STEP_IN = 0.2f;
+        public const float STEP_IN = 0.2f;
+        public static float STEP_H => PlainCamp ? 0f : 0.6f;   // v0.14.0a: no firing step without the compound
 
         void FiringStep(Geo g, Vector2 c, float half, Vector2 U, Vector2 V)
         {
