@@ -419,7 +419,8 @@ namespace DayZero.Runtime
             var cv = G.ConvOf(l);
             string err = G.ConvError(l);
             bool canConv = err == "";
-            float pw = Mathf.Min(980f, w - 120f), ph = canConv || cv != null ? 300f : 150f, px = w / 2 - pw / 2, py = h - 62 - ph - 10;
+            float gutH = GutRowH(l);   // GameUI.Camp.cs: GUT row (main.gd _sheet_gut)
+            float pw = Mathf.Min(980f, w - 120f), ph = (canConv || cv != null ? 300f : 150f) + gutH, px = w / 2 - pw / 2, py = h - 62 - ph - 10;
             var p = Blk(new Rect(px, py, pw, ph));
             GUI.Box(p, GUIContent.none, _box); GUI.Box(p, GUIContent.none, _box);
             var tt = new GUIStyle(_title) { fontSize = 24, wordWrap = false, clipping = TextClipping.Clip };
@@ -444,6 +445,7 @@ namespace DayZero.Runtime
                 var e = _b.Act("send_raid", l);
                 _b.Toast(e == "" ? "A task force is heading there for supplies." : e);
             }
+            DrawGutRow(new Rect(px + 16, py + ph - gutH - 8, pw - 32, gutH), l);
             if (!canConv && cv == null) return;
             if (cv != null && G.ConvPlaceError(l) != "") return;
             // grid of uses: 5 x 2

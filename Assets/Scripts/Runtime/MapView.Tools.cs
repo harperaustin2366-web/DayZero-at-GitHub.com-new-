@@ -50,6 +50,7 @@ namespace DayZero.Runtime
         public void StartTool(Tool t, int tier = 0, int trapKind = 0)
         {
             ClearBuilding();
+            ResetCampTools();   // MapView.Camp.cs
             ActiveTool = t; WallTier = tier; TrapKind = trapKind;
             if (t == Tool.Tower) TowerTier = tier;
             if (t == Tool.Loop) { var mb = G?.MainBase(); _loopEdges = mb != null ? G.SuggestLoop(mb, tier) : new List<int>(); }
@@ -101,6 +102,7 @@ namespace DayZero.Runtime
         public void CancelTool()
         {
             ActiveTool = Tool.None; _toolKey = -1; ToolErr = ToolCost = ToolInfo = ""; ToolOk = false;
+            ResetCampTools();   // MapView.Camp.cs: outpost mode, trap line
             SquadId = -1; Target = new Vector2Int(-1, -1); TargetText = new TargetInfo(); _loopEdges = new List<int>();
             if (_ghostGo != null) { DestroyChunk(_ghostGo); _ghostGo = null; }
             _ghostSig = "";
@@ -190,6 +192,7 @@ namespace DayZero.Runtime
                 case Tool.Trap:
                 {
                     kind = MapGen.GhostKind.Trap;
+                    if (!Game.PhaseARules) { if (!TrapLineGhost(tiles, state, ref a)) return; b = a; break; }   // original trap line (MapView.Camp.cs)
                     a = new Vector2(tile.x + 0.5f, tile.y + 0.5f);
                     if (key >= 0) tiles.Add(key);
                     ToolErr = g.CanTrap(tile, TrapKind);
@@ -317,6 +320,7 @@ namespace DayZero.Runtime
                 case Tool.Tower: e = bs.Act("place_tower", new Vector2Int(Mathf.FloorToInt(GhostAt.x), Mathf.FloorToInt(GhostAt.y)), TowerTier); break;
                 case Tool.Trap:
                     {
+                        if (!Game.PhaseARules) { e = TrapConfirm(); break; }   // original: place_traps with the whole line
                         var tp = new Vector2Int(Mathf.FloorToInt(GhostAt.x), Mathf.FloorToInt(GhostAt.y));
                         e = Game.PhaseARules ? bs.Act("place_trap", tp, TrapKind) : bs.Act("place_traps", new List<Vector2Int> { tp }, TrapKind);
                         break;
@@ -368,6 +372,7 @@ namespace DayZero.Runtime
                 return;
             }
             if (ActiveTool == Tool.Loop) return;   // the suggested loop doesn't move
+            if (TrapLine) { if (gp.x >= 0f) TrapTapTile(new Vector2Int(Mathf.FloorToInt(gp.x), Mathf.FloorToInt(gp.y))); return; }   // MapView.Camp.cs
             if (ActiveTool != Tool.None)
             {
                 if (gp.x < 0f) return;
@@ -376,6 +381,7 @@ namespace DayZero.Runtime
                 Bootstrap.Instance?.PlayClick();
                 return;
             }
+            if (CampTap(ray, gp)) return;   // MapView.Camp.cs: BUILD OUTPOST, own camps, traps
             // survivor groups waiting for rescue (SOS sheet) stand on the street: they win over the building behind them
             if (gp.x >= 0f && G.S.Groups != null)
             {
@@ -441,7 +447,8 @@ namespace DayZero.Runtime
 
         public void ClearBuilding()
         {
-            BuildingLot = -1; SelectedRun = -1; SelectedFence = -1; SelectedTower = -1; SelectedGroup = -1; SelectedWreck = -1;
+            BuildingLot = -1; SelectedRun = -1; SelectedFence = -1; SelectedTower = -1; SelectedGroup = -1;
+            ClearCampSel();   // MapView.Camp.cs SelectedWreck = -1;
             if (_bselGo != null) { DestroyChunk(_bselGo); _bselGo = null; }
         }
 

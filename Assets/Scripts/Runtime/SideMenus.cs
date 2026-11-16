@@ -88,7 +88,7 @@ namespace DayZero.Runtime
         /// and the preview.</summary>
         public static readonly (string label, string style)[] ACTIONS =
         {
-            ("BUILD", "olive"), ("CAMP", "sel"), ("GATHER", "brown"), ("DEFENSE", "olive"), ("SQUADS", "olive"), ("TASK FORCE", "olive"),
+            ("BUILD OUTPOST", "olive"), ("BUILD", "olive"), ("CAMPS", "sel"), ("GATHER", "brown"), ("DEFENSE", "olive"), ("SQUADS", "olive"), ("TASK FORCE", "olive"),
             ("CREW & JOBS", "olive"), ("COLONY", "olive"), ("TRADE", "olive"), ("ARMORY", "olive"), ("GARAGE", "olive"), ("RESEARCH", "olive"), ("LOG", "olive"),
         };
         public const float ACT_W = 200f, ACT_Y = 108f, ACT_HDR = 34f, ACT_BH = 44f, ACT_GAP = 5f;
@@ -126,7 +126,8 @@ namespace DayZero.Runtime
         public static void Build(MenuCtx c)
         {
             if (c.G?.S == null || c.G.C == null) return;
-            if (c.St.Open == "research") Research(c);
+            if (SideMenus.CampMenus(c)) { }   // SideMenus.Camp.cs: camps, base (facilities / upgrade base), crew
+            else if (c.St.Open == "research") Research(c);
             else if (c.St.Open == "trade") Trade(c);
             else if (c.St.Open == "squads") Squads(c);
             else if (c.St.Open == "taskforce") TaskForce(c);

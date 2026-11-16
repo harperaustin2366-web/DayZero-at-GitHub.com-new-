@@ -232,7 +232,8 @@ namespace DayZero.Runtime
             if (!DrawSidePanel(w, map)) DrawActions(w, map);
             if (map != null && !ModalOpen)
             {
-                if (map.TargetTool) DrawTargetBar(w, h, map);
+                if (DrawCampSheets(w, h, map)) { }   // GameUI.Camp.cs: outpost bar, trap line, camp / trap sheets
+                else if (map.TargetTool) DrawTargetBar(w, h, map);
                 else if (map.ActiveTool != MapView.Tool.None) DrawPlacementBar(w, h, map);
                 else if (map.BuildingLot >= 0) DrawBuildingSheet(w, h, map);
                 else if (map.SelectedGroup >= 0) DrawGroupSheet(w, h, map);
@@ -364,12 +365,14 @@ namespace DayZero.Runtime
             for (int i = 0; i < SideMenus.ACTIONS.Length; i++)
             {
                 var (label, style) = SideMenus.ACTIONS[i];
-                if (!Btn(SideMenus.ActionButton(w, i), label, MButton(style, 19))) continue;
+                if (!Btn(SideMenus.ActionButton(w, i), label, MButton(style, SideMenus.ActFont(i)))) continue;
                 switch (label)
                 {
                     case "BUILD": _panel = Panel.Build; map?.CancelTool(); break;
-                    case "CAMP": map?.Home(); break;
-                    case "GATHER": case "CREW & JOBS": _tab = 1; _menuOpen = true; break;
+                    case "BUILD OUTPOST": StartOutpost(map); break;                         // GameUI.Camp.cs
+                    case "CAMPS": SideMenus.CampsPage = 0; OpenSide("camps", map); break;   // main.gd _show_bases
+                    case "GATHER": _tab = 1; _menuOpen = true; break;
+                    case "CREW & JOBS": SideMenus.CrewPage = 0; OpenSide("crew", map); break; // main.gd _show_crew
                     case "DEFENSE": _panel = Panel.Defense; map?.ClearBuilding(); break;
                     case "SQUADS": _side.Camp = -1; OpenSide("squads", map); break;        // main.gd _pick_default_camp: the main camp
                     case "TASK FORCE": _side.Camp = -1; OpenSide("taskforce", map); break;
