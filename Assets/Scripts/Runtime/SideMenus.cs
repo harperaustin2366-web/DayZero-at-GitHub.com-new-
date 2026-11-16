@@ -30,7 +30,7 @@ namespace DayZero.Runtime
     }
 
     /// <summary>What the side menus remember between frames (open menu, tree, page, tab, barter camp).</summary>
-    public sealed class SideMenuState
+    public sealed partial class SideMenuState
     {
         public string Open = "";         // "" | "research" | "trade" | "squads" | "taskforce"
         public string Cat = "farming";
@@ -47,7 +47,7 @@ namespace DayZero.Runtime
         public readonly ArmoryMenuState Arm = new ArmoryMenuState();   // ARMORY / GARAGE (SideMenus.Armory.cs)
     }
 
-    public sealed class MenuCtx
+    public sealed partial class MenuCtx
     {
         public Game G;
         public float W, H;
@@ -88,7 +88,7 @@ namespace DayZero.Runtime
         /// and the preview.</summary>
         public static readonly (string label, string style)[] ACTIONS =
         {
-            ("BUILD OUTPOST", "olive"), ("BUILD", "olive"), ("CAMPS", "sel"), ("GATHER", "brown"), ("DEFENSE", "olive"), ("SQUADS", "olive"), ("TASK FORCE", "olive"),
+            ("BUILD OUTPOST", "olive"), ("BUILD", "olive"), ("CAMPS", "sel"), ("GATHER", "brown"), ("DEFENSE", "olive"), ("SQUADS", "olive"), ("WAR", "olive"), ("TASK FORCE", "olive"),
             ("CREW & JOBS", "olive"), ("COLONY", "olive"), ("TRADE", "olive"), ("ARMORY", "olive"), ("GARAGE", "olive"), ("RESEARCH", "olive"), ("LOG", "olive"),
         };
         public const float ACT_W = 200f, ACT_Y = 108f, ACT_HDR = 34f, ACT_BH = 44f, ACT_GAP = 5f;
@@ -131,6 +131,7 @@ namespace DayZero.Runtime
             else if (c.St.Open == "trade") Trade(c);
             else if (c.St.Open == "squads") Squads(c);
             else if (c.St.Open == "taskforce") TaskForce(c);
+            else if (c.St.Open == "war") War(c);
             else if (c.St.Open == "armory") Armory(c);
             else if (c.St.Open == "garage") Garage(c);
         }
@@ -408,13 +409,14 @@ namespace DayZero.Runtime
                 var card = new Rect(x, y, iw, RH);
                 c.Box(card, new Color(0.13f, 0.14f, 0.12f));
                 c.Box(new Rect(card.x, card.y, 4, RH), AttColor(att));
-                float tw = iw - 200f;
+                float tw = iw - (c.ViewCamp != null ? 312f : 200f);
                 c.Label(new Rect(card.x + 14, card.y + 6, tw, 26), string.Format("{0}  ·  {1}{2}  ·  {3} people", cp.Name, att, pact ? " (pact)" : "", cp.Pop), 17, AttColor(att), true, false);
                 string line = string.Format("Relations {0:+0;-0;0} · needs {1} · spare {2}", (int)g.CampRel(cp), cp.Needs.Count > 0 ? string.Join(", ", cp.Needs) : "nothing", cp.Surplus.Count > 0 ? string.Join(", ", cp.Surplus) : "nothing");
                 c.Label(new Rect(card.x + 14, card.y + 34, tw, 32), line, 14, INK2);
                 var br = new Rect(card.xMax - 176, card.y + 10, 164, 50);
                 if (att == "Hostile") c.Label(br, "WON'T TRADE", 16, RED, true, false, MenuAlign.Center);
                 else { string cid = cp.Id; c.Button(br, "BARTER NOW", "olive", 18, () => { st.Barter = cid; st.BPage = 0; }); }
+                if (c.ViewCamp != null) { string vid = cp.Id; c.Button(new Rect(br.x - 112, br.y, 104, 50), "VIEW", "dark", 18, () => c.ViewCamp(vid)); }   // faction camp sheet (main.gd COLONIES VIEW)
                 y += RH + GAP;
             }
             Pager(c, p, st.CPage, pages, v => st.CPage = v, "Hostile camps don't trade. Standing orders use the best price among the rest.");

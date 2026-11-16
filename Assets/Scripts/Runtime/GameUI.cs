@@ -229,6 +229,7 @@ namespace DayZero.Runtime
             DrawAttackBanner(w, h, ref by);
             DrawRepairChip(w, ref by);
             DrawResearchNote(w, ref by, map);
+            DrawWarHud(w, ref by, map);   // GameUI.Factions.cs
             if (!DrawSidePanel(w, map)) DrawActions(w, map);
             if (map != null && !ModalOpen)
             {
@@ -237,6 +238,7 @@ namespace DayZero.Runtime
                 else if (map.ActiveTool != MapView.Tool.None) DrawPlacementBar(w, h, map);
                 else if (map.BuildingLot >= 0) DrawBuildingSheet(w, h, map);
                 else if (map.SelectedGroup >= 0) DrawGroupSheet(w, h, map);
+                else if (map.SelectedCamp != "") DrawFactionSheet(w, h, map);   // GameUI.Factions.cs
                 else if (map.SelectedWreck >= 0) DrawWreckSheet(w, h, map);
                 else if (map.SelectedFence >= 0) DrawFenceSheet(w, h, map);
                 else if (map.SelectedTower >= 0) DrawTowerSheet(w, h, map);
@@ -246,6 +248,7 @@ namespace DayZero.Runtime
             if (swallow) Event.current.type = evType;
 
             if (_b.Ended || G.S.Phase == "lost") DrawGameOver(w, h);
+            else if (_b.Pending.Count > 0 && DrawWarDemand(w, h, _b.Pending[0])) { }   // GameUI.Factions.cs
             else if (_b.Pending.Count > 0) DrawDecision(w, h, _b.Pending[0]);
             else if (_menuOpen) DrawMenuOverlay(w, h);
             else if (SideOpen) DrawSideMenu(w, h);
@@ -375,6 +378,7 @@ namespace DayZero.Runtime
                     case "CREW & JOBS": SideMenus.CrewPage = 0; OpenSide("crew", map); break; // main.gd _show_crew
                     case "DEFENSE": _panel = Panel.Defense; map?.ClearBuilding(); break;
                     case "SQUADS": _side.Camp = -1; OpenSide("squads", map); break;        // main.gd _pick_default_camp: the main camp
+                    case "WAR": _side.Sub = ""; OpenSide("war", map); break;                // main.gd _show_war (GameUI.Factions.cs)
                     case "TASK FORCE": _side.Camp = -1; OpenSide("taskforce", map); break;
                     case "COLONY": _tab = 0; _menuOpen = true; break;
                     case "TRADE": OpenSide("trade", map); break;

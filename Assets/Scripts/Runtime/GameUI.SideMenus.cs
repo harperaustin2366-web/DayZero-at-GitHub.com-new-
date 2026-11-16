@@ -64,6 +64,7 @@ namespace DayZero.Runtime
                 _side.Open = ""; _panel = Panel.None;
                 map?.StartTarget(kind, sid);
             },
+            ViewCamp = cid => { _side.Open = ""; _side.Barter = ""; _panel = Panel.None; map?.ViewCamp(cid); },   // GameUI.Factions.cs
             ViewGroup = gid =>
             {
                 var gr = G.GroupById(gid);
