@@ -184,17 +184,18 @@ namespace DayZero.Core
             if (budget <= 0) return;
             double perSector = 4.2 * MaxZombies / 1100.0;
             var order = Enumerable.Range(0, SW * SH).ToList();
-            Rng.Shuffle(order);
+            GRng.Shuffle(order);
             foreach (int i in order)
             {
                 if (budget <= 0) break;
                 if (Active[i] == 0) continue;
-                int want = (int)(S.Zinf[i] * SectLand[i] * perSector * 1.6 * (SectWild[i] > 0.5f && SectZone[i] == 0 ? WILD_Z : 1.0) * (SectZone[i] != 0 ? SectDens[i] : 1.0));
+                int want = (int)((double)S.Zinf[i] * SectLand[i] * perSector * 1.6 * (SectWild[i] > 0.5f && SectZone[i] == 0 ? WILD_Z : 1.0) * (SectZone[i] != 0 ? SectDens[i] : 1.0));
                 int have = counts[i];
                 if (have >= want) continue;
                 int n = Math.Min(Math.Min(want - have, 3), budget);
                 int sx = i % SW, sy = i / SW;
-                for (int t = 0; t < n * 6; t++)
+                int tries = n * 6;
+                for (int t = 0; t < tries; t++)
                 {
                     if (n <= 0) break;
                     var q = new Vector2Int(Rng.RandiRange(sx * SECT, Math.Min(D.W - 1, sx * SECT + SECT - 1)), Rng.RandiRange(sy * SECT, Math.Min(D.H - 1, sy * SECT + SECT - 1)));

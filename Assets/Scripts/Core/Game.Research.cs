@@ -211,7 +211,7 @@ namespace DayZero.Core
         {
             string e = ConvPlaceError(l, ci);
             if (e != "") return e;
-            if (ConvOf(l) == null && !IsGutted(l) && !ScavengedByMe(l, ci < 0 ? CurCol : ci)) return SCAV_FIRST;
+            if (ConvOf(l) == null && !IsGutted(l) && !(PhaseARules && ScavengedByMe(l, ci < 0 ? CurCol : ci))) return PhaseARules ? SCAV_FIRST : GUT_FIRST;
             return "";
         }
 
@@ -254,7 +254,7 @@ namespace DayZero.Core
             if (k == "farm" && D.Lots[l].Landmark == "") return "That's an open field.";
             if (D.Lots[l].Cells < 2) return "Too small to use.";
             if (LotOwnerBase(l) != null) return "That building is part of a camp.";
-            if (InCampYard(l)) return "That spot is inside your camp's yard (it was cleared for the palisade).";
+            if (PhaseARules && InCampYard(l)) return "That spot is inside your camp's yard (it was cleared for the palisade).";
             if (_factionLotsDirty) RefreshFactionLots();
             if (_factionLots.ContainsKey(l)) return "A faction holds that building.";
             var cv = ConvOf(l);
@@ -367,7 +367,7 @@ namespace DayZero.Core
             string best = "school"; double bs = -1000000000.0;
             foreach (var t in Data.CONV_ORDER)
             {
-                double sc = needs[t].score / (1.0 + 0.8 * ConvNAll(t)) + (t == aff ? 2.5 : 0.0);
+                double sc = needs[t].score / (1.0 + 0.8 * (PhaseARules ? ConvNAll(t) : ConvN(t))) + (t == aff ? 2.5 : 0.0);
                 if (sc > bs + 0.0001) { bs = sc; best = t; }
             }
             return (best, needs[best].why);
@@ -379,8 +379,8 @@ namespace DayZero.Core
         {
             string was = ConvType(l);
             var old = ConvOf(l);
-            double hrs = ConvHours(type, l);
-            S.Conv[l] = new Conversion { Type = type, Col = CurCol, Bid = b?.Id ?? -1, Manual = manual ? 1 : 0, T = S.T, Ready = S.T + hrs,
+            double hrs = PhaseARules ? ConvHours(type, l) : 0.0;
+            S.Conv[l] = new Conversion { Type = type, Col = CurCol, Bid = b?.Id ?? -1, Manual = manual ? 1 : 0, T = S.T, Ready = PhaseARules ? S.T + hrs : 0.0,
                 Prev = old != null ? (old.Ready > 0.0 ? old.Prev : old.Type) : null };
             if (!S.Gut.Has(l)) S.Gut[l] = CurCol + 1;
             if (!Searched(l)) MarkSearched(l, CurCol + 1);
@@ -388,7 +388,16 @@ namespace DayZero.Core
             S.ConvVer++;
             var cd = Data.CONVERSIONS[type];
             string where = WhereName(l);
-            if (manual)
+            if (!PhaseARules)
+            {
+                if (manual)
+                {
+                    if (was != "") AddLog(string.Format("{0}: the {1} is now {2}.", b?.Name ?? "Camp", Data.CONVERSIONS[was].Name, A(cd.Name)), "good");
+                    else AddLog(string.Format("{0}: survivors moved into {1} and set it up as {2}.", b?.Name ?? "Camp", where, A(cd.Name)), "good");
+                }
+                else AddLog(string.Format("Inside {0}'s safe zone, survivors turned {1} into {2} ({3}).", b?.Name ?? "camp", where, A(cd.Name), reason), "good");
+            }
+            else if (manual)
             {
                 if (was != "") AddLog(string.Format("{0}: the {1} is being refitted as {2} (about {3:0} h).", b?.Name ?? "Camp", Data.CONVERSIONS[was].Name, A(cd.Name), hrs), "info");
                 else AddLog(string.Format("{0}: survivors moved into {1} and are setting it up as {2} (about {3:0} h).", b?.Name ?? "Camp", where, A(cd.Name), hrs), "info");
@@ -470,7 +479,7 @@ namespace DayZero.Core
                     bool mine = (srch[l] >= 0f && srchC[l] == CurCol + 1) || S.Loot[l] < 0.25f || IsGutted(l);
                     if (!mine) continue;
                     if (ConvPlaceError(l) != "") continue;
-                    if (!IsGutted(l) && !ScavengedByMe(l))
+                    if (!IsGutted(l) && !(PhaseARules && ScavengedByMe(l)))
                     {
                         if (Gutting(l) || GutsOf(CurCol) >= Data.GUT_MAX) continue;
                         if (GutError(l) == "") BeginGut(l, ConvZoneBase(l), false);

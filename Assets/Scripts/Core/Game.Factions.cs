@@ -701,7 +701,7 @@ namespace DayZero.Core
             var c = ColonyAt(ci);
             double d = Math.Max(0.0, (S.T - c.StartT) / 24.0);
             // v0.12.0a: a visibly growing horde (normal: day 1 ~5, day 10 ~28, day 20 ~67, day 30 ~120)
-            double n = (3.0 + 1.7 * d + 0.075 * d * d) * RAID_DIFF[V.Clampi(S.Difficulty, 0, 2)];
+            double n = (PhaseARules ? 3.0 + 1.7 * d + 0.075 * d * d : 2.0 + 1.6 * d + 0.06 * d * d) * RAID_DIFF[V.Clampi(S.Difficulty, 0, 2)];
             foreach (var cid in c.Pacts)
             {
                 var cp = CampById(cid);
@@ -804,10 +804,10 @@ namespace DayZero.Core
                 AutoGuards(true);
                 PostGuards(true);
                 int hh = (int)(R0.NextT % 24.0);
-                if (R0.N >= RAID_MAJOR || HasSiren())
+                if (R0.N >= RAID_MAJOR || (PhaseARules && HasSiren()))
                 {
                     AddLog(string.Format("SIREN · Lookouts spotted about {0} of the dead moving on {1} from the {2}. Expect them at the wall around {3:00}:00. Guards to the line.", R0.N, tb.Name, DirName(R0.Dir), hh), "siren");
-                    PlaySfx("siren", V.F(tb.Pos));
+                    if (PhaseARules) PlaySfx("siren", V.F(tb.Pos));
                 }
                 else
                     AddLog(string.Format("Movement at dusk: a few of the dead are drifting toward {0} from the {1}. The night watch is ready.", tb.Name, DirName(R0.Dir)), "info");

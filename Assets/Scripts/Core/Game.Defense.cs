@@ -866,7 +866,7 @@ namespace DayZero.Core
             double n = BaseLevelDef(b).Beds + 10.0 * b.U("barracks") + Rx("housing_add");
             n += Math.Min(30.0, EnclosedCount(b) / 10.0);
             n += 8.0 * ConvN("barracks", b.Id, b.Col);
-            n += 3.0 * Math.Min(4, YardLotCount(b));   // v0.12.0a: sheds and outbuildings inside the palisade yard
+            if (PhaseARules) n += 3.0 * Math.Min(4, YardLotCount(b));   // v0.12.0a: sheds and outbuildings inside the palisade yard
             return (int)(n * (1.0 + Rx("housing_mult")));
         }
 
@@ -1702,7 +1702,7 @@ namespace DayZero.Core
 
         bool RepairUrgent(Base b)
         {
-            if (!C.Auto.Repair) return false;
+            if (PhaseARules && !C.Auto.Repair) return false;
             var q = RepairQueue(b);
             return q.Count > 0 && q[0].frac < 0.5 && MatsTotal() >= 2.0;
         }

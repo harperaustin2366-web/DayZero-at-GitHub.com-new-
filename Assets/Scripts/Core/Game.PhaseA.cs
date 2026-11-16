@@ -24,11 +24,15 @@ namespace DayZero.Core
         public static Func<Base, YardGeo?> YardProvider;
         /// <summary>Headless runs (smoke test) may raise the starter palisade of an old save from the estimated yard.</summary>
         public static bool AllowYardFallback;
+        /// <summary>v0.13.0a: the Phase A rule changes (starter palisade, breaches, yard beds, guard-behind-wall bonus,
+        /// raid sizing, siren lead, conversion set-up time, convert-after-scavenge) are dormant. The game plays by the
+        /// original v0.10.8a rules; set true only to experiment.</summary>
+        public static bool PhaseARules = false;
 
         public const int WALL_MAX_LEN = 24;            // tiles per placed run
         public static readonly int[] WALL_PATH = { 0, 2, 3 };   // wood palisade -> scrap metal -> concrete
         public const double SIREN_LEAD_H = 3.0;
-        public const double RAID_WALL_HIT = 0.6;   // was 1.1: a night horde chews through a wood palisade from ~day 12, scrap metal from ~day 20
+        public static double RAID_WALL_HIT => PhaseARules ? 0.6 : 1.1;   // was 1.1: a night horde chews through a wood palisade from ~day 12, scrap metal from ~day 20
 
         // ---------------- geometry ----------------
         /// <summary>Tiles under a straight line (sampled every 0.2 tile, so the set is 4-connected and zombies,
@@ -227,7 +231,7 @@ namespace DayZero.Core
         {
             S.Walls ??= new List<WallRun>();
             S.Breaches ??= new ODict<int, Breach>();
-            if (S.WallsInit) return;
+            if (S.WallsInit || !PhaseARules) return;
             if (YardProvider == null && !AllowYardFallback) return;   // the view calls EnsureWallsNow once its map exists
             int prev = CurCol;
             for (int ci = 0; ci < S.Cols.Count; ci++)
@@ -381,6 +385,7 @@ namespace DayZero.Core
         /// <summary>Called by HitBlocker when a fence tile hits 0 hp: remember it so it can be rebuilt.</summary>
         void RecordBreach(int k, Fence f, bool gate)
         {
+            if (!PhaseARules) return;
             S.Breaches[k] = new Breach { Tier = f.Tier, Col = f.Col, T = S.T, Gate = gate };
         }
 
@@ -472,7 +477,7 @@ namespace DayZero.Core
         }
 
         /// <summary>Hours before the raid reaches the wall when the lookouts raise the alarm.</summary>
-        double RaidWarnLead() => Math.Max(RAID_WARN_H, RAID_TRAVEL_H) + (HasSiren() ? SIREN_LEAD_H : 0.0);
+        double RaidWarnLead() => Math.Max(RAID_WARN_H, RAID_TRAVEL_H) + (PhaseARules && HasSiren() ? SIREN_LEAD_H : 0.0);
 
         /// <summary>HUD state of the next / current attack on the viewed colony: phase "warn" (countdown),
         /// "attack" (at the walls), or null.</summary>

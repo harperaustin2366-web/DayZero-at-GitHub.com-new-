@@ -77,12 +77,107 @@ namespace DayZero.Core
         }
 
         /// <summary>Stable sort (Godot sort_custom is unstable; we pick stable for determinism).</summary>
-        public static void StableSort<T>(List<T> list, Comparison<T> cmp)
+        /// <summary>Array.sort_custom / Array.sort: a port of Godot 4's SortArray (core/templates/sort_array.h,
+        /// introsort + final insertion sort, Validate on). Godot's sort is NOT stable; reproducing its exact element
+        /// order on ties keeps seeded runs identical to the original. cmp(a, b) &lt; 0 means "a before b" (the
+        /// GDScript comparator returning true). Name kept for the existing call sites.</summary>
+        public static void StableSort<T>(List<T> list, Comparison<T> cmp) => GodotSort(list, (a, b) => cmp(a, b) < 0);
+
+        public static void GodotSort<T>(List<T> a, Func<T, T, bool> less)
         {
-            var idx = new List<(T v, int i)>(list.Count);
-            for (int i = 0; i < list.Count; i++) idx.Add((list[i], i));
-            idx.Sort((a, b) => { int c = cmp(a.v, b.v); return c != 0 ? c : a.i.CompareTo(b.i); });
-            for (int i = 0; i < list.Count; i++) list[i] = idx[i].v;
+            int n = a.Count;
+            if (n == 0) return;
+            new SortArray<T>(a, less).Sort(n);
+        }
+
+        sealed class SortArray<T>
+        {
+            const int THRESH = 16;
+            readonly List<T> A; readonly Func<T, T, bool> L;
+            public SortArray(List<T> a, Func<T, T, bool> l) { A = a; L = l; }
+            public void Sort(int n) { Introsort(0, n, Bitlog(n) * 2); FinalInsertion(0, n); }
+            static int Bitlog(int n) { int k = 0; for (; n != 1; n >>= 1) k++; return k; }
+            T Median3(T a, T b, T c)
+            {
+                if (L(a, b)) { if (L(b, c)) return b; else if (L(a, c)) return c; else return a; }
+                else if (L(a, c)) return a;
+                else if (L(b, c)) return c;
+                else return b;
+            }
+            void PushHeap(int first, int hole, int top, T value)
+            {
+                int parent = (hole - 1) / 2;
+                while (hole > top && L(A[first + parent], value)) { A[first + hole] = A[first + parent]; hole = parent; parent = (hole - 1) / 2; }
+                A[first + hole] = value;
+            }
+            void PopHeap(int first, int last, int result, T value) { A[result] = A[first]; AdjustHeap(first, 0, last - first, value); }
+            void AdjustHeap(int first, int hole, int len, T value)
+            {
+                int top = hole, second = 2 * hole + 2;
+                while (second < len)
+                {
+                    if (L(A[first + second], A[first + (second - 1)])) second--;
+                    A[first + hole] = A[first + second]; hole = second; second = 2 * (second + 1);
+                }
+                if (second == len) { A[first + hole] = A[first + (second - 1)]; hole = second - 1; }
+                PushHeap(first, hole, top, value);
+            }
+            void SortHeap(int first, int last) { while (last - first > 1) { last--; PopHeap(first, last, last, A[last]); } }
+            void MakeHeap(int first, int last)
+            {
+                if (last - first < 2) return;
+                int len = last - first, parent = (len - 2) / 2;
+                while (true) { AdjustHeap(first, parent, len, A[first + parent]); if (parent == 0) return; parent--; }
+            }
+            void PartialSort(int first, int last, int middle)
+            {
+                MakeHeap(first, middle);
+                for (int i = middle; i < last; i++) if (L(A[i], A[first])) PopHeap(first, middle, i, A[i]);
+                SortHeap(first, middle);
+            }
+            int Partitioner(int first, int last, T pivot)
+            {
+                int uf = first, ul = last;
+                while (true)
+                {
+                    while (L(A[first], pivot)) { if (first == ul - 1) break; first++; }
+                    last--;
+                    while (L(pivot, A[last])) { if (last == uf) break; last--; }
+                    if (!(first < last)) return first;
+                    T t = A[first]; A[first] = A[last]; A[last] = t;
+                    first++;
+                }
+            }
+            void Introsort(int first, int last, int depth)
+            {
+                while (last - first > THRESH)
+                {
+                    if (depth == 0) { PartialSort(first, last, last); return; }
+                    depth--;
+                    int cut = Partitioner(first, last, Median3(A[first], A[first + (last - first) / 2], A[last - 1]));
+                    Introsort(cut, last, depth);
+                    last = cut;
+                }
+            }
+            void UnguardedLinearInsert(int last, T value)
+            {
+                int next = last - 1;
+                while (L(value, A[next])) { if (next == 0) break; A[last] = A[next]; last = next; next--; }
+                A[last] = value;
+            }
+            void LinearInsert(int first, int last)
+            {
+                T val = A[last];
+                if (L(val, A[first])) { for (int i = last; i > first; i--) A[i] = A[i - 1]; A[first] = val; }
+                else UnguardedLinearInsert(last, val);
+            }
+            void InsertionSort(int first, int last) { if (first == last) return; for (int i = first + 1; i != last; i++) LinearInsert(first, i); }
+            void UnguardedInsertionSort(int first, int last) { for (int i = first; i != last; i++) UnguardedLinearInsert(i, A[i]); }
+            void FinalInsertion(int first, int last)
+            {
+                if (last - first > THRESH) { InsertionSort(first, first + THRESH); UnguardedInsertionSort(first + THRESH, last); }
+                else InsertionSort(first, last);
+            }
         }
 
         public static Dictionary<string, double> D(params (string k, double v)[] kv)

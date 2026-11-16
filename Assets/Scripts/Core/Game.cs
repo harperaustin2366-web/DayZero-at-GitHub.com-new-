@@ -84,6 +84,9 @@ namespace DayZero.Core
         public GdRng Rng = new GdRng();
         public GdRng Frng = new GdRng();
         public GdRng Wrng = new GdRng();
+        /// <summary>Godot's global RNG (Math::rand): Array.shuffle() draws from it, not from rng. Godot randomizes it at
+        /// startup; tests seed it (seed(n)) to reproduce a run.</summary>
+        public GdRng GRng = new GdRng((ulong)DateTime.UtcNow.Ticks);
         public int MaxZombies = 1100;
         public int CurCol = -1;
         public int ViewCol = 0;
@@ -460,14 +463,14 @@ namespace DayZero.Core
             col.StartT = S.T;
             var b = AddBase(p, true, lot);
             b.Done = 1.0;
-            FoundPalisade(b);   // v0.12.0a: the drawn palisade is a real (wood, breakable) wall
+            if (PhaseARules) FoundPalisade(b);   // v0.12.0a (dormant): the drawn palisade is a real (wood, breakable) wall
             if (first)
             {
                 var corners = new List<Vector2Int>();
                 var cr = D.CityRect;
                 foreach (var cc in new[] { new Vector2Int(cr.x + 4, cr.y + 4), new Vector2Int(cr.x + cr.width - 5, cr.y + 4), new Vector2Int(cr.x + 4, cr.y + cr.height - 5), new Vector2Int(cr.x + cr.width - 5, cr.y + cr.height - 5) })
                     corners.Add(LandNear(cc));
-                Rng.Shuffle(corners);
+                GRng.Shuffle(corners);
                 var pick = corners[0];
                 foreach (var c in corners)
                     if (V.F(c).DistTo(V.F(p)) >= 200.0) { pick = c; break; }
@@ -897,15 +900,15 @@ namespace DayZero.Core
             _rtBudget = RT_PATH_BUDGET;
             S.T += dh;
             if (S.Guts.Count > 0) StepGuts(dh * sph);
-            MoveZombies(dh);
+            MoveZombies(dh); Dbg("MoveZombies");
             RebuildBuckets();
             _openHumans.Clear();
-            EachCol(() => MovePeople(dh));
+            EachCol(() => MovePeople(dh)); Dbg("MovePeople");
             _accCombat += dh;
             if (_accCombat >= 0.25)
             {
                 _accCombat -= 0.25;
-                EachCol(CombatTick);
+                EachCol(CombatTick); Dbg("CombatTick");
             }
             FlushDead();
             _accHour += dh;
@@ -957,55 +960,60 @@ namespace DayZero.Core
 
         void FlushHourQ() { while (_hourQ.Count > 0) StepHourQ(); }
 
+        /// <summary>Parity debugging (work/parity): called after each hourly sub-step with its name. Null in the game.</summary>
+        public Action<string> DbgHook;
+        public static bool DbgV;
+        void Dbg(string n) => DbgHook?.Invoke(n);
+
         void TickHourPre()
         {
             _rtNeed.Clear(); _slotCache.Clear(); _insideDirty = true;
-            UpdateZoneLive();
-            Spread();
-            UpdateWeights();
-            UpdateActive();
-            SpawnDotsHourly();
+            UpdateZoneLive(); Dbg("UpdateZoneLive");
+            Spread(); Dbg("Spread");
+            UpdateWeights(); Dbg("UpdateWeights");
+            UpdateActive(); Dbg("UpdateActive");
+            SpawnDotsHourly(); Dbg("SpawnDotsHourly");
         }
 
         void HourCol()
         {
-            Economy();
-            Medical();
-            StepCraft();
-            StepVehicles();
-            StepNoise();
-            Equip();
-            AssignJobs();
-            AutoRescue();
-            StepResearch();
-            StepTrade();
-            StepBases();
-            StepSquads();
-            StepFieldSquads();
-            StepArrivals();
-            PatchGaps();
-            StepConversions();
-            AutoGuards();
-            PostGuards();
-            StepNightRaid();
-            StepFamily();
-            MaybeEvents();
-            StepWar();
+            Economy(); Dbg("Economy");
+            Medical(); Dbg("Medical");
+            StepCraft(); Dbg("StepCraft");
+            StepVehicles(); Dbg("StepVehicles");
+            StepNoise(); Dbg("StepNoise");
+            Equip(); Dbg("Equip");
+            AssignJobs(); Dbg("AssignJobs");
+            AutoRescue(); Dbg("AutoRescue");
+            StepResearch(); Dbg("StepResearch");
+            StepTrade(); Dbg("StepTrade");
+            StepBases(); Dbg("StepBases");
+            StepSquads(); Dbg("StepSquads");
+            StepFieldSquads(); Dbg("StepFieldSquads");
+            StepArrivals(); Dbg("StepArrivals");
+            PatchGaps(); Dbg("PatchGaps");
+            StepConversions(); Dbg("StepConversions");
+            AutoGuards(); Dbg("AutoGuards");
+            PostGuards(); Dbg("PostGuards");
+            StepNightRaid(); Dbg("StepNightRaid");
+            StepFamily(); Dbg("StepFamily");
+            MaybeEvents(); Dbg("MaybeEvents");
+            StepWar(); Dbg("StepWar");
         }
 
         void TickHourPost()
         {
-            StepControl();
-            StepGroups();
-            StepCamps();
-            StepFactions();
-            RegrowLoot();
-            StepPhase();
-            StepDefenseGlobal();
+            StepControl(); Dbg("StepControl");
+            StepGroups(); Dbg("StepGroups");
+            StepCamps(); Dbg("StepCamps");
+            StepFactions(); Dbg("StepFactions");
+            RegrowLoot(); Dbg("RegrowLoot");
+            StepPhase(); Dbg("StepPhase");
+            StepDefenseGlobal(); Dbg("StepDefenseGlobal");
             Use(ViewCol);
             if (_flowDirty && (S.Phase == "fall" || RaidOnAny())) BuildFlow();
             HourTicked?.Invoke();
-            EmitChanged();
+            EmitChanged(); Dbg("EmitChanged");
         }
 
         // ---------------- resources ----------------

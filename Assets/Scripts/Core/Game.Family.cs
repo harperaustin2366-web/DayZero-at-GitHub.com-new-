@@ -134,7 +134,7 @@ namespace DayZero.Core
                     }
                     continue;
                 }
-                bool yardPosts = !IsEnclosed(b) && S.Walls.Any(w => w.Starter && w.Bid == b.Id);
+                bool yardPosts = PhaseARules && !IsEnclosed(b) && S.Walls.Any(w => w.Starter && w.Bid == b.Id);
                 var yd = yardPosts ? YardOf(b) : default;
                 for (int i = 0; i < n; i++)
                 {
@@ -191,7 +191,7 @@ namespace DayZero.Core
                 if (p.St != "base" || !p.Guard || !p.Post.HasValue) continue;
                 var near = ZombiesNear(p.Pos, 0.9, 3);
                 if (near.Count == 0) continue;
-                near.RemoveAll(zi => WallBetween(ZPos(zi), p.Pos));   // v0.12.0a: not through an intact wall
+                if (PhaseARules) near.RemoveAll(zi => WallBetween(ZPos(zi), p.Pos));   // v0.12.0a: not through an intact wall
                 if (near.Count == 0) continue;
                 var b = BaseById(p.Base);
                 double atk = 0.18 * 30.0 / (30.0 + (b != null ? Defense(b) : 10.0));
