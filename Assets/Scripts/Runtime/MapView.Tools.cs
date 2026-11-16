@@ -14,7 +14,7 @@ namespace DayZero.Runtime
     {
         /// <summary>Wall..Upgrade: DEFENSE placement tools. Loop: the original's SUGGEST fence loop. Squad / Scav / Drone /
         /// Strike: map targets for SQUADS (CLEAR ROAD, SCAVENGE, DRONE SCOUT, GUNSHIP STRIKE), as main.gd world.mode.</summary>
-        public enum Tool { None, Wall, Gate, Tower, Trap, Upgrade, Loop, Squad, Scav, Drone, Strike }
+        public enum Tool { None, Wall, Gate, Tower, Trap, Upgrade, Loop, Squad, Scav, Drone, Strike, Fence }
         public bool TargetTool => ActiveTool == Tool.Squad || ActiveTool == Tool.Scav || ActiveTool == Tool.Drone || ActiveTool == Tool.Strike;
         public int TowerTier { get; private set; }
         public int SquadId { get; private set; } = -1;
@@ -54,6 +54,7 @@ namespace DayZero.Runtime
             ActiveTool = t; WallTier = tier; TrapKind = trapKind;
             if (t == Tool.Tower) TowerTier = tier;
             if (t == Tool.Loop) { var mb = G?.MainBase(); _loopEdges = mb != null ? G.SuggestLoop(mb, tier) : new List<int>(); }
+            if (t == Tool.Fence) FenceToolStart();   // MapView.Fence.cs: corner posts
             // start the ghost just outside the camp gate, or at the screen centre when the camera looks elsewhere
             var c = new Vector2(_focus.x, -_focus.z);
             var g = G; var b = g?.MainBase();
@@ -104,6 +105,7 @@ namespace DayZero.Runtime
             ActiveTool = Tool.None; _toolKey = -1; ToolErr = ToolCost = ToolInfo = ""; ToolOk = false;
             ResetCampTools();   // MapView.Camp.cs: outpost mode, trap line
             SquadId = -1; Target = new Vector2Int(-1, -1); TargetText = new TargetInfo(); _loopEdges = new List<int>();
+            FenceToolReset();   // MapView.Fence.cs
             if (_ghostGo != null) { DestroyChunk(_ghostGo); _ghostGo = null; }
             _ghostSig = "";
         }
@@ -155,9 +157,11 @@ namespace DayZero.Runtime
                 case Tool.Gate:
                 {
                     kind = MapGen.GhostKind.Gate;
-                    int best = -1; float bd = 1.6f;
-                    for (int dy = -2; dy <= 2; dy++)
-                        for (int dx = -2; dx <= 2; dx++)
+                    // v0.14.0a: the reach grows with the camera distance so a gate can be dropped on a fence when zoomed out
+                    float reach = Mathf.Max(1.6f, _dist * 0.045f); int ri = Mathf.CeilToInt(reach);
+                    int best = -1; float bd = reach;
+                    for (int dy = -ri; dy <= ri; dy++)
+                        for (int dx = -ri; dx <= ri; dx++)
                         {
                             var q = new Vector2Int(tile.x + dx, tile.y + dy);
                             if (!D.InMap(q)) continue;
@@ -224,6 +228,13 @@ namespace DayZero.Runtime
                     ToolCost = pv.N > 0 ? Game.FmtCost(pv.Cost) : "-";
                     ToolInfo = string.Format("Suggested loop around {0}: {1} · {2} sections · {3} tiles to build", mb?.Name ?? "camp", Data.FENCES[WallTier].Name, pv.Edges, pv.N);
                     kind = MapGen.GhostKind.Route;
+                    break;
+                }
+                case Tool.Fence:
+                {
+                    kind = MapGen.GhostKind.Fence;
+                    FenceGhost(tiles, state);   // MapView.Fence.cs
+                    a = b = new Vector2(-1f, -1f);
                     break;
                 }
                 case Tool.Squad: case Tool.Scav: case Tool.Drone: case Tool.Strike:
@@ -315,6 +326,7 @@ namespace DayZero.Runtime
                         e = tl.Count > 0 ? bs.Act("build_fence", tl, WallTier) : (pl.Err != "" ? pl.Err : "Nothing to build here.");
                     }
                     break;
+                case Tool.Fence: e = FenceConfirm(); break;   // MapView.Fence.cs
                 case Tool.Loop: e = _loopEdges.Count > 0 ? bs.Act("build_fence_segs", new List<int>(_loopEdges), WallTier) : ToolErr; if (e == "") { CancelTool(); return e; } break;
                 case Tool.Gate: e = _toolKey >= 0 ? bs.Act("place_gate", _toolKey) : "Tap a wall to put a gate in it."; break;
                 case Tool.Tower: e = bs.Act("place_tower", new Vector2Int(Mathf.FloorToInt(GhostAt.x), Mathf.FloorToInt(GhostAt.y)), TowerTier); break;
@@ -347,6 +359,7 @@ namespace DayZero.Runtime
         {
             if (!Playing) { if (ActiveTool != Tool.None) CancelTool(); if (BuildingLot >= 0) ClearBuilding(); return; }
             if (ActiveTool == Tool.None) return;
+            if (ActiveTool == Tool.Fence) UpdatePosts();   // MapView.Fence.cs: corner-post pins around the camera
             _ghostT -= Time.unscaledDeltaTime;
             if (_ghostT <= 0f) { _ghostT = TargetTool || ActiveTool == Tool.Loop ? 1.5f : 0.3f; RefreshGhost(); }
         }
@@ -372,6 +385,7 @@ namespace DayZero.Runtime
                 return;
             }
             if (ActiveTool == Tool.Loop) return;   // the suggested loop doesn't move
+            if (ActiveTool == Tool.Fence) { FenceTap(screen, gp); return; }   // MapView.Fence.cs
             if (TrapLine) { if (gp.x >= 0f) TrapTapTile(new Vector2Int(Mathf.FloorToInt(gp.x), Mathf.FloorToInt(gp.y))); return; }   // MapView.Camp.cs
             if (ActiveTool != Tool.None)
             {
@@ -480,5 +494,197 @@ namespace DayZero.Runtime
 
         /// <summary>Force the dynamic layer (walls, conversions) to rebuild now.</summary>
         public void DirtyDynamic() { _dynKey = ""; _dynT = 0f; }
+
+        // ================= v0.14.0a: FENCE tool with corner posts =================
+        // Austin: "make snapping points on all four corners of roads where you can draw fencing from each snapping point
+        // when you zoom out of the map a little bit". The snap points are the original game's fence posts (Data road
+        // graph: a post on every curb corner around every crossing in the city, a 4-tile grid in the wild). Tap a post,
+        // then another: the sections between them (Data.RgPath, along the curbs and across the road at crossings) join
+        // the chain, and the second post becomes the next start. UNDO / CLEAR, CONFIRM builds the chain with the
+        // original build_fence_segs (original costs and hp). Posts show while the camera is within POST_MAX_DIST.
+        public const float POST_MAX_DIST = 115f;
+        public readonly List<int> FenceChain = new List<int>();
+        public List<bool> FenceOk { get; private set; } = new List<bool>();
+        readonly List<int> _fenceHist = new List<int>();
+        public int FenceStart { get; private set; } = -1;
+        public string FenceHint { get; private set; } = "";
+        readonly Dictionary<int, bool> _postOk = new Dictionary<int, bool>();
+        int _postOkVer = -1;
+        GameObject _postsGo;
+        string _postsKey = "";
+
+        public bool PostsVisible => ActiveTool == Tool.Fence && _dist <= POST_MAX_DIST;
+
+        void FenceToolStart()
+        {
+            FenceChain.Clear(); _fenceHist.Clear(); FenceOk = new List<bool>(); FenceStart = -1;
+            _postOk.Clear(); _postsKey = "";
+            FenceHint = "Tap a corner post to start the fence.";
+            // posts read best a little zoomed out: a few blocks in view
+            if (_distTarget < 40f) _distTarget = 44f;
+        }
+
+        void FenceToolReset()
+        {
+            FenceChain.Clear(); _fenceHist.Clear(); FenceOk = new List<bool>(); FenceStart = -1; FenceHint = "";
+            if (_postsGo != null) { DestroyChunk(_postsGo); _postsGo = null; }
+            _postsKey = "";
+        }
+
+        bool PostOk(int n)
+        {
+            var g = G;
+            if (g?.S == null) return false;
+            if (_postOkVer != g.S.FenceVer) { _postOk.Clear(); _postOkVer = g.S.FenceVer; }
+            if (_postOk.TryGetValue(n, out bool v)) return v;
+            var p = D.RgPos(n);
+            v = g.InTerritory(new Vector2Int((int)p.x, (int)p.y), g.CurCol);
+            _postOk[n] = v;
+            return v;
+        }
+
+        static float PostScale(float dist) => Mathf.Clamp(dist / 26f, 0.8f, 4.2f);
+
+        void UpdatePosts()
+        {
+            var g = G;
+            if (!PostsVisible || g?.S == null || _gen == null)
+            {
+                if (_postsGo != null) { DestroyChunk(_postsGo); _postsGo = null; }
+                _postsKey = "";
+                return;
+            }
+            var f = new Vector2(_focus.x, -_focus.z);
+            float R = Mathf.Clamp(_dist * 1.25f, 22f, 130f);
+            const float Q = 4f;
+            string key = Mathf.RoundToInt(f.x / Q) + "," + Mathf.RoundToInt(f.y / Q) + "," + Mathf.RoundToInt(_dist / 5f) + "," + FenceStart + "," + FenceChain.Count + "," + (FenceChain.Count > 0 ? FenceChain[FenceChain.Count - 1] : -1)
+                + "," + WallTier + "," + g.S.FenceVer + "," + (FenceOk.Count > 0 && FenceOk[FenceOk.Count - 1] ? 1 : 0);
+            if (key == _postsKey && _postsGo != null) return;
+            _postsKey = key;
+            var nodes = new List<int>(); var ok = new List<bool>();
+            foreach (int n in D.RgNodesIn(new Rect(f.x - R, f.y - R, R * 2f, R * 2f), 2500))
+            {
+                if (D.RgAdj[n].Count == 0) continue;
+                nodes.Add(n); ok.Add(PostOk(n));
+            }
+            if (_postsGo != null) DestroyChunk(_postsGo);
+            var ch = _gen.FencePosts(nodes, ok, FenceStart, FenceChain, FenceOk, PostScale(_dist), WallTier);
+            _postsGo = new GameObject("Fence posts");
+            _postsGo.transform.SetParent(transform, false);
+            if (ch.Mesh.Count > 0) MakeObject("Posts", ToMesh("Posts", ch.Mesh), _objMat, _postsGo.transform);
+            if (_glowMat != null && ch.Shadow.Count > 0) MakeObject("Post glow", ToMesh("Post glow", ch.Shadow), _glowMat, _postsGo.transform);
+        }
+
+        /// <summary>The corner post under the finger: nearest on screen within ~a fingertip, among posts near the ground hit.</summary>
+        int PostAt(Vector2 screen, Vector2 gp)
+        {
+            if (gp.x < 0f) return -1;
+            float R = Mathf.Max(2.5f, _dist * 0.09f);
+            var tap = new Vector2(screen.x, UnityEngine.Screen.height - screen.y);
+            float lim = Mathf.Max(52f, (UnityEngine.Screen.dpi > 0f ? UnityEngine.Screen.dpi : 320f) * 0.32f);
+            int best = -1; float bd = lim;
+            foreach (int n in D.RgNodesIn(new Rect(gp.x - R, gp.y - R, R * 2f, R * 2f), 600))
+            {
+                if (D.RgAdj[n].Count == 0) continue;
+                if (!TryScreen(Geo.W(D.RgPos(n), 0.3f), out var sp)) continue;
+                float dd = (sp - tap).magnitude;
+                if (dd < bd) { bd = dd; best = n; }
+            }
+            if (best < 0) return -1;
+            int twin = D.SnapPost(D.RgPos(best), 0.5f);   // a seam post next to a city corner is the same corner
+            return twin >= 0 ? twin : best;
+        }
+
+        void FenceTap(Vector2 screen, Vector2 gp)
+        {
+            var bs = Bootstrap.Instance;
+            if (!PostsVisible) { bs?.Toast("Zoom in a little to see the corner posts."); return; }
+            int n = PostAt(screen, gp);
+            if (n < 0) { bs?.Toast("Tap one of the glowing corner posts."); return; }
+            if (FenceStart < 0) { FenceStart = n; FenceHint = "Now tap another corner post. The fence follows the curb between them."; }
+            else if (n == FenceStart) { FenceStart = -1; FenceHint = FenceChain.Count > 0 ? "Tap a corner post to carry on, or CONFIRM." : "Tap a corner post to start the fence."; }
+            else
+            {
+                var path = D.RgPath(FenceStart, n);
+                if (path.Count == 0) FenceHint = "Those posts are too far apart. Tap posts closer together.";
+                else
+                {
+                    var add = new List<int>();
+                    foreach (int e in path) if (!FenceChain.Contains(e) && !add.Contains(e)) add.Add(e);
+                    if (FenceChain.Count + add.Count > Game.SEG_MAX_EDGES) FenceHint = string.Format("That's as long as one fence goes ({0} sections). CONFIRM it first.", Game.SEG_MAX_EDGES);
+                    else if (add.Count > 0) { _fenceHist.Add(FenceChain.Count); FenceChain.AddRange(add); FenceHint = "Keep tapping posts to carry the fence on. Close the loop back at your first post."; }
+                }
+                FenceStart = n;
+            }
+            bs?.PlayClick();
+            _postsKey = ""; _ghostSig = "";
+            RefreshGhost();
+        }
+
+        public bool CanUndoFence => _fenceHist.Count > 0 || FenceStart >= 0;
+
+        public void FenceUndo()
+        {
+            if (_fenceHist.Count == 0) { FenceStart = -1; _postsKey = ""; RefreshGhost(); return; }
+            int n = _fenceHist[_fenceHist.Count - 1];
+            _fenceHist.RemoveAt(_fenceHist.Count - 1);
+            // the start goes back to the post where the removed stretch began (original world_view.gd fence_undo)
+            if (n > 0)
+            {
+                int last = FenceChain[n - 1];
+                int first = FenceChain[n];
+                int sa = D.RgEa[first], sb = D.RgEb[first];
+                FenceStart = sa == D.RgEa[last] || sa == D.RgEb[last] ? sa : sb == D.RgEa[last] || sb == D.RgEb[last] ? sb : D.RgEb[last];
+            }
+            else FenceStart = -1;
+            FenceChain.RemoveRange(n, FenceChain.Count - n);
+            _postsKey = ""; _ghostSig = "";
+            RefreshGhost();
+        }
+
+        public void FenceClear()
+        {
+            FenceChain.Clear(); _fenceHist.Clear(); FenceOk = new List<bool>(); FenceStart = -1;
+            FenceHint = "Tap a corner post to start the fence.";
+            _postsKey = ""; _ghostSig = "";
+            RefreshGhost();
+        }
+
+        void FenceGhost(List<int> tiles, List<int> state)
+        {
+            var g = G;
+            var pv = g.SegPreview(FenceChain, WallTier);
+            FenceOk = pv.Ok;
+            var seen = new HashSet<int>();
+            for (int i = 0; i < FenceChain.Count; i++)
+                foreach (int k in g.EdgeTiles(FenceChain[i]))
+                {
+                    if (!D.Walkable(new Vector2Int(k % D.W, k / D.W)) || !seen.Add(k)) continue;
+                    tiles.Add(k);
+                    state.Add(g.S.Fences.TryGetValue(k, out var f0) && f0.Col == g.CurCol && f0.Tier >= WallTier ? 3 : i < pv.Ok.Count && pv.Ok[i] ? 0 : 2);
+                }
+            bool unlocked = g.FenceTierUnlocked(WallTier);
+            ToolErr = FenceChain.Count == 0 ? "" : !unlocked ? string.Format("Research {0} first.", g.UnlockSourceName(Data.FENCES[WallTier].Unlock))
+                : pv.N == 0 ? (pv.Err != "" ? pv.Err : "Already fenced.")
+                : !g.CanAfford(pv.Cost) ? "Need " + Game.FmtCost(pv.Cost) + "." : pv.Err != "" ? "Some sections are skipped: " + pv.Err : "";
+            ToolOk = FenceChain.Count > 0 && pv.N > 0 && unlocked && g.CanAfford(pv.Cost);
+            ToolCost = pv.N > 0 ? Game.FmtCost(pv.Cost) : "-";
+            ToolInfo = FenceChain.Count == 0 ? string.Format("{0} fence: tap corner posts", Data.FENCES[WallTier].Name) : string.Format("{0} fence · {1} section{2} · {3} tiles to build", Data.FENCES[WallTier].Name, pv.Edges, pv.Edges == 1 ? "" : "s", pv.N);
+        }
+
+        string FenceConfirm()
+        {
+            var bs = Bootstrap.Instance;
+            if (FenceChain.Count == 0) return "Tap two corner posts first.";
+            string e = bs.Act("build_fence_segs", new List<int>(FenceChain), WallTier);
+            if (e == "")
+            {
+                // keep the tool and the last post: the next tap carries the fence on from where it ended
+                FenceChain.Clear(); _fenceHist.Clear(); FenceOk = new List<bool>();
+                FenceHint = "Built. Carry on from the amber post, or put a GATE in it so your people can get in and out.";
+                _postsKey = "";
+            }
+            return e;
+        }
     }
 }

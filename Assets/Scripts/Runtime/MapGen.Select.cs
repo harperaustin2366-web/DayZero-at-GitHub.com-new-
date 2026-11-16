@@ -21,6 +21,7 @@ namespace DayZero.Runtime
         {
             o = default;
             if (b == null) return false;
+            if (PlainCamp) return PlainLayout(b, out o);
             CampRect(b, out var c, out float half, out var bld);
             var V = -CampFront(); var U = new Vector2(V.y, -V.x);
             o.Yard = new ORect(c, U, half, half);
@@ -30,6 +31,33 @@ namespace DayZero.Runtime
             o.Gate = c - V * half;
             o.Main = b.Main;
             o.TowerTop = 1.92f;
+            return true;
+        }
+
+        /// <summary>v0.14.0a: under the original rules there is no pre-built compound (Austin: "get rid of the original
+        /// starting base"): the camp is the building itself with a campfire and flag at its door, and the player fences
+        /// it in with the FENCE tool. The yard is the building footprint plus a narrow apron; the "tower" spot is the
+        /// door at ground level (TowerTop 0), so a guard on duty stands at the door.</summary>
+        bool PlainLayout(Base b, out CampLayout o)
+        {
+            o = default;
+            var door = new Vector2(b.Pos.x + 0.5f, b.Pos.y + 0.5f);
+            bool inBld = b.Lot >= 0 && b.Lot < _info.Length && _info[b.Lot].Valid && _info[b.Lot].Floors > 0;
+            if (inBld)
+            {
+                var r = _info[b.Lot].R;
+                o.HasBld = true; o.Bld = r;
+                o.Yard = new ORect(r.C, r.U, r.Hu + 0.9f, r.Hv + 0.9f);
+                var outv = door - r.C; if (outv.sqrMagnitude < 1e-4f) outv = GU;
+                outv = outv.normalized;
+                o.Fire = door + outv * 0.9f + new Vector2(-outv.y, outv.x) * 0.6f;
+            }
+            else
+            {
+                o.Yard = new ORect(door, GU, 2.0f, 2.0f);
+                o.Fire = door + GU * 0.5f;
+            }
+            o.Gate = door; o.Tower = door; o.TowerTop = 0f; o.Main = b.Main;
             return true;
         }
 

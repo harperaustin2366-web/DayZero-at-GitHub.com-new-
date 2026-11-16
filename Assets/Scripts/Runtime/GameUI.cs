@@ -362,7 +362,7 @@ namespace DayZero.Runtime
             GUI.Box(ban, GUIContent.none, _hudBox);
             var bs = _bannerS;
             Shadowed(new Rect(ban.x, ban.y + 6, ban.width, 40), "Tap any building to make it your base", _bannerT);
-            GUI.Label(new Rect(ban.x, ban.y + 46, ban.width, 26), "Drag to look around · pinch to zoom · HOME returns to the suggested site", bs);
+            GUI.Label(new Rect(ban.x, ban.y + 46, ban.width, 26), "Start anywhere: drag to look around, pinch to zoom, then tap the building you want", bs);
             if (map.SelectedLot < 0 || !map.SelectionInfo(out string type, out string size, out int floors, out string district)) return;
             string err = map.SelectError;
             float pw = 600, ph = err != "" ? 210 : 180, px = w / 2 - pw / 2, py = h - ph - 14;

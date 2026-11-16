@@ -33,6 +33,7 @@ namespace DayZero.Core
         void RefreshRefs()
         {
             _F = S.Fences; _T = S.Towers; _TR = S.Traps;
+            SyncFenceBlocks();
             if (!_lureDirty && ReferenceEquals(_TR, _lureSrc)) return;
             _lureDirty = false; _lureSrc = _TR;
             _lures.Clear();
@@ -43,6 +44,50 @@ namespace DayZero.Core
                     _lures.Add((V.F(Tp(kv.Key)).Add(V.HALF), TrapRadius(t.Kind, TrapLvl(t))));
             }
         }
+
+        // ---------------- v0.14.0a: fences block people, gates let them through ----------------
+        // Austin's rule change: survivors, squads and vehicles path around fence tiles and can only cross a fence
+        // line at a gate (the zombies already had to break fences and gates). The A* grid gets a fence layer
+        // (AStarGrid.SetBlocked); it is synced here whenever the fences change (FencesChanged -> RebuildSafe ->
+        // RefreshRefs) or a save is loaded. With no fences nothing is blocked and paths are the original's.
+        readonly HashSet<int> _pathBlocks = new HashSet<int>();
+        object _blockSrc;
+        int _blockVer = -1;
+
+        void SyncFenceBlocks()
+        {
+            if (S == null || Astar == null) return;
+            if (ReferenceEquals(_blockSrc, S) && _blockVer == S.FenceVer && _pathBlocks.Count == CountPathBlocks()) return;
+            _blockSrc = S; _blockVer = S.FenceVer;
+            var want = new HashSet<int>();
+            foreach (var kv in S.Fences) if (!S.Gates.Has(kv.Key)) want.Add(kv.Key);
+            bool changed = false;
+            foreach (int k in _pathBlocks) if (!want.Contains(k)) { Astar.SetBlocked(Tp(k), false); changed = true; }
+            foreach (int k in want) if (!_pathBlocks.Contains(k)) { Astar.SetBlocked(Tp(k), true); changed = true; }
+            if (!changed) return;
+            _pathBlocks.Clear(); foreach (int k in want) _pathBlocks.Add(k);
+            _pathCache.Clear(); _pathOrder.Clear();
+            // survivors who were waiting at a closed fence try their route again (a gate may have gone in)
+            foreach (int id in _rtFenced) if (_rt.TryGetValue(id, out var rr)) rr.Code = "";
+            _rtFenced.Clear();
+        }
+
+        /// <summary>Survivors whose daily route is cut by a fence with no gate (Game.Family.cs Routine waits for them).</summary>
+        readonly HashSet<int> _rtFenced = new HashSet<int>();
+
+        int CountPathBlocks()
+        {
+            int n = 0;
+            foreach (var kv in S.Fences) if (!S.Gates.Has(kv.Key)) n++;
+            return n;
+        }
+
+        /// <summary>True when fences are what keeps a route from a to b closed (no gate on the way): the caller then
+        /// keeps the survivor where they are instead of walking them through the fence.</summary>
+        public bool FenceBlocksRoute(Vector2Int a, Vector2Int b) => _pathBlocks.Count > 0 && !a.Same(b);
+
+        /// <summary>Is this tile part of a fence line that people can't walk through (gates excluded)?</summary>
+        public bool PathBlocked(int k) => _pathBlocks.Contains(k);
 
         public int FenceOwner(int k) => S.Fences.TryGetValue(k, out var f) ? f.Col : -1;
         public int TowerOwner(int k) => S.Towers.TryGetValue(k, out var t) ? t.Col : -1;

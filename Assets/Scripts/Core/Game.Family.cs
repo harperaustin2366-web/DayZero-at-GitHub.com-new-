@@ -1176,10 +1176,12 @@ namespace DayZero.Core
                     path = FindPath(from, to);
                     RtPaths++;
                 }
-                if (path.Count < 2) path = new List<Vector2> { V.F(from), V.F(to) };
+                bool fenced = path.Count < 2 && !from.Same(to) && FenceBlocksRoute(from, to);   // v0.14.0a: no way through the fence (no gate): stay put
+                if (path.Count < 2) path = fenced ? new List<Vector2> { V.F(from), V.F(from) } : new List<Vector2> { V.F(from), V.F(to) };
                 path = FromHere(path, p.Pos);
                 r.Path = path; r.Pi = 0; r.Seg = 0.0; r.Arr = false; r.Set = false;
-                r.Code = t.code; r.Tt = t.tile; r.Ek = t.key;
+                r.Code = t.code; r.Tt = t.tile; r.Ek = fenced ? NO_BLD : t.key;
+                if (fenced) _rtFenced.Add(p.Id); else if (_rtFenced.Count > 0) _rtFenced.Remove(p.Id);
             }
             if (IsInside(p)) return true;
             if (!r.Arr)
@@ -1207,6 +1209,7 @@ namespace DayZero.Core
                     return true;
                 }
             }
+            if (_rtFenced.Count > 0 && _rtFenced.Contains(p.Id)) return true;   // v0.14.0a: fenced off from the spot: wait
             var spot = t.spot;
             double amp = t.code == "p" ? 0.18 : 0.3;
             var want = spot.Add(V.F(Math.Sin(S.T * 0.9 + p.Id), Math.Cos(S.T * 0.7 + p.Id * 1.3)).Mul(amp));

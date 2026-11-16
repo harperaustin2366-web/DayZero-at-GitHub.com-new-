@@ -332,15 +332,23 @@ namespace DayZero.Core
             return ColonyAt(ci)?.Name ?? "";
         }
 
-        public string CanStartAt(Vector2Int tile, int ci)
+        public string CanStartAt(Vector2Int tile, int ci) => StartError(tile, ci, false);
+
+        /// <summary>v0.14.0a (Austin: "pick wherever you want to start"): the player's own pick. Any building the
+        /// player can tap works unless another faction or colony holds it: no size limits, and a building with no
+        /// door on the street gets the nearest open tile as its gate. The game's own suggestions (SuggestStart,
+        /// AssignSpawns) keep the original rule, so hands-off runs start where they always did.</summary>
+        public string CanStartAnywhere(Vector2Int tile, int ci) => StartError(tile, ci, true);
+
+        string StartError(Vector2Int tile, int ci, bool anywhere)
         {
             tile = WildSite(tile, ci);
             var c = ColonyAt(ci);
             if (c == null) return "No such colony.";
             if (c.Started) return "Your camp is already set up.";
-            string te = TakeError(tile, ci);
+            string te = anywhere ? StartTakeError(tile, ci) : TakeError(tile, ci);
             if (te != "") return te;
-            var p = TakeDoor(tile);
+            var p = anywhere ? StartDoor(tile) : TakeDoor(tile);
             foreach (var b in AllBases())
             {
                 double d = V.F(b.Pos).DistTo(V.F(p));
@@ -349,6 +357,33 @@ namespace DayZero.Core
             }
             if (S.Phase != "pick" && InfAt(p) > 0.3) return "That part of the city is already overrun.";
             return "";
+        }
+
+        /// <summary>TakeError for the player's start pick: buildings only, never one another faction or colony holds.</summary>
+        string StartTakeError(Vector2Int tile, int ci)
+        {
+            if (TakeError(tile, ci) == "") return "";
+            int l = D.BuildingAt(tile);
+            if (l < 0) return TakeError(tile, ci);
+            var L = D.Lots[l];
+            if (L.Kind == "parking") return "That's a parking lot. Tap a building.";
+            var fo = FactionOfLot(l);
+            if (fo != null) return string.Format("{0} holds that building.", fo.Name);
+            var ob = LotOwnerBase(l);
+            if (ob != null) return ob.Col == ci ? string.Format("That building is already part of {0}.", ob.Name) : string.Format("That building belongs to {0}.", ColonyAt(ob.Col)?.Name ?? "another colony");
+            if (StartDoor(tile).x < 0) return "No open ground next to that building.";
+            return "";
+        }
+
+        /// <summary>The camp's gate tile for a start pick: the building's street door, else the nearest open tile.</summary>
+        Vector2Int StartDoor(Vector2Int tile)
+        {
+            var p = TakeDoor(tile);
+            if (p.x >= 0) return p;
+            int l = D.BuildingAt(tile);
+            if (l < 0) return p;
+            var lc = D.LotCenter(l);
+            return D.NearestWalkable(new Vector2Int((int)lc.x, (int)lc.y), 14);
         }
 
         const int SPAWN_CELL = 16;
@@ -452,9 +487,9 @@ namespace DayZero.Core
         {
             int ci = CurCol;
             tile = WildSite(tile, ci);
-            string e = CanStartAt(tile, ci);
+            string e = CanStartAnywhere(tile, ci);   // v0.14.0a: the player's pick may be any building (see CanStartAnywhere)
             if (e != "") return e;
-            var p = TakeDoor(tile);
+            var p = StartDoor(tile);
             int lot = D.BuildingAt(tile);
             bool first = true;
             foreach (var c in S.Cols) if (c.Started) first = false;

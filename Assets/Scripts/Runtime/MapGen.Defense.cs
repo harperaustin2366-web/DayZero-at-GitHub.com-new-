@@ -64,6 +64,270 @@ namespace DayZero.Runtime
                 // binding rails / caps along intact stretches, and a contact shadow
                 if (tierRun == 0) RailRun(g, r, a, dir, nrm, len, S, game);
             }
+            DrawFenceLines(g, game);
+        }
+
+        // ================= v0.14.0a: the camp without the pre-built compound =================
+        /// <summary>Original rules: no palisade square, watchtower, truck or cleared yard around the chosen building.</summary>
+        public static bool PlainCamp => !Game.PhaseARules;
+
+        /// <summary>The camp as the survivors found it: the building (lit windows are drawn by the caller), a campfire on
+        /// a patch of packed dirt at the door, a flag in the colony colour and a few supply crates.</summary>
+        void DrawPlainCamp(Geo g, Base b, bool mine)
+        {
+            if (!Layout(b, out var lay)) return;
+            var door = lay.Gate; var fire = lay.Fire;
+            var outv = fire - door; if (outv.sqrMagnitude < 1e-4f) outv = GU; outv = outv.normalized;
+            var side = new Vector2(-outv.y, outv.x);
+            // packed dirt under the fire
+            var pr = new ORect(fire, outv, 0.75f, 0.75f);
+            g.Flat(pr.Quad(), 0.047f, YARD_DARK);
+            Campfire(g, fire, b.Id);
+            // flag pole beside the door
+            var fp = door - side * 0.55f;
+            g.Beam(Geo.W(fp, 0f), Geo.W(fp, 1.85f), 0.014f, TIMBER);
+            Color flag = mine ? Hex("#bd882f") : Hex("#6e3226");
+            g.QuadRaw(Geo.W(fp, 1.55f), Geo.W(fp + side * -0.38f, 1.58f), Geo.W(fp + side * -0.4f, 1.8f), Geo.W(fp, 1.84f), Mul(flag, 0.9f), Mul(flag, 0.8f), flag, flag);
+            // supplies stacked by the door
+            var cp = door + side * 0.65f + outv * 0.1f;
+            float y = 0.049f;
+            g.BoxAt(cp, outv, 0.11f, 0.11f, y, y + 0.2f, Hex("#7a5536"), Hex("#8a6a48"));
+            g.BoxAt(cp + side * 0.25f, outv, 0.1f, 0.1f, y, y + 0.17f, Hex("#6b4a30"), Hex("#7a5a3a"));
+            g.Cyl(cp + outv * 0.28f, 0.085f, y, y + 0.26f, Hex("#3a4a5a"), Hex("#2e2c28"), 8);
+        }
+
+        // ================= v0.14.0a: fences built under the original rules =================
+        // build_fence_segs (corner posts, SUGGEST LOOP) and build_fence (loose tiles) only set S.Fences / S.Fsegs; until
+        // now nothing drew them. Corner-post fences are drawn as straight runs from post to post along the curb, each
+        // element looking up the sim tile under it (hp, gate, breach). Loose tiles are joined to their fenced neighbours.
+        readonly HashSet<int> _fenceDrawn = new HashSet<int>();
+
+        void DrawFenceLines(Geo g, Game game)
+        {
+            var S = game.S;
+            if (S == null || (S.Fences.Count == 0 && S.Breaches.Count == 0)) return;
+            _fenceDrawn.Clear();
+            if (S.Walls != null)
+                foreach (var r in S.Walls)
+                {
+                    float len = (r.B - r.A).magnitude; if (len < 0.2f) continue;
+                    var dir = (r.B - r.A) / len;
+                    for (float t = 0f; t <= len; t += 0.25f) { var p = r.A + dir * t; var tl = new Vector2Int(Mathf.FloorToInt(p.x), Mathf.FloorToInt(p.y)); if (d.InMap(tl)) _fenceDrawn.Add(tl.y * d.W + tl.x); }
+                }
+            var gates = new HashSet<int>();
+            var corners = new HashSet<int>();
+            foreach (var kv in S.Fsegs)
+            {
+                int e = kv.Key;
+                if (e < 0 || e >= d.RgEdges()) continue;
+                var a = d.RgPos(d.RgEa[e]); var b = d.RgPos(d.RgEb[e]);
+                float len = (b - a).magnitude;
+                if (len < 0.2f) continue;
+                var dir = (b - a) / len; var nrm = new Vector2(-dir.y, dir.x);
+                int tierSeg = kv.Value.Tier;
+                float step = WallStep(tierSeg);
+                int n = Mathf.Max(1, Mathf.RoundToInt(len / step));
+                float st = len / n;
+                bool any = false;
+                float run0 = -1f;
+                for (int i = 0; i <= n; i++)
+                {
+                    bool standing = false;
+                    if (i < n)
+                    {
+                        float t = (i + 0.5f) * st;
+                        var p = a + dir * t;
+                        var tile = new Vector2Int(Mathf.FloorToInt(p.x), Mathf.FloorToInt(p.y));
+                        if (d.InMap(tile))
+                        {
+                            int k = tile.y * d.W + tile.x;
+                            if (!_fenceDrawn.Contains(k) || gates.Contains(k))
+                            {
+                                int salt = e * 977 + i;
+                                if (S.Fences.TryGetValue(k, out var f))
+                                {
+                                    any = true;
+                                    float frac = (float)(f.Hp / Math.Max(1.0, game.FenceTileMax(k)));
+                                    if (S.Gates.ContainsKey(k))
+                                    {
+                                        if (gates.Add(k))
+                                        {
+                                            // one gate per tile, centred where the line crosses the tile
+                                            var tc = new Vector2(tile.x + 0.5f, tile.y + 0.5f);
+                                            var gp = a + dir * Mathf.Clamp(Vector2.Dot(tc - a, dir), 0f, len);
+                                            GateLeaf(g, gp, dir, nrm, f.Tier, frac);
+                                            GateMark(g, gp, nrm);
+                                        }
+                                    }
+                                    else { WallPiece(g, p, dir, nrm, st, f.Tier, frac, salt); standing = true; }
+                                }
+                                else if (S.Breaches.TryGetValue(k, out var br)) { if ((i & 1) == 0) Rubble(g, p, dir, nrm, br.Tier, salt); }
+                            }
+                        }
+                    }
+                    // binding rails (wood) / top wire (others) along each standing stretch
+                    if (standing && run0 < 0f) run0 = i * st;
+                    if (!standing && run0 >= 0f) { FenceRail(g, a + dir * run0, a + dir * (i * st), nrm, tierSeg); run0 = -1f; }
+                }
+                if (!any) continue;
+                for (int i = 0; i <= n; i++)
+                {
+                    var p = a + dir * ((i + 0.5f) * st);
+                    var tl = new Vector2Int(Mathf.FloorToInt(p.x), Mathf.FloorToInt(p.y));
+                    if (d.InMap(tl)) _fenceDrawn.Add(tl.y * d.W + tl.x);
+                }
+                // stout corner posts where sections meet
+                foreach (int nd in new[] { d.RgEa[e], d.RgEb[e] })
+                {
+                    if (!corners.Add(nd)) continue;
+                    var cp = d.RgPos(nd);
+                    var ct = new Vector2Int(Mathf.FloorToInt(cp.x), Mathf.FloorToInt(cp.y));
+                    if (!d.InMap(ct) || !S.Fences.ContainsKey(ct.y * d.W + ct.x)) continue;
+                    CornerPost(g, cp, tierSeg);
+                }
+            }
+            // loose fence tiles (build_fence): link each tile to its fenced neighbours
+            foreach (var kv in S.Fences)
+            {
+                int k = kv.Key;
+                if (_fenceDrawn.Contains(k)) continue;
+                int x = k % d.W, y = k / d.W;
+                var c = new Vector2(x + 0.5f, y + 0.5f);
+                var f = kv.Value;
+                float frac = (float)(f.Hp / Math.Max(1.0, game.FenceTileMax(k)));
+                bool gate = S.Gates.ContainsKey(k);
+                int links = 0; Vector2 firstDir = GU;
+                for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        if (dx == 0 && dy == 0) continue;
+                        int qx = x + dx, qy = y + dy;
+                        if (qx < 0 || qy < 0 || qx >= d.W || qy >= d.H) continue;
+                        int q = qy * d.W + qx;
+                        if (!S.Fences.ContainsKey(q)) continue;
+                        // diagonal only when the two orthogonal neighbours aren't fenced (no double corners)
+                        if (dx != 0 && dy != 0 && (S.Fences.ContainsKey(y * d.W + qx) || S.Fences.ContainsKey(qy * d.W + x))) continue;
+                        var dir = new Vector2(dx, dy).normalized;
+                        if (links == 0) firstDir = dir;
+                        links++;
+                        if (gate || S.Gates.ContainsKey(q)) continue;
+                        // half link from this tile toward the neighbour (the neighbour draws the other half)
+                        float half = new Vector2(dx, dy).magnitude * 0.5f;
+                        float stp = WallStep(f.Tier);
+                        int n = Mathf.Max(1, Mathf.RoundToInt(half / stp));
+                        float st = half / n;
+                        var nrm = new Vector2(-dir.y, dir.x);
+                        for (int i = 0; i < n; i++) WallPiece(g, c + dir * ((i + 0.5f) * st), dir, nrm, st, f.Tier, frac, k * 31 + (dx + 1) * 3 + dy + 1 + i * 17);
+                        FenceRail(g, c, c + dir * half, nrm, f.Tier);
+                    }
+                if (gate) { var nrm = new Vector2(-firstDir.y, firstDir.x); GateLeaf(g, c, firstDir, nrm, f.Tier, frac); GateMark(g, c, nrm); }
+                else if (links == 0)
+                {
+                    float stp = WallStep(f.Tier); int n = Mathf.Max(1, Mathf.RoundToInt(0.9f / stp)); float st = 0.9f / n;
+                    for (int i = 0; i < n; i++) WallPiece(g, c - GU * 0.45f + GU * ((i + 0.5f) * st), GU, GV, st, f.Tier, frac, k * 31 + i);
+                }
+            }
+            // breaches of loose fences
+            foreach (var kv in S.Breaches)
+            {
+                int k = kv.Key;
+                if (_fenceDrawn.Contains(k) || S.Fences.ContainsKey(k)) continue;
+                Rubble(g, new Vector2(k % d.W + 0.5f, k / d.W + 0.5f), GU, GV, kv.Value.Tier, k);
+            }
+        }
+
+        void FenceRail(Geo g, Vector2 a, Vector2 b, Vector2 nrm, int tier)
+        {
+            if ((b - a).sqrMagnitude < 0.01f) return;
+            if (tier == 0) foreach (float yy in new[] { 0.25f, 0.7f }) g.Beam(Geo.W(a + nrm * 0.07f, yy), Geo.W(b + nrm * 0.07f, yy), 0.02f, TIMBER);
+            else if (tier == 1) g.Beam(Geo.W(a, 0.8f), Geo.W(b, 0.8f), 0.01f, Hex("#7a8082"));
+        }
+
+        void CornerPost(Geo g, Vector2 p, int tier)
+        {
+            if (tier == 0) { g.Cyl(p, 0.075f, 0f, 1.08f, LOG, LOG_TIP, 6); return; }
+            if (tier == 1) { g.Cyl(p, 0.035f, 0f, 0.88f, Hex("#6e7476"), Hex("#8a9092"), 6); return; }
+            if (tier == 2) { g.Cyl(p, 0.045f, 0f, 1.05f, Hex("#4a4440"), Hex("#5a5450"), 6); return; }
+            g.Box(new ORect(p, GU, 0.13f, 0.13f).Quad(), 0f, tier >= 4 ? 1.2f : 1.1f, CONC_D, CONC_TOP, 0.2f);
+        }
+
+        /// <summary>Gates read as gates from a distance: a lintel sign in colony mustard over the leaves.</summary>
+        void GateMark(Geo g, Vector2 p, Vector2 nrm)
+        {
+            var dir = new Vector2(nrm.y, -nrm.x);
+            g.Box(new ORect(p, dir, 0.32f, 0.03f).Quad(), 1.24f, 1.4f, Hex("#bd882f"), Hex("#d8a840"));
+        }
+
+        // ================= v0.14.0a: corner posts for the FENCE tool =================
+        /// <summary>The snap points of the FENCE tool: the road graph's corner posts (curb corners on every side of every
+        /// crossing in the city, a 4-tile grid in the wild). Glowing pins sized for the camera distance (scale), green
+        /// where you can build, grey outside your territory; the picked start post is amber and taller. The section
+        /// chain being drawn is a glowing line along the curbs (green builds, red can't) with a pale fence frame.</summary>
+        public Chunk FencePosts(IList<int> nodes, IList<bool> valid, int start, IList<int> chain, IList<bool> chainOk, float scale, int tier)
+        {
+            var g = new Geo(new MeshData(), new MeshData());
+            Color good = Hex("#7ad04a"), bad = Hex("#e05040"), amber = Hex("#ffd27a"), grey = Hex("#a8a8a0");
+            float s = Mathf.Max(0.5f, scale);
+            // chain: ground band + frame
+            for (int i = 0; i < chain.Count; i++)
+            {
+                int e = chain[i];
+                if (e < 0 || e >= d.RgEdges()) continue;
+                var a = d.RgPos(d.RgEa[e]); var b = d.RgPos(d.RgEb[e]);
+                float len = (b - a).magnitude; if (len < 0.05f) continue;
+                var dir = (b - a) / len; var nrm = new Vector2(-dir.y, dir.x);
+                bool ok = i < chainOk.Count && chainOk[i];
+                Color c = ok ? good : bad;
+                float wdt = 0.09f * s;
+                GlowQuad(g.S, Geo.W(a - nrm * wdt, SHADOW_Y_GLOW + 0.006f), Geo.W(b - nrm * wdt, SHADOW_Y_GLOW + 0.006f), Geo.W(b + nrm * wdt, SHADOW_Y_GLOW + 0.006f), Geo.W(a + nrm * wdt, SHADOW_Y_GLOW + 0.006f), c, 0.75f, 0.75f, 0.75f, 0.75f);
+                float h = tier == 1 ? 0.78f : tier >= 3 ? 1.05f : 0.95f;
+                Color pale = ok ? Hex("#d8f0c0") : Hex("#f0b0a0");
+                int n = Mathf.Max(1, Mathf.RoundToInt(len / 0.6f));
+                for (int k = 0; k <= n; k++) { var p = a + dir * (len * k / n); GlowBeam(g, Geo.W(p, 0f), Geo.W(p, h), 0.022f, pale); }
+                GlowBeam(g, Geo.W(a, h), Geo.W(b, h), 0.028f, pale);
+                GlowBeam(g, Geo.W(a, 0.45f), Geo.W(b, 0.45f), 0.02f, pale);
+                GlowBeam(g, Geo.W(a, 0.12f), Geo.W(b, 0.12f), 0.03f * s, c);
+            }
+            // pins
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                int nd = nodes[i];
+                var p = d.RgPos(nd);
+                bool v = i < valid.Count && valid[i];
+                bool st = nd == start;
+                Color c = st ? amber : v ? good : grey;
+                float r = (st ? 0.42f : v ? 0.3f : 0.16f) * s;
+                float al = st ? 0.85f : v ? 0.6f : 0.35f;
+                Ring(g.S, p, r * 0.55f, r, c, al);
+                Ring(g.S, p, 0f, r * 0.45f, c, al * 0.8f);
+                if (!v && !st) continue;
+                float sh = Mathf.Min(s, 1.9f);   // pins grow with the camera distance, but stay short when far out
+                float ph = (st ? 1.8f : 0.85f) * sh;
+                GlowBeam(g, Geo.W(p, 0f), Geo.W(p, ph), (st ? 0.05f : 0.035f) * s, c);
+                // diamond head
+                var m = Geo.W(p, ph + 0.12f * s); float dd = (st ? 0.2f : 0.13f) * s;
+                var e4 = new[] { m + new Vector3(dd, 0, 0), m + new Vector3(0, 0, dd), m + new Vector3(-dd, 0, 0), m + new Vector3(0, 0, -dd) };
+                var up = m + new Vector3(0, dd * 1.2f, 0); var dn = m + new Vector3(0, -dd * 1.2f, 0);
+                for (int k = 0; k < 4; k++)
+                {
+                    var q0 = e4[k]; var q1 = e4[(k + 1) & 3];
+                    g.Tri(q0, q1, up, k % 2 == 0 ? c : Geo.Lerp(c, new Color(1f, 1f, 1f, 1f), 0.25f), (q0 + q1) * 0.5f - m + new Vector3(0, 0.3f, 0));
+                    g.Tri(q0, q1, dn, Geo.Mul(c, 0.75f), (q0 + q1) * 0.5f - m + new Vector3(0, -0.3f, 0));
+                }
+            }
+            return new Chunk { Mesh = g.M, Shadow = g.S };
+        }
+
+        static void Ring(MeshData s, Vector2 c, float r0, float r1, Color col, float al)
+        {
+            const int N = 12;
+            for (int i = 0; i < N; i++)
+            {
+                float a0 = i * Mathf.PI * 2f / N, a1 = (i + 1) * Mathf.PI * 2f / N;
+                var d0 = new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)); var d1 = new Vector2(Mathf.Cos(a1), Mathf.Sin(a1));
+                float y = SHADOW_Y_GLOW + 0.008f;
+                GlowQuad(s, Geo.W(c + d0 * r0, y), Geo.W(c + d1 * r0, y), Geo.W(c + d1 * r1, y), Geo.W(c + d0 * r1, y), col, al, al, al * (r0 > 0f ? 1f : 1f), al);
+            }
         }
 
         static float WallStep(int tier) => tier == 0 ? 0.105f : tier == 1 ? 0.6f : tier == 2 ? 0.34f : 0.55f;
@@ -497,7 +761,7 @@ namespace DayZero.Runtime
         }
 
         // ================= placement ghost =================
-        public enum GhostKind { Wall, Gate, Tower, Trap, Upgrade, Route }
+        public enum GhostKind { Wall, Gate, Tower, Trap, Upgrade, Route, Fence }
 
         /// <summary>Ghost for the DEFENSE tools: per-tile ground glow (green builds, amber already there,
         /// grey natural wall, red blocked) and a pale preview of what will stand there.</summary>

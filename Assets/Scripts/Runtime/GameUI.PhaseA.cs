@@ -312,7 +312,7 @@ namespace DayZero.Runtime
                 Icon(new Rect(r.x + 4, r.y + 8, 38, 38), icon, new Color(0.42f, 0.48f, 0.23f));
             }
             int ft = _fenceTier;
-            Tool(0, "FENCE\nLINE", "wall", () => Start(map, MapView.Tool.Wall, ft));
+            Tool(0, "FENCE\n(CORNERS)", "wall", () => Start(map, MapView.Tool.Fence, ft));   // v0.14.0a: corner-post fence tool
             Tool(1, "SUGGEST\nLOOP", "wall", () => Start(map, MapView.Tool.Loop, ft)); y += ch + 6;
             Tool(0, "GATE", "gate", () => Start(map, MapView.Tool.Gate, 0));
             Tool(1, "TOWER", "tower", () => Start(map, MapView.Tool.Tower, _towerTier)); y += ch + 6;
@@ -325,7 +325,7 @@ namespace DayZero.Runtime
                 mb != null && G.IsEnclosed(mb) ? " · camp fenced in" : "");
             var ss = new GUIStyle(_cellSmall) { fontSize = 14 }; ss.normal.textColor = AMBER;
             GUI.Label(new Rect(x, y, bw, 40), stat, ss); y += 44;
-            GUI.Label(new Rect(x, y, bw, 110), "Repairs are automatic: survivors fix damaged fences, gates and towers from the stockpile, gates first. Tap a fence or tower on the map to upgrade it, make a gate or remove it. Draw a fence line over an old one in a better material to upgrade it.", _cellSmall);
+            GUI.Label(new Rect(x, y, bw, 130), "Fences stop everyone: survivors, squads and vehicles only get in and out through a GATE, the dead have to break through. Draw from corner post to corner post along the curbs, close the loop, then put a gate in it. Repairs are automatic, gates first. Tap a fence to upgrade it, make it a gate or remove it.", _cellSmall);
         }
 
         // main.gd world.fence_tier / tower_tier: the last material picked on the placement bar (wood palisade / watchtower at first)
@@ -336,7 +336,7 @@ namespace DayZero.Runtime
         void Start(MapView map, MapView.Tool t, int tier, int trap = 0)
         {
             map.StartTool(t, tier, trap);
-            _b.Toast(t == MapView.Tool.Loop ? "The suggested fence loop around your camp. Pick the material, CONFIRM to build." : t == MapView.Tool.Wall ? (Game.PhaseARules ? "Tap the map to place the wall. ROTATE and +/- to shape it, CONFIRM to build." : "Tap the map to place the fence line. ROTATE and +/- to shape it, CONFIRM to build.") : t == MapView.Tool.Upgrade ? "Tap one of your walls to upgrade it." : t == MapView.Tool.Gate ? "Tap a wall to put a gate in it." : "Tap the map to place it.");
+            _b.Toast(t == MapView.Tool.Fence ? "Tap a glowing corner post, then the next one: the fence follows the curb. Close the loop and add a GATE." : t == MapView.Tool.Loop ? "The suggested fence loop around your camp. Pick the material, CONFIRM to build." : t == MapView.Tool.Wall ? (Game.PhaseARules ? "Tap the map to place the wall. ROTATE and +/- to shape it, CONFIRM to build." : "Tap the map to place the fence line. ROTATE and +/- to shape it, CONFIRM to build.") : t == MapView.Tool.Upgrade ? "Tap one of your walls to upgrade it." : t == MapView.Tool.Gate ? "Tap a wall to put a gate in it." : "Tap the map to place it.");
         }
 
         // ---------------- placement bar ----------------
@@ -346,15 +346,37 @@ namespace DayZero.Runtime
             float pw = Mathf.Min(840f, w - 200f), ph = 168f, px = w / 2 - pw / 2, py = h - 62 - ph - 10;
             var p = Blk(new Rect(px, py, pw, ph));
             GUI.Box(p, GUIContent.none, _box); GUI.Box(p, GUIContent.none, _box);
-            string icon = map.ActiveTool == MapView.Tool.Wall || map.ActiveTool == MapView.Tool.Loop ? "wall" : map.ActiveTool == MapView.Tool.Gate ? "gate" : map.ActiveTool == MapView.Tool.Tower ? "tower" : map.ActiveTool == MapView.Tool.Trap ? "trap" : "upgrade";
+            string icon = map.ActiveTool == MapView.Tool.Wall || map.ActiveTool == MapView.Tool.Loop || map.ActiveTool == MapView.Tool.Fence ? "wall" : map.ActiveTool == MapView.Tool.Gate ? "gate" : map.ActiveTool == MapView.Tool.Tower ? "tower" : map.ActiveTool == MapView.Tool.Trap ? "trap" : "upgrade";
             Icon(new Rect(px + 10, py + 10, 46, 46), icon, new Color(0.42f, 0.48f, 0.23f));
             var tt = new GUIStyle(_pill) { fontSize = 18, wordWrap = false, clipping = TextClipping.Clip };
             Shadowed(new Rect(px + 64, py + 8, pw - 74, 26), map.ToolInfo, tt);
             var cs = new GUIStyle(_small) { wordWrap = false }; cs.normal.textColor = AMBER;
-            GUI.Label(new Rect(px + 64, py + 34, pw - 74, 22), "Cost: " + map.ToolCost + (map.ActiveTool == MapView.Tool.Loop ? "" : "   ·   tap the map to move it"), cs);
+            bool fenceTool = map.ActiveTool == MapView.Tool.Fence;
+            GUI.Label(new Rect(px + 64, py + 34, pw - 74, 22), "Cost: " + map.ToolCost + (map.ActiveTool == MapView.Tool.Loop || fenceTool ? "" : "   ·   tap the map to move it"), cs);
             if (map.ToolErr != "") { var es = new GUIStyle(_warn) { fontSize = 15, wordWrap = false, clipping = TextClipping.Clip }; GUI.Label(new Rect(px + 64, py + 56, pw - 74, 22), map.ToolErr, es); }
+            else if (fenceTool)
+            {
+                var hs = new GUIStyle(_small) { fontSize = 15, wordWrap = false, clipping = TextClipping.Clip };
+                GUI.Label(new Rect(px + 64, py + 56, pw - 74, 22), map.PostsVisible ? map.FenceHint : "Zoom in a little to see the corner posts.", hs);
+            }
             float by = py + ph - 74, bh = 64, x = px + 10;
-            if (map.ActiveTool == MapView.Tool.Wall || map.ActiveTool == MapView.Tool.Loop)
+            if (fenceTool)
+            {
+                // v0.14.0a corner-post fence: material (the original five tiers), UNDO, CLEAR
+                string[] tn = { "WOOD", "CHAIN-LINK", "SHEET METAL", "CONCRETE", "REINFORCED" };
+                int t = Mathf.Clamp(map.WallTier, 0, Data.FENCES.Length - 1);
+                if (Btn(new Rect(x, by, 190, bh), (t < tn.Length ? tn[t] : Data.FENCES[t].Name.ToUpperInvariant()) + (G.FenceTierUnlocked(t) ? "" : "\n(locked)"), _brownButton))
+                { _fenceTier = (t + 1) % Data.FENCES.Length; map.SetWallTier(_fenceTier); }
+                x += 198;
+                GUI.enabled = map.CanUndoFence;
+                if (Btn(new Rect(x, by, 110, bh), "UNDO")) map.FenceUndo();
+                x += 116;
+                GUI.enabled = map.FenceChain.Count > 0 || map.FenceStart >= 0;
+                if (Btn(new Rect(x, by, 110, bh), "CLEAR", _darkButton)) map.FenceClear();
+                GUI.enabled = true;
+                x += 116;
+            }
+            else if (map.ActiveTool == MapView.Tool.Wall || map.ActiveTool == MapView.Tool.Loop)
             {
                 if (map.ActiveTool == MapView.Tool.Wall)
                 {

@@ -15,6 +15,12 @@ namespace DayZero.Core
         public RectInt Region { get; private set; }
         int _w, _h;
         bool[] _solid;
+        // v0.14.0a: fence layer (Austin's rule change). A blocked cell is impassable like a solid one, except as the
+        // first or last cell of a search, so someone standing on a fence (or sent to one, to repair it) still gets a
+        // path. All false unless fences exist, so fenceless runs search exactly like Godot's AStarGrid2D.
+        bool[] _block;
+        int _blockN;
+        int _end = -1;
         float[] _weight;
         // per-search scratch
         float[] _g, _f, _absG, _absF;
@@ -31,7 +37,7 @@ namespace DayZero.Core
             Region = region;
             _w = Math.Max(0, region.width); _h = Math.Max(0, region.height);
             int n = _w * _h;
-            _solid = new bool[n]; _weight = new float[n];
+            _solid = new bool[n]; _weight = new float[n]; _block = new bool[n]; _blockN = 0;
             for (int i = 0; i < n; i++) _weight[i] = 1f;
             _g = new float[n]; _f = new float[n]; _absG = new float[n]; _absF = new float[n];
             _prev = new int[n]; _openPass = new int[n]; _closedPass = new int[n];
@@ -42,6 +48,18 @@ namespace DayZero.Core
 
         public void SetSolid(Vector2Int p, bool solid) { if (InBounds(p.x, p.y)) _solid[Id(p.x, p.y)] = solid; }
         public bool IsSolid(Vector2Int p) => InBounds(p.x, p.y) && _solid[Id(p.x, p.y)];
+
+        /// <summary>Fence layer: blocked cells can't be crossed (gates are left unblocked).</summary>
+        public void SetBlocked(Vector2Int p, bool on)
+        {
+            if (!InBounds(p.x, p.y)) return;
+            int i = Id(p.x, p.y);
+            if (_block[i] == on) return;
+            _block[i] = on;
+            _blockN += on ? 1 : -1;
+        }
+        public bool IsBlocked(Vector2Int p) => InBounds(p.x, p.y) && _block[Id(p.x, p.y)];
+        public int BlockedCount => _blockN;
         public void SetWeight(Vector2Int p, float w) { if (InBounds(p.x, p.y)) _weight[Id(p.x, p.y)] = w; }
 
         /// <summary>fill_weight_scale_region(rect, w), clipped to the grid region.</summary>
@@ -107,12 +125,18 @@ namespace DayZero.Core
             return Math.Abs(ax - bx) + Math.Abs(ay - by);
         }
 
-        bool Walkable(int x, int y) => InBounds(x, y) && !_solid[Id(x, y)];
+        bool Walkable(int x, int y)
+        {
+            if (!InBounds(x, y)) return false;
+            int i = Id(x, y);
+            return !_solid[i] && (_blockN == 0 || !_block[i] || i == _end);
+        }
 
         bool Solve(int begin, int end, bool partial)
         {
             _lastClosest = -1;
             _pass++;
+            _end = end;
             if (_solid[end] && !partial) return false;
             bool found = false;
             _open.Clear();

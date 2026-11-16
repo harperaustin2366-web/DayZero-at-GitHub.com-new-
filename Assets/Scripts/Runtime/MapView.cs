@@ -39,7 +39,7 @@ namespace DayZero.Runtime
         const int CH = MapGen.CH;
         // keep in sync with work/unity-verify/Preview/Program.cs
         public const float FOV = 35f, PITCH = 42f, YAW = 75f;
-        const float MIN_DIST = 7f, MAX_DIST = 200f, HOME_DIST = 24f, LOD0_MAX_DIST = 75f;
+        const float MIN_DIST = 7f, MAX_DIST = 200f, HOME_DIST = 24f, LOD0_MAX_DIST = 75f, PICK_DIST = 45f;
 
         public bool Ready { get; private set; }
         public bool Building { get; private set; }
@@ -109,7 +109,7 @@ namespace DayZero.Runtime
             var p = HomeTile();
             _focusTarget = new Vector3(p.x, 0f, -p.y);
             _animFocus = true;
-            _distTarget = HOME_DIST;
+            _distTarget = Picking ? PICK_DIST : HOME_DIST;
             _yaw = YAW;
         }
 
@@ -134,12 +134,9 @@ namespace DayZero.Runtime
             if (g?.C != null && g.C.Bases.Count > 0) return new Vector2(g.C.Bases[0].Pos.x, g.C.Bases[0].Pos.y);
             if (Picking)
             {
-                // no camp yet: look at the game's suggested start so there are buildings to tap
-                if (_pickFocus.x < 0f)
-                {
-                    var st = g.SuggestStart(Math.Max(0, g.CurCol));
-                    _pickFocus = st.x >= 0 ? new Vector2(st.x + 0.5f, st.y + 0.5f) : new Vector2(d.CityRect.x + d.CityRect.width * 0.5f, d.CityRect.y + d.CityRect.height * 0.5f);
-                }
+                // no camp yet (v0.14.0a: no suggested site any more, Austin picks anywhere): open over the middle of
+                // the city, a little zoomed out, so there are plenty of buildings to tap
+                if (_pickFocus.x < 0f) _pickFocus = new Vector2(d.CityRect.x + d.CityRect.width * 0.5f, d.CityRect.y + d.CityRect.height * 0.5f);
                 return _pickFocus;
             }
             return new Vector2(d.CityRect.x + d.CityRect.width * 0.5f, d.CityRect.y + d.CityRect.height * 0.5f);
@@ -336,7 +333,7 @@ namespace DayZero.Runtime
             ClearSelection();
             SelectedLot = lot;
             SelectedTile = _gen.LotTile(lot);
-            SelectError = SelectedTile.x >= 0 ? g.CanStartAt(SelectedTile, Math.Max(0, g.CurCol)) : "Tap a building.";
+            SelectError = SelectedTile.x >= 0 ? g.CanStartAnywhere(SelectedTile, Math.Max(0, g.CurCol)) : "Tap a building.";
             var ch = _gen.Highlight(lot, SelectError == "");
             _selGo = new GameObject("Selection");
             _selGo.transform.SetParent(transform, false);
@@ -493,7 +490,7 @@ namespace DayZero.Runtime
             BuildLabels(d);
             var h = HomeTile();
             _focus = _focusTarget = new Vector3(h.x, 0f, -h.y);
-            _dist = _distTarget = HOME_DIST; _yaw = YAW;
+            _dist = _distTarget = Picking ? PICK_DIST : HOME_DIST; _yaw = YAW;
 
             // --- full detail around the camp before the map is shown ---
             Progress = 0.85f;
