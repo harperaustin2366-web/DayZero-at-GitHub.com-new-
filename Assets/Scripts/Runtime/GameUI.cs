@@ -200,7 +200,7 @@ namespace DayZero.Runtime
             if (G?.S == null || G.C == null) { Center(w, h, "DayZero", "No game running."); return; }
             var map = MapView.Instance;
             if (map != null && map.Ready) DrawMapLabels(map, w, h);
-            if (map != null && map.Ready && !_b.Picking && G.C.Started) { DrawConvLabels(map, w, h); DrawRepairMarks(map, w, h); }
+            if (map != null && map.Ready && !_b.Picking && G.C.Started) { DrawConvLabels(map, w, h); DrawRepairMarks(map, w, h); DrawWreckMarks(map, w, h); }
             if (map != null && !string.IsNullOrEmpty(map.RenderWarning))
                 Shadowed(new Rect(12, h - 30, w - 24, 24), map.RenderWarning, _small);
             // v0.11.2a drew this every frame, so "Building the map 100%" never went away
@@ -236,6 +236,7 @@ namespace DayZero.Runtime
                 else if (map.ActiveTool != MapView.Tool.None) DrawPlacementBar(w, h, map);
                 else if (map.BuildingLot >= 0) DrawBuildingSheet(w, h, map);
                 else if (map.SelectedGroup >= 0) DrawGroupSheet(w, h, map);
+                else if (map.SelectedWreck >= 0) DrawWreckSheet(w, h, map);
                 else if (map.SelectedFence >= 0) DrawFenceSheet(w, h, map);
                 else if (map.SelectedTower >= 0) DrawTowerSheet(w, h, map);
                 else if (map.SelectedRun >= 0) DrawWallSheet(w, h, map);
@@ -374,6 +375,8 @@ namespace DayZero.Runtime
                     case "TASK FORCE": _side.Camp = -1; OpenSide("taskforce", map); break;
                     case "COLONY": _tab = 0; _menuOpen = true; break;
                     case "TRADE": OpenSide("trade", map); break;
+                    case "ARMORY": OpenSide("armory", map); break;
+                    case "GARAGE": OpenSide("garage", map); break;
                     case "RESEARCH": OpenSide("research", map); break;
                     case "LOG": _tab = 2; _menuOpen = true; break;
                 }

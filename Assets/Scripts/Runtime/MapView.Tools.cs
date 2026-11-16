@@ -388,6 +388,7 @@ namespace DayZero.Runtime
                 }
                 if (bestG != null) { ClearBuilding(); SelectedGroup = bestG.Id; Bootstrap.Instance?.PlayClick(); return; }
             }
+            if (TrySelectWreck(gp)) return;   // main.gd _select_at: a wreck on the road wins over the lot behind it
             int lot = _gen.PickLot(ray.origin, ray.direction);
             if (lot >= 0 && !G.InCampYard(lot)) { SelectBuilding(lot); return; }
             if (gp.x >= 0f)
@@ -440,7 +441,7 @@ namespace DayZero.Runtime
 
         public void ClearBuilding()
         {
-            BuildingLot = -1; SelectedRun = -1; SelectedFence = -1; SelectedTower = -1; SelectedGroup = -1;
+            BuildingLot = -1; SelectedRun = -1; SelectedFence = -1; SelectedTower = -1; SelectedGroup = -1; SelectedWreck = -1;
             if (_bselGo != null) { DestroyChunk(_bselGo); _bselGo = null; }
         }
 

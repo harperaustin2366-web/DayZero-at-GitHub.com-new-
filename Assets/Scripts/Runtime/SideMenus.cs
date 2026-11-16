@@ -44,6 +44,7 @@ namespace DayZero.Runtime
         public string Sub = "";          // SQUADS sub-screen: "" | "form" | "map"
         public int SqPage, TfPage, FPage, MapSid = -1;
         public readonly HashSet<int> Pick = new HashSet<int>();
+        public readonly ArmoryMenuState Arm = new ArmoryMenuState();   // ARMORY / GARAGE (SideMenus.Armory.cs)
     }
 
     public sealed class MenuCtx
@@ -88,11 +89,27 @@ namespace DayZero.Runtime
         public static readonly (string label, string style)[] ACTIONS =
         {
             ("BUILD", "olive"), ("CAMP", "sel"), ("GATHER", "brown"), ("DEFENSE", "olive"), ("SQUADS", "olive"), ("TASK FORCE", "olive"),
-            ("CREW & JOBS", "olive"), ("COLONY", "olive"), ("TRADE", "olive"), ("RESEARCH", "olive"), ("LOG", "olive"),
+            ("CREW & JOBS", "olive"), ("COLONY", "olive"), ("TRADE", "olive"), ("ARMORY", "olive"), ("GARAGE", "olive"), ("RESEARCH", "olive"), ("LOG", "olive"),
         };
         public const float ACT_W = 200f, ACT_Y = 108f, ACT_HDR = 34f, ACT_BH = 44f, ACT_GAP = 5f;
-        public static Rect ActionsPanel(float w) => new Rect(w - ACT_W - 8, ACT_Y, ACT_W, ACT_HDR + ACTIONS.Length * (ACT_BH + ACT_GAP) - ACT_GAP + 10);
-        public static Rect ActionButton(float w, int i) { var p = ActionsPanel(w); return new Rect(p.x + 10, p.y + ACT_HDR + i * (ACT_BH + ACT_GAP), ACT_W - 20, ACT_BH); }
+        /// <summary>One column while every 44 px button fits above y = 712 on a 720 px screen; past that (the original has 15)
+        /// two columns, read top to bottom then left to right, so touch targets never shrink below 44 px.</summary>
+        static int ActCols => ACT_Y + ACT_HDR + 10f + ACTIONS.Length * (ACT_BH + ACT_GAP) - ACT_GAP <= 712f ? 1 : 2;
+        static int ActRows => (ACTIONS.Length + ActCols - 1) / ActCols;
+        const float ACT_CW2 = 168f;   // column width with two columns
+        public static Rect ActionsPanel(float w)
+        {
+            float pw = ActCols == 1 ? ACT_W : 20f + 2f * ACT_CW2 + 8f, ph = ACT_HDR + ActRows * (ACT_BH + ACT_GAP) - ACT_GAP + 10;
+            // the wider two-column panel sits on the bottom edge (y 712), below the centred banners / research note
+            return new Rect(w - pw - 8, ActCols == 1 ? ACT_Y : 712f - ph, pw, ph);
+        }
+        public static Rect ActionButton(float w, int i)
+        {
+            var p = ActionsPanel(w);
+            float cw = ActCols == 1 ? ACT_W - 20 : ACT_CW2;
+            int col = i / ActRows, row = i % ActRows;
+            return new Rect(p.x + 10 + col * (cw + 8f), p.y + ACT_HDR + row * (ACT_BH + ACT_GAP), cw, ACT_BH);
+        }
 
         /// <summary>"Research complete" note under the top bar (main.gd show_research_note), tap opens RESEARCH.</summary>
         public static Rect ResearchNoteRect(float w, float y) => new Rect(w / 2 - 350, y, 700, 50);
@@ -103,6 +120,7 @@ namespace DayZero.Runtime
             if (which == "research") st.RJump = true;
             if (which == "trade") st.Barter = "";
             if (which == "squads" || which == "taskforce") { st.Sub = ""; st.Pick.Clear(); }
+            if (which == "armory" || which == "garage") st.Arm.PickPid = -1;
         }
 
         public static void Build(MenuCtx c)
@@ -112,6 +130,8 @@ namespace DayZero.Runtime
             else if (c.St.Open == "trade") Trade(c);
             else if (c.St.Open == "squads") Squads(c);
             else if (c.St.Open == "taskforce") TaskForce(c);
+            else if (c.St.Open == "armory") Armory(c);
+            else if (c.St.Open == "garage") Garage(c);
         }
 
         static Rect Frame(MenuCtx c, string title)
