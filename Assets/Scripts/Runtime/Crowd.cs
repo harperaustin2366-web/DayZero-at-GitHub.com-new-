@@ -14,6 +14,10 @@
 //   * gunfire: Game.SfxRequested("gunshot"/"rifle"/"hit", pos) is the sim's shot event; the nearest
 //     visible survivor aims, flashes and draws a tracer to the nearest zombie
 //   * survivor groups waiting for rescue (S.Groups, St "wait") stand where the sim put them and wave
+//   * v0.14.0a: people of the other colonies (S.Camps) live in their compounds (MapGen.Factions.cs): a few per
+//     camp by population, wearing the camp colour, gate guards on the bigger ones; purely cosmetic
+//   * v0.14.0a: vehicles: a survivor leading a vehicle (Person.Vlead / Vt, Game.Gear.cs) is drawn as that
+//     vehicle, and a squad bringing a wreck home (Squad.Towing) drags it behind on a tow line
 // Cosmetic only (the sim has no value for these): where exactly a survivor stands inside the yard
 // (their sim position is clamped into the palisade and pushed out of the camp building), guards on
 // duty are drawn just inside the palisade in the direction of their sim post (the first one on the
@@ -51,7 +55,18 @@ namespace DayZero.Runtime
             public float AttackYaw; public bool Attacking, AtWall;
             public int Mode;
             public float Dist2;
+            public int Fac = -1, Leg; public float Wait; public bool Post;   // faction folk (v0.14.0a)
         }
+
+        sealed class VehAgent
+        {
+            public Vector2 Pos, Dir = new Vector2(1f, 0f);
+            public string Type = "pickup"; public int Salt; public bool Seen, Wreck, TowSeen;
+            public bool HasTow; public Vector2 TowPos, TowDir = new Vector2(1f, 0f); public string TowType = "pickup"; public int TowSalt;
+        }
+        readonly Dictionary<int, VehAgent> _vehs = new Dictionary<int, VehAgent>();
+        readonly Dictionary<int, MapGen.FactionLayout> _facLay = new Dictionary<int, MapGen.FactionLayout>();
+        public int Vehicles => _vehs.Count;
 
         readonly MapGen _gen;
         readonly Dictionary<int, Agent> _surv = new Dictionary<int, Agent>();
@@ -77,7 +92,7 @@ namespace DayZero.Runtime
 
         public Crowd(MapGen gen) { _gen = gen; }
 
-        public void Clear() { _lastKills = -1; _surv.Clear(); _zom.Clear(); _dying.Clear(); _events.Clear(); _recentHits.Clear(); }
+        public void Clear() { _lastKills = -1; _vehs.Clear(); _facLay.Clear(); _surv.Clear(); _zom.Clear(); _dying.Clear(); _events.Clear(); _recentHits.Clear(); }
 
         /// <summary>Hook for Game.SfxRequested: shots and melee hits drive muzzle flashes, aiming and zombie falls.</summary>
         public void OnSfx(string name, Vector2 at)
@@ -118,6 +133,8 @@ namespace DayZero.Runtime
             foreach (var a in _surv.Values) a.Seen = false;
             SyncSurvivors(g, dt, focus, R, camDist);
             SyncGroups(g, dt, focus, R);
+            SyncFactionFolk(g, dt, focus, R);
+            SyncVehicles(g, dt, focus, R);
             _drop.Clear();
             foreach (var kv in _surv) if (!kv.Value.Seen) _drop.Add(kv.Key);
             foreach (int k in _drop) _surv.Remove(k);
@@ -337,6 +354,161 @@ namespace DayZero.Runtime
                     a.A = CharGen.Anim.Wave;   // calling for rescue (recruit loop: send a rescue / take them in)
                 }
             }
+        }
+
+        // ================= other colonies (v0.14.0a) =================
+        /// <summary>A few people of every faction camp near the camera: walking between huts, at the fire, guarding
+        /// the gate. Cosmetic only; how many follows the camp's sim population (Camp.Pop).</summary>
+        void SyncFactionFolk(Game g, float dt, Vector2 focus, float R)
+        {
+            if (g.S.Camps == null) return;
+            foreach (var c in g.S.Camps)
+            {
+                if (!c.Alive || c.Lot < 0) continue;
+                var cp = new Vector2(c.Pos.x + 0.5f, c.Pos.y + 0.5f);
+                if ((cp - focus).sqrMagnitude > R * R) continue;
+                if (!_facLay.TryGetValue(c.Lot, out var lay))
+                {
+                    if (!_gen.FactionLayoutOf(c, out lay)) continue;
+                    _facLay[c.Lot] = lay;
+                }
+                var band = Game.FactionColor(c);
+                int n = Mathf.Clamp(2 + c.Pop / 5, 2, 8);
+                int guards = c.Pop >= 14 ? 2 : 0;
+                var gs = new Vector2(-lay.GateOut.y, lay.GateOut.x);
+                for (int k = 0; k < n; k++)
+                {
+                    int key = unchecked((int)0x50000000 | ((c.Lot & 0xFFFF) << 4) | k);
+                    bool guard = k < guards;
+                    if (!_surv.TryGetValue(key, out var a))
+                    {
+                        int seed = c.Lot * 41 + k * 13 + 900000;
+                        string job = guard ? (c.Att == "Raiders" ? "Scavenger" : "Soldier") : (MapGen.Hf(seed, 5) < 0.3f ? "Scavenger" : MapGen.Hf(seed, 6) < 0.3f ? "Farmer" : "Civilian");
+                        Vector2 pos = guard ? lay.Gate + lay.GateOut * 0.35f + gs * (k == 0 ? 0.85f : -0.85f) : FolkSpot(lay, seed, 0);
+                        a = new Agent { Key = key, Salt = seed, Fac = c.Lot, Post = guard, M = CharGen.Survivor(job, seed, guard, false, band),
+                            Low = CharGen.Low(band, Geo.Hex("#3a4a5a"), Geo.Hex("#a8785a"), false), Pos = pos, Tgt = pos, Yaw = YawOf(lay.GateOut), Sig = "fac" };
+                        a.Wait = MapGen.Hf(seed, 9) * 4f;
+                        _surv[key] = a;
+                    }
+                    a.Seen = true; a.T += dt;
+                    if (a.Post) { a.A = CharGen.Anim.Guard; a.Speed = 0f; a.Yaw = LerpAngle(a.Yaw, YawOf(lay.GateOut), 1f - Mathf.Exp(-dt * 3f)); continue; }
+                    var d = a.Tgt - a.Pos; float dist = d.magnitude;
+                    if (dist > 0.04f)
+                    {
+                        float step = Mathf.Min(dist, 0.3f * dt);
+                        a.Pos += d / dist * step;
+                        a.Speed = dt > 0f ? step / dt : 0f;
+                        a.Yaw = LerpAngle(a.Yaw, YawOf(d), 1f - Mathf.Exp(-dt * 8f));
+                        a.Phase += Mathf.Min(a.Speed * dt / (1.5f * MT) * Mathf.PI, dt * 7f * Mathf.PI);
+                        a.A = CharGen.Anim.Walk;
+                    }
+                    else
+                    {
+                        a.Speed = 0f;
+                        a.Wait -= dt;
+                        if (a.Wait <= 0f)
+                        {
+                            a.Leg++;
+                            a.Tgt = FolkSpot(lay, a.Salt, a.Leg);
+                            a.Wait = 3f + MapGen.Hf(a.Salt, a.Leg * 3 + 1) * 7f;
+                        }
+                        else
+                        {
+                            int act = (a.Salt + a.Leg) % 4;
+                            a.A = act == 0 ? CharGen.Anim.Search : act == 1 ? CharGen.Anim.Chop : CharGen.Anim.Idle;
+                            if ((lay.Fire - a.Pos).sqrMagnitude < 2.5f) { a.A = CharGen.Anim.Idle; a.Yaw = LerpAngle(a.Yaw, YawOf(lay.Fire - a.Pos), 1f - Mathf.Exp(-dt * 2f)); }
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>Somewhere to walk to inside a faction yard: the fire, a hut door, or open yard (not in the building).</summary>
+        static Vector2 FolkSpot(MapGen.FactionLayout lay, int salt, int leg)
+        {
+            float r = MapGen.Hf(salt, leg * 7 + 2);
+            if (r < 0.3f)
+            {
+                float ang = MapGen.Hf(salt, leg * 7 + 3) * 6.283f;
+                return lay.Fire + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * 0.6f;
+            }
+            if (r < 0.6f && lay.Huts != null && lay.Huts.Count > 0)
+            {
+                var h = lay.Huts[(int)(MapGen.Hf(salt, leg * 7 + 4) * lay.Huts.Count) % lay.Huts.Count];
+                var toC = lay.Yard.C - h; if (toC.sqrMagnitude > 1e-4f) toC = toC.normalized;
+                return h + toC * 0.55f;
+            }
+            for (int t = 0; t < 8; t++)
+            {
+                var q = lay.Yard.P(MapGen.Hf(salt, leg * 7 + 5 + t * 11) * 1.6f - 0.8f, MapGen.Hf(salt, leg * 7 + 6 + t * 13) * 1.6f - 0.8f);
+                if (lay.HasBld && lay.Bld.Contains(q, 0.25f)) continue;
+                return q;
+            }
+            return lay.Fire + new Vector2(0.5f, 0.3f);
+        }
+
+        // ================= vehicles and tows (v0.14.0a) =================
+        void SyncVehicles(Game g, float dt, Vector2 focus, float R)
+        {
+            foreach (var v in _vehs.Values) { v.Seen = false; v.TowSeen = false; }
+            float R2 = R * R * 1.5f;
+            foreach (var c in g.S.Cols)
+            {
+                if (c.Lost || c.Merged >= 0 || !c.Started) continue;
+                foreach (var p in c.People)
+                {
+                    if (!p.Vlead || p.St == "dead" || p.Trav.HasValue || g.IsInside(p)) continue;
+                    if ((p.Pos - focus).sqrMagnitude > R2) continue;
+                    int key = (c.Id << 20) | (p.Id & 0xFFFFF);
+                    var v = VehFollow(key, p.Pos, dt);
+                    v.Type = p.Vt ?? "pickup"; v.Salt = (p.Vid ?? p.Id) * 97 + 11; v.Wreck = false;
+                }
+                foreach (var q in c.Squads)
+                {
+                    if (q.Towing == null) continue;
+                    // the puller: the squad's vehicle lead, else the first member out walking (a light wreck dragged by hand)
+                    Person lead = null; bool driving = false;
+                    foreach (var p in c.People)
+                    {
+                        if (p.Sq != q.Id || p.St == "dead" || p.Trav.HasValue || g.IsInside(p)) continue;
+                        if (p.Vlead) { lead = p; driving = true; break; }
+                        if (lead == null && !p.Veh) lead = p;
+                    }
+                    if (lead == null || (lead.Pos - focus).sqrMagnitude > R2) continue;
+                    VehAgent v;
+                    if (driving && _vehs.TryGetValue((c.Id << 20) | (lead.Id & 0xFFFFF), out var dv)) v = dv;
+                    else
+                    {
+                        // on foot: an invisible puller at the lead walker (no vehicle mesh), the wreck behind
+                        v = VehFollow(unchecked((int)0x60000000 | (c.Id << 16) | (q.Id & 0xFFFF)), lead.Pos, dt);
+                        v.Type = "none";
+                    }
+                    var tw = q.Towing;
+                    v.TowSeen = true;
+                    if (!v.HasTow) { v.HasTow = true; v.TowPos = v.Pos - v.Dir * 2f; v.TowDir = v.Dir; }
+                    v.TowType = tw.Type; v.TowSalt = tw.Id * 97 + 11;
+                    float L = (driving ? MapGen.VehicleSize(v.Type).x : 0.2f) + MapGen.VehicleSize(tw.Type).x + 0.3f;
+                    var d = v.Pos - v.TowPos; float dl = d.magnitude;
+                    if (dl > L * 3f) { v.TowPos = v.Pos - v.Dir * L; v.TowDir = v.Dir; }
+                    else if (dl > L && dl > 1e-4f) { v.TowPos = v.Pos - d / dl * L; v.TowDir = d / dl; }
+                }
+            }
+            _vdrop.Clear();
+            foreach (var kv in _vehs) { if (!kv.Value.Seen) _vdrop.Add(kv.Key); else if (!kv.Value.TowSeen) kv.Value.HasTow = false; }
+            foreach (int k in _vdrop) _vehs.Remove(k);
+        }
+        readonly List<int> _vdrop = new List<int>();
+
+        VehAgent VehFollow(int key, Vector2 at, float dt)
+        {
+            if (!_vehs.TryGetValue(key, out var v)) { v = new VehAgent { Pos = at }; _vehs[key] = v; }
+            v.Seen = true;
+            var d = at - v.Pos; float dist = d.magnitude;
+            if (dist > 3.5f) { v.Pos = at; return v; }
+            var step = d * (1f - Mathf.Exp(-dt * 7f));
+            v.Pos += step;
+            if (step.magnitude > 0.003f) v.Dir = Vector2.Lerp(v.Dir, d / Mathf.Max(1e-4f, dist), 1f - Mathf.Exp(-dt * 6f)).normalized;
+            return v;
         }
 
         void SyncZombies(Game g, float dt, Vector2 focus, float R)
@@ -582,6 +754,20 @@ namespace DayZero.Runtime
                     Emit(m, a.Low.Parts[0], lr);
                 }
                 if (shadow != null && a.Height <= 0f) sg.ShadowBlob(a.Pos, a.DeadT >= 0f ? 0.2f : 0.13f, 0.1f, a.DeadT >= 0f ? 0.25f : 0.32f);
+            }
+            if (camDist <= LowDist * 1.4f)
+            {
+                var vg = new Geo(m, shadow);
+                foreach (var v in _vehs.Values)
+                {
+                    bool puller = v.Type != "none";
+                    if (puller) MapGen.Vehicle(vg, v.Pos, v.Dir, v.Type, v.Salt, v.Wreck ? MapGen.VehLook.Towed : MapGen.VehLook.Driving, 0.02f);
+                    if (!v.HasTow) continue;
+                    MapGen.Vehicle(vg, v.TowPos, v.TowDir, v.TowType, v.TowSalt, MapGen.VehLook.Towed, 0.02f);
+                    // tow line: from the rear of the puller to the nose of the wreck
+                    var a0 = puller ? v.Pos - v.Dir * MapGen.VehicleSize(v.Type).x : v.Pos; var a1 = v.TowPos + v.TowDir * MapGen.VehicleSize(v.TowType).x;
+                    vg.Beam(Geo.W(a0, 0.16f), Geo.W(a1, 0.16f), 0.012f, Geo.Hex("#2a2a26"));
+                }
             }
             LastFull = full; LastLow = low; LastVerts = m.V.Count;
         }

@@ -328,7 +328,7 @@ namespace DayZero.Runtime
             a.GPage = Math.Max(0, Math.Min(pages.Count - 1, a.GPage));
             int from = pages[a.GPage], to = a.GPage + 1 < pages.Count ? pages[a.GPage + 1] : rows.Count;
             for (int i = from; i < to; i++) { rows[i].draw(y); y += rows[i].h + 6f; }
-            Pager(c, p, a.GPage, pages.Count, v => a.GPage = v, string.Format("{0} vehicle{1} · ASSIGN ▸ cycles the camp's squads", g.C.Vehs.Count, g.C.Vehs.Count == 1 ? "" : "s"));
+            Pager(c, p, a.GPage, pages.Count, v => a.GPage = v, string.Format("{0} vehicle{1} · ASSIGN cycles the camp's squads", g.C.Vehs.Count, g.C.Vehs.Count == 1 ? "" : "s"));
         }
 
         static (string, string) VehTexts(Game g, Vehicle v)
@@ -340,7 +340,19 @@ namespace DayZero.Runtime
             string t2 = string.Format("Condition {0}% · fuel {1}/{2} · {3} seats · cargo {4} · speed x{5:0.0} · armour {6}% · uses {7:0.00} fuel/tile{8}\nSquad: {9}",
                 (int)(v.Hp * 100.0), (int)v.Fuel, d.Tank, d.Seats, d.Cargo, d.Speed, (int)(d.Armor * 100.0), d.Use,
                 nd.Count > 0 ? " · missing " + string.Join(", ", nd) : "", q != null ? q.Name : "none (scavengers / task forces may take it)");
+            t2 += "\n" + VehNext(g, v);
             return (t1, t2);
+        }
+
+        /// <summary>v0.14.0a: the next step for a vehicle (towed wreck -> repair -> refuel -> assign / drive).</summary>
+        static string VehNext(Game g, Vehicle v)
+        {
+            if (v.St == "out") return "On the road.";
+            if (v.St == "repair") return "Mechanics are on it. It runs when the repair is done.";
+            if (v.St == "wreck" || !Game.VehRuns(v)) return "Next: REPAIR it here (parts and materials).";
+            if (v.Fuel < 1.0) return "Next: REFUEL it from the stores.";
+            if (v.Sq < 0) return "Ready to drive. ASSIGN it to a squad, or scavengers and task forces from this camp take it.";
+            return "Ready to drive with its squad.";
         }
 
         static void VehCard(MenuCtx c, Vehicle v, float x, float iw, float y, string t1, string t2, float th, float dh, float ch)
@@ -361,7 +373,7 @@ namespace DayZero.Runtime
             var opts = new List<int> { -1 };
             foreach (var sq in g.C.Squads) if (sq.Base == v.Base) opts.Add(sq.Id);
             int nxt = opts[(opts.IndexOf(v.Sq) + 1) % opts.Count];
-            c.Button(new Rect(x + 12 + rbw + 6 + fbw + 6, ty, abw, 52), "ASSIGN ▸", "olive", 17, () => ArmAct(c, "assign_vehicle", vid, nxt));
+            c.Button(new Rect(x + 12 + rbw + 6 + fbw + 6, ty, abw, 52), "ASSIGN", "olive", 17, () => ArmAct(c, "assign_vehicle", vid, nxt));
         }
 
         // ---------------- camp FACILITIES rows (main.gd _armory_rows / _garage_rows) ----------------
@@ -420,13 +432,16 @@ namespace DayZero.Runtime
         // ---------------- wreck sheet (main.gd _sheet_wreck) ----------------
         public static Rect WreckSheetRect(float w, float h, int squads)
         {
-            float pw = Math.Min(820f, w - 200f), ph = 192f + Math.Min(4, Math.Max(1, squads)) * 52f;
+            float pw = Math.Min(860f, w - 200f), ph = 250f + Math.Min(4, Math.Max(1, squads)) * 54f;
             return new Rect(w / 2f - pw / 2f, h - 62f - ph - 10f, pw, ph);
         }
 
         public static int IdleSquads(Game g) => g.C.Squads.Count(q => q.St == "idle");
 
-        /// <summary>The wreck sheet: info, SIPHON FUEL (siphon_wreck) and TOW WITH each idle squad (tow_wreck).</summary>
+        /// <summary>The wreck sheet (main.gd _sheet_wreck): info, SIPHON FUEL (siphon_wreck) and v0.14.0a's TOW TO
+        /// GARAGE block: one button per idle squad (tow_wreck, the original's tow rules in Game.TowError), what is
+        /// missing when none can go (a Garage, a free squad, a vehicle for heavy wrecks), progress while a squad is
+        /// already on the way, and what comes next (GARAGE: repair, refuel, assign).</summary>
         public static void WreckSheet(MenuCtx c, int wid, Action close)
         {
             var g = c.G;
@@ -438,32 +453,56 @@ namespace DayZero.Runtime
             c.Box(p, PANEL);
             c.Box(new Rect(p.x, p.y, p.width, 3), AMBER);
             float x = p.x + 16, iw = p.width - 32, y = p.y + 10;
-            c.Label(new Rect(x, y, iw - 140, 30), "✖ " + d.Name + " wreck", 22, AMBER, true, false);
+            c.Label(new Rect(x, y, iw - 140, 30), d.Name.ToUpperInvariant() + " WRECK", 22, AMBER, true, false);
             c.Button(new Rect(p.xMax - 126, p.y + 8, 112, 44), "CLOSE", "dark", 18, close);
             y += 44f;
             if (w.Own == g.ViewCol) { c.Label(new Rect(x, y, iw, 22), "Yours: left on the road. Tow it back to a Garage and fix it up.", 14, GREEN, false, false); y += 24f; }
             c.Label(new Rect(x, y, iw, 24), Game.WreckInfo(w), 15, INK, false, false); y += 24f;
-            c.Label(new Rect(x, y, iw, 22), string.Format("{0} · speed x{1:0.0} · tank {2} · {3}", Game.StreetName(w.Pos), d.Speed, d.Tank, d.Light ? "light: a squad of 4 can drag it" : "heavy: needs a vehicle to tow"), 13, INK2, false, false);
+            c.Label(new Rect(x, y, iw, 22), string.Format("{0} - speed x{1:0.0} - tank {2} - {3}", Game.StreetName(w.Pos), d.Speed, d.Tank, d.Light ? "light: a squad of 4 can drag it" : "heavy: needs a working vehicle to tow"), 13, INK2, false, false);
             y += 28f;
-            c.Button(new Rect(x, y, iw, 46), string.Format("SIPHON FUEL ({0})", (int)w.Fuel), "olive", 17, () =>
+            c.Button(new Rect(x, y, 260, 46), string.Format("SIPHON FUEL ({0})", (int)w.Fuel), "olive", 17, () =>
             {
                 string e = c.Act("siphon_wreck", new object[] { wid });
                 if (e != "") c.Toast(e);   // main.gd _res_toast: errors only (the log says how much)
             });
-            y += 52f;
-            if (idle.Count == 0) { c.Label(new Rect(x, y, iw, 22), "Form a squad (SQUADS) to tow it to a camp with a Garage.", 13, INK2, false, false); return; }
+            c.Label(new Rect(x + 272, y + 2, iw - 272, 44), "Then: tow it to a Garage, repair it there, refuel it and assign it to a squad. Scavengers and task forces take free vehicles too.", 13, INK2);
+            y += 54f;
+            c.Box(new Rect(x, y, iw, 2), CARD_EDGE); y += 8f;
+            c.Label(new Rect(x, y, iw, 24), "TOW TO GARAGE", 18, AMBER, true, false); y += 28f;
+            // already on its way?
+            var tq = g.TowingSquad(wid);
+            if (tq != null && g.TowStatus(tq, out double frac, out string phase, out _))
+            {
+                c.Label(new Rect(x, y, iw, 22), string.Format("{0} is {1} ({2}%). It goes into {3}'s Garage.", tq.Name, phase, (int)(frac * 100.0), g.BaseById(tq.Base)?.Name ?? "camp"), 15, INK, false, false);
+                c.Bar(new Rect(x, y + 26, iw, 12), (float)frac, AMBER);
+                return;
+            }
+            if (!g.C.Bases.Any(g.HasGarage))
+            {
+                c.Label(new Rect(x, y, iw - 220, 50), "No Garage yet. Gut a building and convert it to a Garage (2 vehicles each), or upgrade a camp's Garage.", 14, INK2);
+                c.Button(new Rect(x + iw - 210, y, 210, 48), "OPEN GARAGE", "sel", 17, () => { close?.Invoke(); Open(c.St, "garage"); });
+                return;
+            }
+            if (idle.Count == 0)
+            {
+                c.Label(new Rect(x, y, iw - 220, 50), d.Light ? "No squad is free. Form one in SQUADS: 4 people can drag it, or give the squad a working vehicle." : "No squad is free. Form one in SQUADS and assign it a working, fuelled vehicle to tow with.", 14, INK2);
+                c.Button(new Rect(x + iw - 210, y, 210, 48), "OPEN SQUADS", "sel", 17, () => { close?.Invoke(); Open(c.St, "squads"); });
+                return;
+            }
             foreach (var q in idle.Take(4))
             {
                 string e = g.TowError(wid, q.Id); int sid = q.Id;
-                float bw = e == "" ? iw : 300f;
-                c.Button(new Rect(x, y, bw, 46), "TOW WITH " + q.Name.ToUpperInvariant(), e == "" ? "sel" : "dark", 16, () =>
+                var b = g.BaseById(q.Base);
+                float bw = e == "" ? iw : Math.Min(420f, iw * 0.5f);
+                string lbl = string.Format("TOW TO {0} WITH {1}", (b?.Name ?? "CAMP").ToUpperInvariant(), q.Name.ToUpperInvariant());
+                c.Button(new Rect(x, y, bw, 48), lbl, e == "" ? "sel" : "dark", 16, () =>
                 {
                     string e2 = c.Act("tow_wreck", new object[] { wid, sid });
-                    if (e2 != "") c.Toast(e2);
+                    c.Toast(e2 != "" ? e2 : "On the way. When it's in, open GARAGE to repair, refuel and assign it.");
                     close?.Invoke();   // main.gd closes the sheet either way
                 });
-                if (e != "") c.Label(new Rect(x + 310, y + 2, iw - 310, 46), e, 13, INK2);
-                y += 52f;
+                if (e != "") c.Label(new Rect(x + bw + 10, y + 2, iw - bw - 10, 48), e, 13, INK2);
+                y += 54f;
             }
         }
     }

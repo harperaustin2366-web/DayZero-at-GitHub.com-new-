@@ -734,6 +734,37 @@ namespace DayZero.Core
             EmitChanged();
         }
 
+        /// <summary>v0.14.0a (UI only, reads the sim): how far a tow job has come. 0..0.5 while the squad heads out to
+        /// the wreck, 0.5..1 while it brings the wreck home. at = where the squad is now. False when q isn't towing.</summary>
+        public bool TowStatus(Squad q, out double frac, out string phase, out Vector2 at)
+        {
+            frac = 0.0; phase = ""; at = new Vector2(-1f, -1f);
+            if (q == null || q.Mode != "tow" || (q.St != "out" && q.St != "return")) return false;
+            var b = BaseById(q.Base);
+            if (b == null) return false;
+            Person lead = null;
+            foreach (var p in SquadMembers(q)) { if (p.Vlead) { lead = p; break; } if (lead == null) lead = p; }
+            if (lead == null) return false;
+            at = lead.Pos;
+            var home = V.F(b.Pos);
+            if (q.Towing != null)
+            {
+                double full = Math.Max(1.0, V.F(q.Towing.Pos).DistTo(home));
+                frac = 0.5 + 0.5 * V.Clamp(1.0 - lead.Pos.DistTo(home) / full, 0.0, 1.0);
+                phase = "towing home";
+                return true;
+            }
+            var w = WreckById(q.TowId);
+            if (w == null) { phase = "returning"; frac = 0.5; return true; }
+            double out0 = Math.Max(1.0, V.F(w.Pos).DistTo(home));
+            frac = 0.5 * V.Clamp(1.0 - lead.Pos.DistTo(V.F(w.Pos)) / out0, 0.0, 1.0);
+            phase = "heading to the wreck";
+            return true;
+        }
+
+        /// <summary>v0.14.0a (UI only): the squad of this colony on its way to tow this wreck, if any.</summary>
+        public Squad TowingSquad(int wid) => C?.Squads.FirstOrDefault(q => q.Mode == "tow" && q.TowId == wid && (q.St == "out" || q.St == "return"));
+
         public string SiphonWreck(int wid)
         {
             var w = WreckById(wid);

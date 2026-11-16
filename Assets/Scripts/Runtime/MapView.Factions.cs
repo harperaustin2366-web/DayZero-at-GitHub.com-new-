@@ -40,6 +40,7 @@ namespace DayZero.Runtime
         {
             var g = G;
             if (g?.S == null || gp.x < 0f) return false;
+            if (TapCampMark(gp)) return true;   // v0.14.0a: the floating faction pin (MapView.World.cs)
             float bd = 1.3f; string best = null;
             foreach (var c in g.S.Camps)
             {

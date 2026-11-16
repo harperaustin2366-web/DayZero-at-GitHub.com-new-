@@ -130,7 +130,11 @@ namespace DayZero.Runtime
 
         /// <summary>Survivor variant: job decides the silhouette (hat/helmet, vest, pack, rifle);
         /// seed picks skin, hair and the clothing colourway. carry adds a loot sack on the back.</summary>
-        public static CharModel Survivor(string job, int seed, bool rifle, bool carry)
+        public static CharModel Survivor(string job, int seed, bool rifle, bool carry) => Survivor(job, seed, rifle, carry, null);
+
+        /// <summary>v0.14.0a: band = armband / neckerchief colour (another faction's people wear their camp colour
+        /// instead of the player's mustard armband).</summary>
+        public static CharModel Survivor(string job, int seed, bool rifle, bool carry, Color? band)
         {
             var m = new CharModel { Rifle = rifle };
             Color skin = SKIN[(int)(H(seed, 1) * SKIN.Length) % SKIN.Length];
@@ -156,8 +160,9 @@ namespace DayZero.Runtime
             BuildBody(m, skin, hair, top, shirt, pants, BOOT, hasVest, vest, hat, S, false, seed);
             var torso = m.Parts[1];
             // mustard armband (player survivors) on the left upper arm
-            m.Parts[3].Box(new Vector3(0f, -0.09f, 0f), new Vector3(0.135f, 0.05f, 0.135f), ACCENT);
-            if (bandana) m.Parts[2].Box(new Vector3(0f, 0.06f, 0.06f), new Vector3(0.235f, 0.07f, 0.17f), Hex("#6e3226"));
+            m.Parts[3].Box(new Vector3(0f, -0.09f, 0f), new Vector3(0.135f, 0.05f, 0.135f), band ?? ACCENT);
+            if (band.HasValue) m.Parts[2].Box(new Vector3(0f, 0.06f, 0.06f), new Vector3(0.235f, 0.07f, 0.17f), band.Value);   // neckerchief in the camp colour
+            else if (bandana) m.Parts[2].Box(new Vector3(0f, 0.06f, 0.06f), new Vector3(0.235f, 0.07f, 0.17f), Hex("#6e3226"));
             // packs
             switch (pack)
             {
