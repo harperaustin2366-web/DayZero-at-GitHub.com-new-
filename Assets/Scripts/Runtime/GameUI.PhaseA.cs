@@ -116,7 +116,7 @@ namespace DayZero.Runtime
             var a = G.AttackStatus();
             if (a == null) return;
             var st = a.Value;
-            bool siren = st.major || G.HasSiren();
+            bool siren = st.major || (Game.PhaseARules && G.HasSiren());
             if (st.phase == "warn" && !siren && st.hoursLeft > 2.0) return;   // a few stragglers: the phase line says it
             float bw = Mathf.Min(620f, w - 720f + 300f), bx = w / 2 - bw / 2;
             bw = Mathf.Max(bw, 520f); bx = w / 2 - bw / 2;
@@ -145,6 +145,7 @@ namespace DayZero.Runtime
 
         void DrawRepairChip(float w, ref float y)
         {
+            if (!Game.PhaseARules) return;   // original rules: repairs are automatic, there is no REPAIR NOW / auto-repair
             int n = G.DamagedWallCount();
             if (n == 0) return;
             int br = G.BreachCount();
@@ -207,7 +208,8 @@ namespace DayZero.Runtime
             if (list.Count == 0) { GUI.Label(new Rect(x, y, bw, 40), "No converted buildings yet.", _small); y += 44; }
             foreach (int l in list.Skip(_convPage * PER).Take(PER))
             {
-                var cv = G.ConvOf(l); var cd = Data.CONVERSIONS[cv.Type];
+                var cv = G.ConvOf(l);
+                if (cv == null || !Data.CONVERSIONS.TryGetValue(cv.Type, out var cd)) continue;
                 var row = new Rect(x, y, bw, 46);
                 if (GUI.Button(row, GUIContent.none, _darkButton)) { map.SelectBuilding(l); map.FlyTo(Data.Instance.LotCenter(l)); _panel = Panel.None; }
                 Icon(new Rect(row.x + 4, row.y + 5, 36, 36), cv.Type, cd.Color);
@@ -223,12 +225,14 @@ namespace DayZero.Runtime
                 if (Btn(new Rect(x + bw - 90, y, 90, 36), ">")) _convPage++;
                 y += 42;
             }
-            // siren upgrade lives here and in DEFENSE
-            DrawSirenRow(new Rect(x, p.yMax - 64, bw, 56));
+            // siren upgrade lives here and in DEFENSE (Phase A only)
+            if (Game.PhaseARules) DrawSirenRow(new Rect(x, p.yMax - 64, bw, 56));
         }
 
         void DrawSirenRow(Rect r)
         {
+            // the siren is a Phase A facility: the original data has no "siren" upgrade (UpgradeCost would have nothing to show)
+            if (!Game.PhaseARules || !Data.UPGRADES.ContainsKey("siren")) return;
             var mb = G.MainBase();
             if (mb == null) return;
             if (mb.U("siren") > 0)
@@ -248,6 +252,7 @@ namespace DayZero.Runtime
         void DrawDefensePanel(float w, MapView map)
         {
             EnsurePhaseAStyles();
+            if (!Game.PhaseARules) { DrawFencePanel(w, map); return; }
             const float PW = 360f;
             var p = Blk(new Rect(w - PW - 8, 108, PW, 600));
             GUI.Box(p, GUIContent.none, _box); GUI.Box(p, GUIContent.none, _box);
@@ -286,12 +291,52 @@ namespace DayZero.Runtime
             DrawSirenRow(new Rect(x, y, bw, 56));
         }
 
+        /// <summary>DEFENSE under the original v0.10.8a rules: main.gd FENCES (line tool + SUGGEST), gates, TOWERS and
+        /// TRAPS through build_fence / build_fence_segs / place_gate / place_tower / place_traps with the original
+        /// costs and unlocks. No repair buttons or siren: survivors repair from the repair queue on their own.</summary>
+        void DrawFencePanel(float w, MapView map)
+        {
+            const float PW = 360f;
+            var p = Blk(new Rect(w - PW - 8, 108, PW, 560));
+            GUI.Box(p, GUIContent.none, _box); GUI.Box(p, GUIContent.none, _box);
+            PanelHeader(p, "DEFENSE");
+            float y = p.y + 46, x = p.x + 12, bw = PW - 24;
+            var ri = G.RaidInfo();
+            string rl = ri == null ? "Hordes won't come for your camps until the city has fallen; until then the dead probe your fences at night." : ri.On ? string.Format("Under attack: {0} zombies.", ri.Spawned) : ri.Warned ? string.Format("Attack tonight: about {0}.", ri.N) : "Fence your camp in before the city falls.";
+            GUI.Label(new Rect(x, y, bw, 40), rl, _cellSmall); y += 42;
+            float cw = (bw - 8) / 2, ch = 54;
+            void Tool(int col, string label, string icon, Action a)
+            {
+                var r = new Rect(x + col * (cw + 8), y, cw, ch);
+                if (Btn(r, label, _cell)) a();
+                Icon(new Rect(r.x + 4, r.y + 8, 38, 38), icon, new Color(0.42f, 0.48f, 0.23f));
+            }
+            int ft = _fenceTier;
+            Tool(0, "FENCE\nLINE", "wall", () => Start(map, MapView.Tool.Wall, ft));
+            Tool(1, "SUGGEST\nLOOP", "wall", () => Start(map, MapView.Tool.Loop, ft)); y += ch + 6;
+            Tool(0, "GATE", "gate", () => Start(map, MapView.Tool.Gate, 0));
+            Tool(1, "TOWER", "tower", () => Start(map, MapView.Tool.Tower, _towerTier)); y += ch + 6;
+            Tool(0, "TRAP", "trap", () => Start(map, MapView.Tool.Trap, 0, TrapIndex("spikes"))); y += ch + 12;
+            var mb = G.MainBase();
+            int fences = 0, gates = 0;
+            foreach (var kv in G.S.Fences) if (kv.Value.Col == G.CurCol) { fences++; if (G.IsGate(kv.Key)) gates++; }
+            int towers = 0; foreach (var kv in G.S.Towers) if (kv.Value.Col == G.CurCol) towers++;
+            string stat = string.Format("{0} fence tiles · {1} gate{2} · {3} tower{4} · {5} / {6} traps{7}", fences, gates, gates == 1 ? "" : "s", towers, towers == 1 ? "" : "s", G.TrapsOf(), Data.TRAP_MAX,
+                mb != null && G.IsEnclosed(mb) ? " · camp fenced in" : "");
+            var ss = new GUIStyle(_cellSmall) { fontSize = 14 }; ss.normal.textColor = AMBER;
+            GUI.Label(new Rect(x, y, bw, 40), stat, ss); y += 44;
+            GUI.Label(new Rect(x, y, bw, 110), "Repairs are automatic: survivors fix damaged fences, gates and towers from the stockpile, gates first. Tap a fence or tower on the map to upgrade it, make a gate or remove it. Draw a fence line over an old one in a better material to upgrade it.", _cellSmall);
+        }
+
+        // main.gd world.fence_tier / tower_tier: the last material picked on the placement bar (wood palisade / watchtower at first)
+        int _fenceTier, _towerTier;
+
         static int TrapIndex(string id) { for (int i = 0; i < Data.TRAPS.Length; i++) if (Data.TRAPS[i].Id == id) return i; return 0; }
 
         void Start(MapView map, MapView.Tool t, int tier, int trap = 0)
         {
             map.StartTool(t, tier, trap);
-            _b.Toast(t == MapView.Tool.Wall ? "Tap the map to place the wall. ROTATE and +/- to shape it, CONFIRM to build." : t == MapView.Tool.Upgrade ? "Tap one of your walls to upgrade it." : t == MapView.Tool.Gate ? "Tap a wall to put a gate in it." : "Tap the map to place it.");
+            _b.Toast(t == MapView.Tool.Loop ? "The suggested fence loop around your camp. Pick the material, CONFIRM to build." : t == MapView.Tool.Wall ? (Game.PhaseARules ? "Tap the map to place the wall. ROTATE and +/- to shape it, CONFIRM to build." : "Tap the map to place the fence line. ROTATE and +/- to shape it, CONFIRM to build.") : t == MapView.Tool.Upgrade ? "Tap one of your walls to upgrade it." : t == MapView.Tool.Gate ? "Tap a wall to put a gate in it." : "Tap the map to place it.");
         }
 
         // ---------------- placement bar ----------------
@@ -301,31 +346,58 @@ namespace DayZero.Runtime
             float pw = Mathf.Min(840f, w - 200f), ph = 168f, px = w / 2 - pw / 2, py = h - 62 - ph - 10;
             var p = Blk(new Rect(px, py, pw, ph));
             GUI.Box(p, GUIContent.none, _box); GUI.Box(p, GUIContent.none, _box);
-            string icon = map.ActiveTool == MapView.Tool.Wall ? "wall" : map.ActiveTool == MapView.Tool.Gate ? "gate" : map.ActiveTool == MapView.Tool.Tower ? "tower" : map.ActiveTool == MapView.Tool.Trap ? "trap" : "upgrade";
+            string icon = map.ActiveTool == MapView.Tool.Wall || map.ActiveTool == MapView.Tool.Loop ? "wall" : map.ActiveTool == MapView.Tool.Gate ? "gate" : map.ActiveTool == MapView.Tool.Tower ? "tower" : map.ActiveTool == MapView.Tool.Trap ? "trap" : "upgrade";
             Icon(new Rect(px + 10, py + 10, 46, 46), icon, new Color(0.42f, 0.48f, 0.23f));
             var tt = new GUIStyle(_pill) { fontSize = 18, wordWrap = false, clipping = TextClipping.Clip };
             Shadowed(new Rect(px + 64, py + 8, pw - 74, 26), map.ToolInfo, tt);
             var cs = new GUIStyle(_small) { wordWrap = false }; cs.normal.textColor = AMBER;
-            GUI.Label(new Rect(px + 64, py + 34, pw - 74, 22), "Cost: " + map.ToolCost + "   ·   tap the map to move it", cs);
+            GUI.Label(new Rect(px + 64, py + 34, pw - 74, 22), "Cost: " + map.ToolCost + (map.ActiveTool == MapView.Tool.Loop ? "" : "   ·   tap the map to move it"), cs);
             if (map.ToolErr != "") { var es = new GUIStyle(_warn) { fontSize = 15, wordWrap = false, clipping = TextClipping.Clip }; GUI.Label(new Rect(px + 64, py + 56, pw - 74, 22), map.ToolErr, es); }
             float by = py + ph - 74, bh = 64, x = px + 10;
-            if (map.ActiveTool == MapView.Tool.Wall)
+            if (map.ActiveTool == MapView.Tool.Wall || map.ActiveTool == MapView.Tool.Loop)
             {
-                if (Btn(new Rect(x, by, 130, bh), "ROTATE")) map.Rotate(); x += 138;
-                if (Btn(new Rect(x, by, 70, bh), "−")) map.Shorter(); x += 76;
-                if (Btn(new Rect(x, by, 70, bh), "+")) map.Longer(); x += 78;
-                string[] tn = { "PALISADE", "", "SCRAP", "CONCRETE" };
-                int[] path = Game.WALL_PATH;
-                int cur = Array.IndexOf(path, map.WallTier);
-                if (Btn(new Rect(x, by, 140, bh), tn[map.WallTier < tn.Length ? map.WallTier : 0], _brownButton)) map.SetWallTier(path[(cur + 1) % path.Length]);
-                x += 148;
+                if (map.ActiveTool == MapView.Tool.Wall)
+                {
+                    if (Btn(new Rect(x, by, 130, bh), "ROTATE")) map.Rotate(); x += 138;
+                    if (Btn(new Rect(x, by, 70, bh), "−")) map.Shorter(); x += 76;
+                    if (Btn(new Rect(x, by, 70, bh), "+")) map.Longer(); x += 78;
+                }
+                if (Game.PhaseARules)
+                {
+                    string[] tn = { "PALISADE", "", "SCRAP", "CONCRETE" };
+                    int[] path = Game.WALL_PATH;
+                    int cur = Array.IndexOf(path, map.WallTier);
+                    if (Btn(new Rect(x, by, 140, bh), tn[map.WallTier < tn.Length ? map.WallTier : 0], _brownButton)) map.SetWallTier(path[(cur + 1) % path.Length]);
+                    x += 148;
+                }
+                else
+                {
+                    // the original's five fence tiers (main.gd fence tier picker); locked ones still show, CONFIRM says what research they need
+                    string[] tn = { "WOOD", "CHAIN-LINK", "SHEET METAL", "CONCRETE", "REINFORCED" };
+                    int t = Mathf.Clamp(map.WallTier, 0, Data.FENCES.Length - 1);
+                    if (Btn(new Rect(x, by, 190, bh), (t < tn.Length ? tn[t] : Data.FENCES[t].Name.ToUpperInvariant()) + (G.FenceTierUnlocked(t) ? "" : "\n(locked)"), _brownButton))
+                    { _fenceTier = (t + 1) % Data.FENCES.Length; map.SetWallTier(_fenceTier); }
+                    x += 198;
+                }
+            }
+            else if (map.ActiveTool == MapView.Tool.Tower)
+            {
+                int t = Mathf.Clamp(map.TowerTier, 0, Data.TOWERS.Length - 1);
+                if (Btn(new Rect(x, by, 230, bh), Data.TOWERS[t].Name.ToUpperInvariant() + (G.TowerTierUnlocked(t) ? "" : "\n(locked)"), _brownButton))
+                { _towerTier = (t + 1) % Data.TOWERS.Length; map.SetTowerTier(_towerTier); }
+                x += 238;
             }
             else if (map.ActiveTool == MapView.Tool.Trap)
             {
-                string[] ids = { "spikes", "barbed", "deadfall", "tripwire" };
-                int cur = Array.IndexOf(ids, Data.TRAPS[map.TrapKind].Id);
-                if (Btn(new Rect(x, by, 230, bh), "TYPE: " + Data.TRAPS[map.TrapKind].Name.ToUpperInvariant(), _brownButton)) map.SetTrapKind(TrapIndex(ids[(cur + 1 + ids.Length) % ids.Length]));
-                x += 238;
+                if (Game.PhaseARules)
+                {
+                    string[] ids = { "spikes", "barbed", "deadfall", "tripwire" };
+                    int cur = Array.IndexOf(ids, Data.TRAPS[map.TrapKind].Id);
+                    if (Btn(new Rect(x, by, 230, bh), "TYPE: " + Data.TRAPS[map.TrapKind].Name.ToUpperInvariant(), _brownButton)) map.SetTrapKind(TrapIndex(ids[(cur + 1 + ids.Length) % ids.Length]));
+                }
+                else if (Btn(new Rect(x, by, 300, bh), "TYPE: " + Data.TRAPS[map.TrapKind].Name.ToUpperInvariant() + (G.TrapUnlocked(map.TrapKind) ? "" : " (locked)"), _brownButton))
+                    map.SetTrapKind((map.TrapKind + 1) % Data.TRAPS.Length);   // all seven of the original's traps
+                x += Game.PhaseARules ? 238 : 308;
             }
             if (Btn(new Rect(px + pw - 330, by, 150, bh), "CANCEL", _darkButton)) map.CancelTool();
             GUI.enabled = map.ToolOk;
@@ -356,14 +428,22 @@ namespace DayZero.Runtime
             Shadowed(new Rect(px + 16, py + 8, pw - 140, 32), (string.IsNullOrEmpty(name) ? type : name).ToUpperInvariant(), tt);
             if (Btn(new Rect(px + pw - 100, py + 8, 90, 38), "CLOSE", _darkButton)) { map.ClearBuilding(); return; }
             string status;
-            if (cv != null)
+            if (cv != null && !Data.CONVERSIONS.ContainsKey(cv.Type)) status = type + " · " + Game.ConvNameOf(cv.Type);
+            else if (cv != null)
             {
                 var cd = Data.CONVERSIONS[cv.Type];
                 status = G.ConvPending(l) ? string.Format("Being set up as {0} · {1}% · ready in about {2:0.0} h", cd.Name, (int)(G.ConvProgress(l) * 100), Math.Max(0.0, cv.Ready - G.S.T)) : cd.Name + ": " + cd.Desc;
             }
             else status = canConv ? type + " · scavenged · inside the safe zone. Pick a use:" : type + " · " + err;
             var ss = new GUIStyle(cv == null && !canConv ? _warn : _label) { fontSize = 16, wordWrap = true };
-            GUI.Label(new Rect(px + 16, py + 42, pw - 32, 44), status, ss);
+            // main.gd _sheet_lot: SEND TASK FORCE TO LOOT on any unsearched building with loot left (send_raid)
+            bool loot = cv == null && !G.Searched(l) && G.S.Loot[l] > 0.15f;
+            GUI.Label(new Rect(px + 16, py + 42, pw - 32 - (loot ? 300 : 0), 44), status, ss);
+            if (loot && Btn(new Rect(px + pw - 306, py + 46, 290, 40), "SEND TASK FORCE TO LOOT", _amberButton))
+            {
+                var e = _b.Act("send_raid", l);
+                _b.Toast(e == "" ? "A task force is heading there for supplies." : e);
+            }
             if (!canConv && cv == null) return;
             if (cv != null && G.ConvPlaceError(l) != "") return;
             // grid of uses: 5 x 2
@@ -381,7 +461,7 @@ namespace DayZero.Runtime
                 {
                     _b.PlayClick();
                     string e = _b.Act("convert_building", l, t);
-                    _b.Toast(e == "" ? string.Format("Survivors are setting it up as {0} (about {1:0} h).", cd.Name, G.ConvHours(t)) : e);
+                    _b.Toast(e != "" ? e : Game.PhaseARules ? string.Format("Survivors are setting it up as {0} (about {1:0} h).", cd.Name, G.ConvHours(t)) : string.Format("Survivors set it up as {0}.", cd.Name));
                     map.DirtyDynamic();
                 }
                 GUI.enabled = true;
@@ -389,7 +469,7 @@ namespace DayZero.Runtime
                 var ns = new GUIStyle(_pill) { fontSize = 15, wordWrap = true };
                 GUI.Label(new Rect(r.x + 50, r.y + 4, r.width - 54, 42), cd.Name, ns);
                 var cs2 = new GUIStyle(_cellSmall) { fontSize = 12 }; cs2.normal.textColor = G.CanAfford(cost) ? new Color(0.85f, 0.82f, 0.7f) : RED_INK;
-                GUI.Label(new Rect(r.x + 6, r.y + 48, r.width - 10, 46), Game.FmtCost(cost) + " · " + G.ConvHours(t, l).ToString("0") + " h", cs2);
+                GUI.Label(new Rect(r.x + 6, r.y + 48, r.width - 10, 46), Game.FmtCost(cost) + (Game.PhaseARules ? " · " + G.ConvHours(t, l).ToString("0") + " h" : ""), cs2);
                 i++;
             }
         }
@@ -420,12 +500,100 @@ namespace DayZero.Runtime
             GUI.enabled = up.err == "" && G.CanAfford(up.cost);
             if (Btn(new Rect(px + 10, by, 300, 64), up.next >= 0 ? "UPGRADE TO " + Data.FENCES[up.next].Name.ToUpperInvariant() + "\n" + Game.FmtCost(up.cost) : "MAX LEVEL", _amberButton))
             { var e = _b.Act("upgrade_wall", run.Id); _b.Toast(e == "" ? "Wall upgraded." : e); map.DirtyDynamic(); }
-            GUI.enabled = dmg + br > 0;
-            if (Btn(new Rect(px + 318, by, 190, 64), "REPAIR NOW")) { var e = _b.Act("repair_all"); _b.Toast(e == "" ? "Crews patched the walls." : e); map.DirtyDynamic(); }
+            GUI.enabled = dmg + br > 0 && Game.PhaseARules;
+            if (Game.PhaseARules && Btn(new Rect(px + 318, by, 190, 64), "REPAIR NOW")) { var e = _b.Act("repair_all"); _b.Toast(e == "" ? "Crews patched the walls." : e); map.DirtyDynamic(); }
             GUI.enabled = !run.Starter;
             if (Btn(new Rect(px + 516, by, 190, 64), "REMOVE", _darkButton)) { var e = _b.Act("remove_wall", run.Id); _b.Toast(e == "" ? "Wall torn down (half the materials back)." : e); map.ClearBuilding(); map.DirtyDynamic(); }
             GUI.enabled = true;
             if (up.err != "" && up.next >= 0) GUI.Label(new Rect(px + 64, py + 64, pw - 80, 22), up.err, new GUIStyle(_warn) { fontSize = 14 });
+        }
+
+        // ---------------- fence-tile and tower sheets (original rules; main.gd _sheet_fence / _sheet_tower) ----------------
+        void DrawFenceSheet(float w, float h, MapView map)
+        {
+            EnsurePhaseAStyles();
+            int k = map.SelectedFence;
+            if (!G.S.Fences.TryGetValue(k, out var f)) { map.ClearBuilding(); return; }
+            var D = Data.Instance;
+            int tier = Mathf.Clamp(f.Tier, 0, Data.FENCES.Length - 1);
+            var fd = Data.FENCES[tier];
+            bool gate = G.IsGate(k);
+            float pw = 760f, ph = 176f, px = w / 2 - pw / 2, py = h - 62 - ph - 10;
+            var p = Blk(new Rect(px, py, pw, ph));
+            GUI.Box(p, GUIContent.none, _box); GUI.Box(p, GUIContent.none, _box);
+            Icon(new Rect(px + 10, py + 10, 46, 46), gate ? "gate" : "wall", new Color(0.42f, 0.48f, 0.23f));
+            var tt = new GUIStyle(_title) { fontSize = 22, wordWrap = false, clipping = TextClipping.Clip };
+            Shadowed(new Rect(px + 64, py + 8, pw - 170, 30), ((gate ? "Gate · " : "") + fd.Name).ToUpperInvariant(), tt);
+            if (Btn(new Rect(px + pw - 100, py + 8, 90, 38), "CLOSE", _darkButton)) { map.ClearBuilding(); return; }
+            var pos = new Vector2Int(k % D.W, k / D.W);
+            var st = new GUIStyle(_label) { fontSize = 15, wordWrap = true };
+            GUI.Label(new Rect(px + 64, py + 40, pw - 80, 44), string.Format("{0} · {1} / {2} hp. Survivors repair damage from the repair queue (gates first) while there are materials.", Game.StreetName(pos), (int)f.Hp, (int)G.FenceTileMax(k)), st);
+            if (f.Col != G.CurCol) { GUI.Label(new Rect(px + 64, py + 88, pw - 80, 24), "Built by another colony. It blocks zombies for everyone, but only they can change it.", _cellSmall); return; }
+            float by = py + ph - 70, bh = 60, x = px + 10;
+            if (gate)
+            {
+                if (Btn(new Rect(x, by, 200, bh), "REMOVE GATE")) { var e = _b.Act("remove_gate", k); _b.Toast(e == "" ? "Gate taken out." : e); map.DirtyDynamic(); }
+                x += 208;
+            }
+            else
+            {
+                string ge = G.CanGate(k);
+                GUI.enabled = ge == "" && G.CanAfford(Data.GATE_COST);
+                if (Btn(new Rect(x, by, 220, bh), ge == "" ? "MAKE IT A GATE\n" + Game.FmtCost(Data.GATE_COST) : "GATE: " + ge, _cell)) { var e = _b.Act("place_gate", k); _b.Toast(e == "" ? "Gate built." : e); map.DirtyDynamic(); }
+                GUI.enabled = true;
+                x += 228;
+            }
+            int se = G.SegAtTile(k);
+            int nt = tier + 1;
+            if (se >= 0)
+            {
+                if (nt < Data.FENCES.Length)
+                {
+                    var cost = G.FenceCost(nt, G.EdgeTiles(se).Count);
+                    bool un = G.FenceTierUnlocked(nt);
+                    GUI.enabled = un && G.CanAfford(cost);
+                    if (Btn(new Rect(x, by, 250, bh), un ? "UPGRADE → " + Data.FENCES[nt].Name.ToUpperInvariant() + "\n" + Game.FmtCost(cost) : Data.FENCES[nt].Name + " needs\n" + G.UnlockSourceName(Data.FENCES[nt].Unlock), _amberButton))
+                    { var e = _b.Act("build_fence_segs", new List<int> { se }, nt); _b.Toast(e == "" ? "Section upgraded." : e); map.DirtyDynamic(); }
+                    GUI.enabled = true;
+                    x += 258;
+                }
+                if (Btn(new Rect(px + pw - 220, by, 210, bh), "REMOVE SECTION (50%)", _darkButton)) { var e = _b.Act("remove_fence_seg", se); _b.Toast(e == "" ? "Section torn down (half the materials back)." : e); map.ClearBuilding(); map.DirtyDynamic(); }
+            }
+            else
+            {
+                if (Btn(new Rect(x, by, 200, bh), "FENCE TOOL")) { map.ClearBuilding(); Start(map, MapView.Tool.Wall, _fenceTier); }
+                if (Btn(new Rect(px + pw - 190, by, 180, bh), "REMOVE (50%)", _darkButton)) { var e = _b.Act("remove_fence", new List<Vector2Int> { pos }); _b.Toast(e == "" ? "Fence torn down (half the materials back)." : e); map.ClearBuilding(); map.DirtyDynamic(); }
+            }
+        }
+
+        void DrawTowerSheet(float w, float h, MapView map)
+        {
+            EnsurePhaseAStyles();
+            int k = map.SelectedTower;
+            if (!G.S.Towers.TryGetValue(k, out var t)) { map.ClearBuilding(); return; }
+            var td = Data.TOWERS[Mathf.Clamp(t.Tier, 0, Data.TOWERS.Length - 1)];
+            float pw = 720f, ph = 176f, px = w / 2 - pw / 2, py = h - 62 - ph - 10;
+            var p = Blk(new Rect(px, py, pw, ph));
+            GUI.Box(p, GUIContent.none, _box); GUI.Box(p, GUIContent.none, _box);
+            Icon(new Rect(px + 10, py + 10, 46, 46), "tower", new Color(0.42f, 0.48f, 0.23f));
+            var tt = new GUIStyle(_title) { fontSize = 22, wordWrap = false };
+            Shadowed(new Rect(px + 64, py + 8, pw - 170, 30), td.Name.ToUpperInvariant(), tt);
+            if (Btn(new Rect(px + pw - 100, py + 8, 90, 38), "CLOSE", _darkButton)) { map.ClearBuilding(); return; }
+            var st = new GUIStyle(_label) { fontSize = 15, wordWrap = true };
+            GUI.Label(new Rect(px + 64, py + 40, pw - 80, 44), string.Format("{0} / {1} hp · range {2:0} tiles · {3}", (int)t.Hp, (int)td.Hp, td.Range + G.Rx("tower_range"), td.Desc), st);
+            if (t.Col != G.CurCol) { GUI.Label(new Rect(px + 64, py + 88, pw - 80, 24), "Belongs to another colony.", _cellSmall); return; }
+            float by = py + ph - 70, bh = 60;
+            int nt = t.Tier + 1;
+            if (nt < Data.TOWERS.Length)
+            {
+                var cost = G.TowerCost(nt);
+                bool un = G.TowerTierUnlocked(nt);
+                GUI.enabled = un && G.CanAfford(cost);
+                if (Btn(new Rect(px + 10, by, 360, bh), un ? "UPGRADE → " + Data.TOWERS[nt].Name.ToUpperInvariant() + "\n" + Game.FmtCost(cost) : Data.TOWERS[nt].Name + " needs\n" + G.UnlockSourceName(Data.TOWERS[nt].Unlock), _amberButton))
+                { var e = _b.Act("upgrade_tower", k); _b.Toast(e == "" ? "Tower upgraded." : e); map.DirtyDynamic(); }
+                GUI.enabled = true;
+            }
+            if (Btn(new Rect(px + pw - 170, by, 160, bh), "REMOVE", _darkButton)) { var e = _b.Act("remove_tower", k); _b.Toast(e == "" ? "Tower taken down." : e); map.ClearBuilding(); map.DirtyDynamic(); }
         }
     }
 }

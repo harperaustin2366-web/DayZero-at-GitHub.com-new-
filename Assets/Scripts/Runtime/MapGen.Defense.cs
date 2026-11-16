@@ -497,7 +497,7 @@ namespace DayZero.Runtime
         }
 
         // ================= placement ghost =================
-        public enum GhostKind { Wall, Gate, Tower, Trap, Upgrade }
+        public enum GhostKind { Wall, Gate, Tower, Trap, Upgrade, Route }
 
         /// <summary>Ghost for the DEFENSE tools: per-tile ground glow (green builds, amber already there,
         /// grey natural wall, red blocked) and a pale preview of what will stand there.</summary>
@@ -550,6 +550,15 @@ namespace DayZero.Runtime
                     var q = new ORect(p, GU, 0.42f, 0.42f).Quad();
                     for (int i = 0; i < 4; i++) GlowBeam(g, Geo.W(q[i], 0.08f), Geo.W(q[(i + 1) & 3], 0.08f), 0.025f, pale);
                     for (int k = 0; k < 5; k++) { var sp = p + new Vector2(Mathf.Cos(k * 1.3f), Mathf.Sin(k * 1.3f)) * 0.2f; GlowBeam(g, Geo.W(sp, 0f), Geo.W(sp, 0.35f), 0.02f, pale); }
+                    break;
+                }
+                case GhostKind.Route:
+                {
+                    // squad route / target marker (tiles are glow squares above); a beacon where the player tapped
+                    if (a.x < 0f) break;
+                    GlowBeam(g, Geo.W(a, 0f), Geo.W(a, 3.2f), 0.06f, ok ? Hex("#ffd27a") : Hex("#f0b0a0"));
+                    var q = new ORect(a, GU, 0.5f, 0.5f).Quad();
+                    for (int i = 0; i < 4; i++) GlowBeam(g, Geo.W(q[i], 0.06f), Geo.W(q[(i + 1) & 3], 0.06f), 0.035f, pale);
                     break;
                 }
                 case GhostKind.Gate:

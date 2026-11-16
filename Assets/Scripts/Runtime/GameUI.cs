@@ -232,8 +232,12 @@ namespace DayZero.Runtime
             if (!DrawSidePanel(w, map)) DrawActions(w, map);
             if (map != null && !ModalOpen)
             {
-                if (map.ActiveTool != MapView.Tool.None) DrawPlacementBar(w, h, map);
+                if (map.TargetTool) DrawTargetBar(w, h, map);
+                else if (map.ActiveTool != MapView.Tool.None) DrawPlacementBar(w, h, map);
                 else if (map.BuildingLot >= 0) DrawBuildingSheet(w, h, map);
+                else if (map.SelectedGroup >= 0) DrawGroupSheet(w, h, map);
+                else if (map.SelectedFence >= 0) DrawFenceSheet(w, h, map);
+                else if (map.SelectedTower >= 0) DrawTowerSheet(w, h, map);
                 else if (map.SelectedRun >= 0) DrawWallSheet(w, h, map);
             }
             DrawTimeControls(w, h);
@@ -366,6 +370,8 @@ namespace DayZero.Runtime
                     case "CAMP": map?.Home(); break;
                     case "GATHER": case "CREW & JOBS": _tab = 1; _menuOpen = true; break;
                     case "DEFENSE": _panel = Panel.Defense; map?.ClearBuilding(); break;
+                    case "SQUADS": _side.Camp = -1; OpenSide("squads", map); break;        // main.gd _pick_default_camp: the main camp
+                    case "TASK FORCE": _side.Camp = -1; OpenSide("taskforce", map); break;
                     case "COLONY": _tab = 0; _menuOpen = true; break;
                     case "TRADE": OpenSide("trade", map); break;
                     case "RESEARCH": OpenSide("research", map); break;

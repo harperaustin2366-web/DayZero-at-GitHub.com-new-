@@ -120,7 +120,7 @@ Virtual 720-px-high canvas, scaled to the screen inside the safe area.
 - **Log tab:** the colony log, newest first, 12 per page.
 - **Menu tab:** Save now, Load last save, Title screen, sound on/off and volume (saved in PlayerPrefs).
 - **Popups:** decisions (title, text, one button per choice with its hint, via `ApplyChoice`; the sim pauses while one is open), game over or won (New game / Title), and toasts.
-- **Not covered yet:** squads, research, trade, crafting, vehicles and multiplayer still need UI (map, start site, building conversion and defenses have it since 0.11.x / 0.12.0a).
+- **Not covered yet:** crafting (armory), war, camps / upgrade base, faction sheets, vehicles and multiplayer still need UI (research, trade, squads and task force have it since v0.13.0a) (map, start site, building conversion and defenses have it since 0.11.x / 0.12.0a).
 
 ### Compile check (work/unity-verify, not committed)
 `bash work/unity-verify/check.sh [days]` builds three projects and then runs the smoke test:
@@ -270,3 +270,9 @@ Device test of 0.11.1a (Android): buildings drew, but no ground and no roads; th
 - ~~**Picking the start site**~~ done in v0.11.4a; **building placement** (outposts, fences, towers, traps), tapping lots to take over / convert / gut.
 - **Props**: decode `recovered/assets/3d/props.bin` (Godot's prop meshes: cars, trees `fpine_a`…, rubble) and replace the procedural boxes/cones; hilltop smoke, fires, night lights (`LIGHTS`), day/night tint.
 - Not verified without a device: shader compile on the phone GPU (the fallback covers it), build time for about 210 chunks on a phone (several seconds is likely), and the vertex budget. Roughly 2–3 M verts over the whole map, with about a quarter active at the default zoom. Fully zoomed out shows all of it, so lower `MAX_DIST` or thin the window bands if it stutters.
+
+## v0.13.0a UI: Squads and Task Force; Phase A UI gated (Nov 2026)
+- **Crash fix:** with `Game.PhaseARules = false` the data is the original's (no `siren` upgrade, no `kitchen` use). `UpgradeCost` / `UpgradeBlock` / `DoUpgrade` now answer "Unknown facility." for an id the data lacks instead of throwing `KeyNotFoundException`; old-save conversion names go through `Game.ConvNameOf`. `PickTeam` is public for the task-force screens. No rule changes: seed 12345 hands-off stays identical to Godot (work/parity cmpc.sh s12345, 1049 lines).
+- **Phase A UI only under `PhaseARules`:** siren rows, REPAIR NOW chip / buttons, AUTO-REPAIR toggle, set-up hours on conversions, wall-run sheet. Under the original rules DEFENSE shows the original tools: FENCE LINE (the ghost line is laid with `build_fence`, all 5 fence tiers with their unlocks), SUGGEST LOOP (`suggest_loop` → `build_fence_segs`), GATE (`place_gate`), TOWER (`place_tower`, 4 tiers), TRAP (`place_traps`, all 7 kinds). Tapping a fence tile opens the original fence sheet (MAKE IT A GATE / REMOVE GATE, UPGRADE section, REMOVE), tapping a tower the tower sheet (UPGRADE / REMOVE).
+- **SQUADS** (ACTIONS, after DEFENSE as in the original's order): camp switch, per-camp auto toggles, squad cards with CLEAR ROAD / SCAVENGE / SEND TO MAP / DISBAND or RECALL, FORM NEW SQUAD (pick 2–max people), SEND TO MAP list, DRONE SCOUT and GUNSHIP STRIKE once researched. CLEAR ROAD, SCAVENGE, DRONE and STRIKE pick their target by tapping the map (route / search / radius overlay, SEND bar).
+- **TASK FORCE**: camp switch, auto toggles, "Ready to go", survivor groups nearest first with VIEW (fly + SOS sheet) and SEND (`send_rescue`). Tapping a group on the map opens its SOS sheet (SEND TASK FORCE, HELICOPTER RESCUE). Supply runs: SEND TASK FORCE TO LOOT on the building sheet (`send_raid`).

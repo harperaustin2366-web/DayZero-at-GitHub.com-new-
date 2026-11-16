@@ -32,13 +32,18 @@ namespace DayZero.Runtime
     /// <summary>What the side menus remember between frames (open menu, tree, page, tab, barter camp).</summary>
     public sealed class SideMenuState
     {
-        public string Open = "";         // "" | "research" | "trade"
+        public string Open = "";         // "" | "research" | "trade" | "squads" | "taskforce"
         public string Cat = "farming";
         public int RPage;
         public bool RJump = true;        // jump to the first unfinished project of the tree on next layout
         public string Tab = "goods";     // goods | gear | camps
         public int TPage, CPage, BPage;
         public string Barter = "";       // camp id while the barter grid is shown
+        // SQUADS / TASK FORCE (main.gd sq_camp, _form_pick)
+        public int Camp = -1;            // camp the squad / task force screens are about (-1 = main camp)
+        public string Sub = "";          // SQUADS sub-screen: "" | "form" | "map"
+        public int SqPage, TfPage, FPage, MapSid = -1;
+        public readonly HashSet<int> Pick = new HashSet<int>();
     }
 
     public sealed class MenuCtx
@@ -50,6 +55,10 @@ namespace DayZero.Runtime
         public Func<string, int, bool, float, float> Measure;
         public Func<string, object[], string> Act;
         public Action<string> Toast;
+        /// <summary>Hand over to the map to pick a target: (clear | scav | drone | strike, squad id).</summary>
+        public Action<string, int> Target;
+        /// <summary>Close the menu, fly to a survivor group and open its SOS sheet.</summary>
+        public Action<int> ViewGroup;
         public readonly List<MenuItem> Items = new List<MenuItem>();
 
         public void Box(Rect r, Color fill) => Items.Add(new MenuItem { Kind = MenuKind.Box, R = r, Fill = fill });
@@ -61,7 +70,7 @@ namespace DayZero.Runtime
         public float H_(string t, int size, bool bold, float w) => string.IsNullOrEmpty(t) ? 0f : (float)Math.Ceiling(Measure(t, size, bold, w));
     }
 
-    public static class SideMenus
+    public static partial class SideMenus
     {
         public static readonly Color INK = new Color(0.93f, 0.90f, 0.80f);
         public static readonly Color INK2 = new Color(0.78f, 0.76f, 0.68f);
@@ -72,14 +81,16 @@ namespace DayZero.Runtime
         static readonly Color PANEL = new Color(0.07f, 0.08f, 0.06f, 0.97f);
 
         // ---------------- ACTIONS panel (right side) ----------------
-        /// <summary>ACTIONS buttons in the original's order (main.gd:258: ... CREW & JOBS, CAMPS, TRADE, ARMORY,
-        /// GARAGE, RESEARCH, LOG), limited to the menus the port has. Shared by GameUI and the preview.</summary>
+        /// <summary>ACTIONS buttons in the original's order (main.gd:258: BUILD OUTPOST, FENCES, TOWERS, TRAPS, SQUADS,
+        /// WAR, TASK FORCE, CREW & JOBS, CAMPS, TRADE, ARMORY, GARAGE, RESEARCH, LOG), limited to the menus the port
+        /// has: DEFENSE stands in for FENCES / TOWERS / TRAPS, so SQUADS and TASK FORCE follow it. Shared by GameUI
+        /// and the preview.</summary>
         public static readonly (string label, string style)[] ACTIONS =
         {
-            ("BUILD", "olive"), ("CAMP", "amber"), ("GATHER", "brown"), ("DEFENSE", "olive"), ("CREW & JOBS", "olive"),
-            ("COLONY", "olive"), ("TRADE", "olive"), ("RESEARCH", "olive"), ("LOG", "olive"),
+            ("BUILD", "olive"), ("CAMP", "sel"), ("GATHER", "brown"), ("DEFENSE", "olive"), ("SQUADS", "olive"), ("TASK FORCE", "olive"),
+            ("CREW & JOBS", "olive"), ("COLONY", "olive"), ("TRADE", "olive"), ("RESEARCH", "olive"), ("LOG", "olive"),
         };
-        public const float ACT_W = 200f, ACT_Y = 108f, ACT_HDR = 34f, ACT_BH = 46f, ACT_GAP = 6f;
+        public const float ACT_W = 200f, ACT_Y = 108f, ACT_HDR = 34f, ACT_BH = 44f, ACT_GAP = 5f;
         public static Rect ActionsPanel(float w) => new Rect(w - ACT_W - 8, ACT_Y, ACT_W, ACT_HDR + ACTIONS.Length * (ACT_BH + ACT_GAP) - ACT_GAP + 10);
         public static Rect ActionButton(float w, int i) { var p = ActionsPanel(w); return new Rect(p.x + 10, p.y + ACT_HDR + i * (ACT_BH + ACT_GAP), ACT_W - 20, ACT_BH); }
 
@@ -91,6 +102,7 @@ namespace DayZero.Runtime
             st.Open = which;
             if (which == "research") st.RJump = true;
             if (which == "trade") st.Barter = "";
+            if (which == "squads" || which == "taskforce") { st.Sub = ""; st.Pick.Clear(); }
         }
 
         public static void Build(MenuCtx c)
@@ -98,6 +110,8 @@ namespace DayZero.Runtime
             if (c.G?.S == null || c.G.C == null) return;
             if (c.St.Open == "research") Research(c);
             else if (c.St.Open == "trade") Trade(c);
+            else if (c.St.Open == "squads") Squads(c);
+            else if (c.St.Open == "taskforce") TaskForce(c);
         }
 
         static Rect Frame(MenuCtx c, string title)
@@ -108,7 +122,7 @@ namespace DayZero.Runtime
             c.Box(p, PANEL);
             c.Box(new Rect(p.x, p.y, pw, 3), AMBER);
             c.Label(new Rect(p.x + 18, p.y + 12, pw - 200, 38), title, 28, AMBER, true, false);
-            c.Button(new Rect(p.xMax - 142, p.y + 10, 128, 48), "CLOSE", "dark", 20, () => { c.St.Open = ""; c.St.Barter = ""; });
+            c.Button(new Rect(p.xMax - 142, p.y + 10, 128, 48), "CLOSE", "dark", 20, () => { c.St.Open = ""; c.St.Barter = ""; c.St.Sub = ""; });
             return p;
         }
 

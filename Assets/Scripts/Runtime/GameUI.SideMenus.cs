@@ -1,4 +1,5 @@
-// IMGUI renderer for the RESEARCH and TRADE side menus (layout in SideMenus.cs) plus the original's
+// IMGUI renderer for the RESEARCH, TRADE, SQUADS and TASK FORCE side menus (layout in SideMenus*.cs), the
+// squad / air-support target bar and the survivor-group SOS sheet, plus the original's
 // "Research complete · tap to open RESEARCH" note (main.gd show_research_note).
 using System;
 using System.Collections.Generic;
@@ -54,10 +55,57 @@ namespace DayZero.Runtime
 
         float MMeasure(string t, int size, bool bold, float w) => MLabel(size, bold, MenuAlign.Left, true).CalcHeight(new GUIContent(t), w);
 
+        MenuCtx NewCtx(float w, float h, MapView map) => new MenuCtx
+        {
+            G = G, W = w, H = h, St = _side, Measure = MMeasure, Act = (a, args) => _b.Act(a, args), Toast = _b.Toast,
+            Target = (kind, sid) =>
+            {
+                // main.gd _start_squad_target / _start_air: close the menu, pick the spot on the map
+                _side.Open = ""; _panel = Panel.None;
+                map?.StartTarget(kind, sid);
+            },
+            ViewGroup = gid =>
+            {
+                var gr = G.GroupById(gid);
+                _side.Open = "";
+                if (gr == null || map == null) return;
+                map.FlyTo(new Vector2(gr.Pos.x + 0.5f, gr.Pos.y + 0.5f));
+                map.SelectGroup(gid);
+            },
+        };
+
         void DrawSideMenu(float w, float h)
         {
-            var ctx = new MenuCtx { G = G, W = w, H = h, St = _side, Measure = MMeasure, Act = (a, args) => _b.Act(a, args), Toast = _b.Toast };
+            var ctx = NewCtx(w, h, MapView.Instance);
             SideMenus.Build(ctx);
+            DrawItems(ctx);
+        }
+
+        /// <summary>Squad / drone / strike target bar at the bottom while a map target is picked.</summary>
+        void DrawTargetBar(float w, float h, MapView map)
+        {
+            var ctx = NewCtx(w, h, map);
+            Blk(SideMenus.TargetBarRect(w, h));
+            string send = map.ActiveTool == MapView.Tool.Drone ? "SCOUT" : map.ActiveTool == MapView.Tool.Strike ? "STRIKE" : "SEND";
+            SideMenus.TargetBar(ctx, map.TargetText, send, () =>
+            {
+                string e = map.ConfirmTool();
+                _b.Toast(e != "" ? e : send == "SEND" ? "On their way." : send == "SCOUT" ? "The drone is up." : "Gunship inbound.");
+            }, () => map.CancelTool());
+            DrawItems(ctx);
+        }
+
+        /// <summary>SOS sheet of a survivor group tapped on the map (main.gd _sheet_group).</summary>
+        void DrawGroupSheet(float w, float h, MapView map)
+        {
+            var ctx = NewCtx(w, h, map);
+            Blk(SideMenus.GroupSheetRect(w, h));
+            SideMenus.GroupSheet(ctx, map.SelectedGroup, () => map.ClearBuilding());
+            DrawItems(ctx);
+        }
+
+        void DrawItems(MenuCtx ctx)
+        {
             var old = GUI.color;
             foreach (var it in ctx.Items)
             {

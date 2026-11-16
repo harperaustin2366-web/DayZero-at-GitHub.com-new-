@@ -886,7 +886,8 @@ namespace DayZero.Core
 
         public Dictionary<string, double> UpgradeCost(Base b, string uid)
         {
-            var u = Data.UPGRADES[uid];
+            // v0.13.0a: an id the data doesn't have (the Phase A "siren" with the original data) costs nothing and can't be built
+            if (!Data.UPGRADES.TryGetValue(uid ?? "", out var u)) return new Dictionary<string, double>();
             int lvl = b.U(uid);
             if (lvl >= u.Max) return new Dictionary<string, double>();
             return u.Cost[lvl];
@@ -894,7 +895,7 @@ namespace DayZero.Core
 
         public string UpgradeBlock(Base b, string uid)
         {
-            var u = Data.UPGRADES[uid];
+            if (!Data.UPGRADES.TryGetValue(uid ?? "", out var u)) return "Unknown facility.";
             int lvl = b.U(uid);
             if (lvl >= u.Max) return "Already at max.";
             if (uid == "radio" && !b.Main) return "The radio goes in the main camp.";
@@ -907,6 +908,7 @@ namespace DayZero.Core
 
         public string DoUpgrade(Base b, string uid)
         {
+            if (!Data.UPGRADES.ContainsKey(uid ?? "")) return "Unknown facility.";
             if (b.Done < 1.0) return "Finish building it first.";
             var cost = UpgradeCost(b, uid);
             string blk = UpgradeBlock(b, uid);
@@ -1045,7 +1047,7 @@ namespace DayZero.Core
             return "";
         }
 
-        List<Person> PickTeam(Vector2 target, int n, int bid = -1)
+        public List<Person> PickTeam(Vector2 target, int n, int bid = -1)
         {
             var cands = new List<(double pri, Person p)>();
             foreach (var b in C.Bases)

@@ -12,7 +12,15 @@ namespace DayZero.Runtime
 {
     public sealed partial class MapView
     {
-        public enum Tool { None, Wall, Gate, Tower, Trap, Upgrade }
+        /// <summary>Wall..Upgrade: DEFENSE placement tools. Loop: the original's SUGGEST fence loop. Squad / Scav / Drone /
+        /// Strike: map targets for SQUADS (CLEAR ROAD, SCAVENGE, DRONE SCOUT, GUNSHIP STRIKE), as main.gd world.mode.</summary>
+        public enum Tool { None, Wall, Gate, Tower, Trap, Upgrade, Loop, Squad, Scav, Drone, Strike }
+        public bool TargetTool => ActiveTool == Tool.Squad || ActiveTool == Tool.Scav || ActiveTool == Tool.Drone || ActiveTool == Tool.Strike;
+        public int TowerTier { get; private set; }
+        public int SquadId { get; private set; } = -1;
+        public Vector2Int Target { get; private set; } = new Vector2Int(-1, -1);
+        public TargetInfo TargetText { get; private set; } = new TargetInfo();
+        List<int> _loopEdges = new List<int>();
 
         public Tool ActiveTool { get; private set; } = Tool.None;
         public int WallTier { get; private set; }
@@ -31,6 +39,9 @@ namespace DayZero.Runtime
 
         public int BuildingLot { get; private set; } = -1;   // building tapped in play mode (conversion sheet)
         public int SelectedRun { get; private set; } = -1;   // wall run tapped in play mode
+        public int SelectedFence { get; private set; } = -1; // fence tile tapped (original rules: fence sheet)
+        public int SelectedTower { get; private set; } = -1; // tower tile tapped (tower sheet)
+        public int SelectedGroup { get; private set; } = -1; // survivor group tapped (SOS sheet)
         GameObject _bselGo;
 
         bool Playing => G?.S != null && G.C != null && G.C.Started && !Picking;
@@ -40,6 +51,8 @@ namespace DayZero.Runtime
         {
             ClearBuilding();
             ActiveTool = t; WallTier = tier; TrapKind = trapKind;
+            if (t == Tool.Tower) TowerTier = tier;
+            if (t == Tool.Loop) { var mb = G?.MainBase(); _loopEdges = mb != null ? G.SuggestLoop(mb, tier) : new List<int>(); }
             // start the ghost just outside the camp gate, or at the screen centre when the camera looks elsewhere
             var c = new Vector2(_focus.x, -_focus.z);
             var g = G; var b = g?.MainBase();
@@ -54,7 +67,32 @@ namespace DayZero.Runtime
             RefreshGhost();
         }
 
-        public void SetWallTier(int t) { WallTier = t; RefreshGhost(); }
+        public void SetWallTier(int t)
+        {
+            WallTier = t;
+            if (ActiveTool == Tool.Loop) { var mb = G?.MainBase(); _loopEdges = mb != null ? G.SuggestLoop(mb, t) : new List<int>(); }
+            RefreshGhost();
+        }
+        public void SetTowerTier(int t) { TowerTier = t; RefreshGhost(); }
+
+        /// <summary>SQUADS / air support: pick a target on the map (main.gd _start_squad_target / _start_air).
+        /// kind: clear | scav | drone | strike.</summary>
+        public void StartTarget(string kind, int sid)
+        {
+            ClearBuilding();
+            if (_ghostGo != null) { DestroyChunk(_ghostGo); _ghostGo = null; }
+            ActiveTool = kind == "scav" ? Tool.Scav : kind == "drone" ? Tool.Drone : kind == "strike" ? Tool.Strike : Tool.Squad;
+            SquadId = sid; Target = new Vector2Int(-1, -1); GhostAt = new Vector2(-1f, -1f);
+            var g = G;
+            var q = g?.SquadById(sid);
+            var b = q != null ? g.BaseById(q.Base) : g?.MainBase();
+            if (b != null) FlyTo(new Vector2(b.Pos.x + 0.5f, b.Pos.y + 0.5f));
+            if (ActiveTool == Tool.Scav || ActiveTool == Tool.Squad) _distTarget = Mathf.Max(_distTarget, 55f);
+            _ghostSig = "";
+            RefreshGhost();
+        }
+
+        string TargetKind => ActiveTool == Tool.Scav ? "scav" : ActiveTool == Tool.Drone ? "drone" : ActiveTool == Tool.Strike ? "strike" : "clear";
         public void SetTrapKind(int k) { TrapKind = k; RefreshGhost(); }
         public void Rotate() { WallDir = (WallDir + 1) & 3; RefreshGhost(); }
         public void Longer() { WallLen = Mathf.Min(Game.WALL_MAX_LEN, WallLen + 2f); RefreshGhost(); }
@@ -63,6 +101,7 @@ namespace DayZero.Runtime
         public void CancelTool()
         {
             ActiveTool = Tool.None; _toolKey = -1; ToolErr = ToolCost = ToolInfo = ""; ToolOk = false;
+            SquadId = -1; Target = new Vector2Int(-1, -1); TargetText = new TargetInfo(); _loopEdges = new List<int>();
             if (_ghostGo != null) { DestroyChunk(_ghostGo); _ghostGo = null; }
             _ghostSig = "";
         }
@@ -139,12 +178,13 @@ namespace DayZero.Runtime
                     kind = MapGen.GhostKind.Tower;
                     a = new Vector2(tile.x + 0.5f, tile.y + 0.5f);
                     if (key >= 0) tiles.Add(key);
-                    ToolErr = g.CanTower(tile, 0);
-                    var cost = g.TowerCost(0);
+                    var td = Data.TOWERS[TowerTier];
+                    ToolErr = g.CanTower(tile, TowerTier);
+                    var cost = g.TowerCost(TowerTier);
                     if (ToolErr == "" && !g.CanAfford(cost)) ToolErr = "Need " + Game.FmtCost(cost) + ".";
                     ToolOk = ToolErr == ""; state.Add(ToolOk ? 0 : 2);
                     ToolCost = Game.FmtCost(cost);
-                    ToolInfo = "Watchtower: one survivor shoots from it (range " + Data.TOWERS[0].Range.ToString("0.#") + "), no ammo";
+                    ToolInfo = string.Format("{0}: range {1:0.#}, {2}", td.Name, td.Range + g.Rx("tower_range"), td.Ammo > 0.0 ? string.Format("{0:0.##} ammo per shot", td.Ammo) : "no ammo") + (td.Crew ? ", one survivor crews it" : ", needs power");
                     break;
                 }
                 case Tool.Trap:
@@ -158,6 +198,68 @@ namespace DayZero.Runtime
                     ToolOk = ToolErr == ""; state.Add(ToolOk ? 0 : 2);
                     ToolCost = Game.FmtCost(cost);
                     ToolInfo = Data.TRAPS[TrapKind].Name + ": " + Data.TRAPS[TrapKind].Desc;
+                    break;
+                }
+                case Tool.Loop:
+                {
+                    // the original's SUGGEST: a closed ring of road-graph fence sections around the main camp
+                    var mb = g.MainBase();
+                    var pv = g.SegPreview(_loopEdges, WallTier);
+                    for (int i = 0; i < _loopEdges.Count; i++)
+                        foreach (int k in g.EdgeTiles(_loopEdges[i]))
+                        {
+                            if (!D.Walkable(new Vector2Int(k % D.W, k / D.W))) continue;
+                            tiles.Add(k);
+                            state.Add(g.S.Fences.TryGetValue(k, out var f0) && f0.Col == g.CurCol && f0.Tier >= WallTier ? 3 : i < pv.Ok.Count && pv.Ok[i] ? 0 : 2);
+                        }
+                    if (tiles.Count > 0) { a = new Vector2(tiles[0] % D.W + 0.5f, tiles[0] / D.W + 0.5f); b = a; }
+                    ToolErr = _loopEdges.Count == 0 ? string.Format("No closed loop fits around {0} yet. Clear more ground with a squad, or place sections by hand.", mb?.Name ?? "your camp")
+                        : !g.FenceTierUnlocked(WallTier) ? string.Format("Research {0} first.", g.UnlockSourceName(Data.FENCES[WallTier].Unlock))
+                        : pv.N == 0 ? (pv.Err != "" ? pv.Err : "Already fenced.")
+                        : !g.CanAfford(pv.Cost) ? "Need " + Game.FmtCost(pv.Cost) + "." : pv.Err != "" ? "Some sections are skipped: " + pv.Err : "";
+                    ToolOk = _loopEdges.Count > 0 && pv.N > 0 && g.CanAfford(pv.Cost) && g.FenceTierUnlocked(WallTier);
+                    ToolCost = pv.N > 0 ? Game.FmtCost(pv.Cost) : "-";
+                    ToolInfo = string.Format("Suggested loop around {0}: {1} · {2} sections · {3} tiles to build", mb?.Name ?? "camp", Data.FENCES[WallTier].Name, pv.Edges, pv.N);
+                    kind = MapGen.GhostKind.Route;
+                    break;
+                }
+                case Tool.Squad: case Tool.Scav: case Tool.Drone: case Tool.Strike:
+                {
+                    kind = MapGen.GhostKind.Route;
+                    var ti = SideMenus.SquadTarget(g, TargetKind, SquadId, Target);
+                    TargetText = ti;
+                    ToolOk = ti.Ok; ToolErr = ti.Ok ? "" : ti.Detail; ToolInfo = ti.Title; ToolCost = ti.Detail;
+                    if (Target.x >= 0) { a = new Vector2(Target.x + 0.5f, Target.y + 0.5f); b = a; }
+                    var seen = new HashSet<int>();
+                    int range = g.SquadRange();
+                    for (int i = 0; i < ti.Path.Count; i++)
+                    {
+                        var pt = V.I(ti.Path[i]);
+                        if (!D.InMap(pt)) continue;
+                        int k = pt.y * D.W + pt.x;
+                        if (seen.Add(k)) { tiles.Add(k); state.Add(i < range ? 0 : 2); }
+                    }
+                    foreach (int l in ti.Search)
+                    {
+                        var dr = D.LotDoor(l);
+                        if (!D.InMap(dr)) continue;
+                        int k = dr.y * D.W + dr.x;
+                        if (seen.Add(k)) { tiles.Add(k); state.Add(3); }
+                    }
+                    if (ti.Radius > 0f && Target.x >= 0)
+                    {
+                        // ring of tiles at the drone / strike radius
+                        int n = Mathf.Max(24, (int)(ti.Radius * 6.3f));
+                        for (int i = 0; i < n; i++)
+                        {
+                            float an = i * Mathf.PI * 2f / n;
+                            var q = new Vector2Int(Mathf.FloorToInt(Target.x + 0.5f + Mathf.Cos(an) * ti.Radius), Mathf.FloorToInt(Target.y + 0.5f + Mathf.Sin(an) * ti.Radius));
+                            if (!D.InMap(q)) continue;
+                            int k = q.y * D.W + q.x;
+                            if (seen.Add(k)) { tiles.Add(k); state.Add(ti.Ok ? 3 : 2); }
+                        }
+                    }
+                    if (Target.x < 0 && tiles.Count == 0) { if (_ghostGo != null) { DestroyChunk(_ghostGo); _ghostGo = null; } _ghostSig = ""; return; }
                     break;
                 }
                 case Tool.Upgrade:
@@ -198,10 +300,36 @@ namespace DayZero.Runtime
             string e;
             switch (ActiveTool)
             {
-                case Tool.Wall: WallEnds(out var a, out var b); e = bs.Act("place_wall", a, b, WallTier); break;
+                case Tool.Wall:
+                    WallEnds(out var a, out var b);
+                    if (Game.PhaseARules) e = bs.Act("place_wall", a, b, WallTier);
+                    else
+                    {
+                        // original rules: the ghost line is laid as fence tiles (main.gd fence tool -> build_fence)
+                        var pl = g.PlanWall(a, b, WallTier);
+                        var tl = new List<Vector2Int>();
+                        foreach (int k in pl.Build) tl.Add(new Vector2Int(k % D.W, k / D.W));
+                        e = tl.Count > 0 ? bs.Act("build_fence", tl, WallTier) : (pl.Err != "" ? pl.Err : "Nothing to build here.");
+                    }
+                    break;
+                case Tool.Loop: e = _loopEdges.Count > 0 ? bs.Act("build_fence_segs", new List<int>(_loopEdges), WallTier) : ToolErr; if (e == "") { CancelTool(); return e; } break;
                 case Tool.Gate: e = _toolKey >= 0 ? bs.Act("place_gate", _toolKey) : "Tap a wall to put a gate in it."; break;
-                case Tool.Tower: e = bs.Act("place_tower", new Vector2Int(Mathf.FloorToInt(GhostAt.x), Mathf.FloorToInt(GhostAt.y)), 0); break;
-                case Tool.Trap: e = bs.Act("place_trap", new Vector2Int(Mathf.FloorToInt(GhostAt.x), Mathf.FloorToInt(GhostAt.y)), TrapKind); break;
+                case Tool.Tower: e = bs.Act("place_tower", new Vector2Int(Mathf.FloorToInt(GhostAt.x), Mathf.FloorToInt(GhostAt.y)), TowerTier); break;
+                case Tool.Trap:
+                    {
+                        var tp = new Vector2Int(Mathf.FloorToInt(GhostAt.x), Mathf.FloorToInt(GhostAt.y));
+                        e = Game.PhaseARules ? bs.Act("place_trap", tp, TrapKind) : bs.Act("place_traps", new List<Vector2Int> { tp }, TrapKind);
+                        break;
+                    }
+                case Tool.Squad: case Tool.Scav: case Tool.Drone: case Tool.Strike:
+                    {
+                        if (Target.x < 0) return "Tap a target first.";
+                        var ak = ActiveTool;
+                        e = ak == Tool.Squad ? bs.Act("send_squad", SquadId, Target) : ak == Tool.Scav ? bs.Act("send_squad_scav", SquadId, Target)
+                          : ak == Tool.Drone ? bs.Act("drone_scout", Target) : bs.Act("air_strike", Target);
+                        if (e == "") { CancelTool(); return e; }
+                        break;
+                    }
                 case Tool.Upgrade: e = _toolKey >= 0 ? bs.Act("upgrade_wall", _toolKey) : "Tap one of your walls."; break;
                 default: e = ""; break;
             }
@@ -216,7 +344,7 @@ namespace DayZero.Runtime
             if (!Playing) { if (ActiveTool != Tool.None) CancelTool(); if (BuildingLot >= 0) ClearBuilding(); return; }
             if (ActiveTool == Tool.None) return;
             _ghostT -= Time.unscaledDeltaTime;
-            if (_ghostT <= 0f) { _ghostT = 0.3f; RefreshGhost(); }
+            if (_ghostT <= 0f) { _ghostT = TargetTool || ActiveTool == Tool.Loop ? 1.5f : 0.3f; RefreshGhost(); }
         }
 
         // ---------------- play-mode taps ----------------
@@ -226,6 +354,20 @@ namespace DayZero.Runtime
             var ray = _cam.ScreenPointToRay(new Vector3(screen.x, screen.y, 0f));
             Vector2 gp = new Vector2(-1f, -1f);
             if (Ground(screen, out var hit)) gp = new Vector2(hit.x, -hit.z);
+            if (TargetTool)
+            {
+                // a building counts as its own tile (the route goes to its door), else the ground under the finger
+                int tl = ActiveTool == Tool.Scav || ActiveTool == Tool.Squad ? _gen.PickLot(ray.origin, ray.direction) : -1;
+                Vector2Int t;
+                if (tl >= 0) { var lc = D.LotCenter(tl); t = new Vector2Int(Mathf.FloorToInt(lc.x), Mathf.FloorToInt(lc.y)); if (D.BuildingAt(t) != tl) t = D.LotDoor(tl); }
+                else if (gp.x >= 0f) t = new Vector2Int(Mathf.FloorToInt(gp.x), Mathf.FloorToInt(gp.y));
+                else return;
+                Target = t; GhostAt = new Vector2(t.x + 0.5f, t.y + 0.5f);
+                RefreshGhost();
+                Bootstrap.Instance?.PlayClick();
+                return;
+            }
+            if (ActiveTool == Tool.Loop) return;   // the suggested loop doesn't move
             if (ActiveTool != Tool.None)
             {
                 if (gp.x < 0f) return;
@@ -234,9 +376,32 @@ namespace DayZero.Runtime
                 Bootstrap.Instance?.PlayClick();
                 return;
             }
+            // survivor groups waiting for rescue (SOS sheet) stand on the street: they win over the building behind them
+            if (gp.x >= 0f && G.S.Groups != null)
+            {
+                Group bestG = null; float bd = 1.6f;
+                foreach (var gr in G.S.Groups)
+                {
+                    if (gr.St != "wait") continue;
+                    float dd = (new Vector2(gr.Pos.x + 0.5f, gr.Pos.y + 0.5f) - gp).magnitude;
+                    if (dd < bd) { bd = dd; bestG = gr; }
+                }
+                if (bestG != null) { ClearBuilding(); SelectedGroup = bestG.Id; Bootstrap.Instance?.PlayClick(); return; }
+            }
             int lot = _gen.PickLot(ray.origin, ray.direction);
             if (lot >= 0 && !G.InCampYard(lot)) { SelectBuilding(lot); return; }
-            var run = gp.x >= 0f ? G.RunNear(gp, 1.0f) : null;
+            if (gp.x >= 0f)
+            {
+                var tt = new Vector2Int(Mathf.FloorToInt(gp.x), Mathf.FloorToInt(gp.y));
+                int tk = NearestKey(tt, k => G.S.Towers.ContainsKey(k));
+                if (tk >= 0) { ClearBuilding(); SelectedTower = tk; Bootstrap.Instance?.PlayClick(); return; }
+                if (!Game.PhaseARules)
+                {
+                    int fk = NearestKey(tt, k => G.S.Fences.ContainsKey(k));
+                    if (fk >= 0) { ClearBuilding(); SelectedFence = fk; Bootstrap.Instance?.PlayClick(); return; }
+                }
+            }
+            var run = gp.x >= 0f && Game.PhaseARules ? G.RunNear(gp, 1.0f) : null;
             if (run != null) { ClearBuilding(); SelectedRun = run.Id; Bootstrap.Instance?.PlayClick(); return; }
             ClearBuilding();
         }
@@ -255,9 +420,27 @@ namespace DayZero.Runtime
             Bootstrap.Instance?.PlayClick();
         }
 
+        /// <summary>Tile key within one tile of t that passes the test (t itself first), or -1.</summary>
+        int NearestKey(Vector2Int t, Func<int, bool> ok)
+        {
+            for (int r = 0; r <= 1; r++)
+                for (int dy = -r; dy <= r; dy++)
+                    for (int dx = -r; dx <= r; dx++)
+                    {
+                        if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != r) continue;
+                        var q = new Vector2Int(t.x + dx, t.y + dy);
+                        if (!D.InMap(q)) continue;
+                        int k = q.y * D.W + q.x;
+                        if (ok(k)) return k;
+                    }
+            return -1;
+        }
+
+        public void SelectGroup(int gid) { ClearBuilding(); SelectedGroup = gid; }
+
         public void ClearBuilding()
         {
-            BuildingLot = -1; SelectedRun = -1;
+            BuildingLot = -1; SelectedRun = -1; SelectedFence = -1; SelectedTower = -1; SelectedGroup = -1;
             if (_bselGo != null) { DestroyChunk(_bselGo); _bselGo = null; }
         }
 

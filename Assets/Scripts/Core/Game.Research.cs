@@ -392,20 +392,23 @@ namespace DayZero.Core
             {
                 if (manual)
                 {
-                    if (was != "") AddLog(string.Format("{0}: the {1} is now {2}.", b?.Name ?? "Camp", Data.CONVERSIONS[was].Name, A(cd.Name)), "good");
+                    if (was != "") AddLog(string.Format("{0}: the {1} is now {2}.", b?.Name ?? "Camp", ConvNameOf(was), A(cd.Name)), "good");
                     else AddLog(string.Format("{0}: survivors moved into {1} and set it up as {2}.", b?.Name ?? "Camp", where, A(cd.Name)), "good");
                 }
                 else AddLog(string.Format("Inside {0}'s safe zone, survivors turned {1} into {2} ({3}).", b?.Name ?? "camp", where, A(cd.Name), reason), "good");
             }
             else if (manual)
             {
-                if (was != "") AddLog(string.Format("{0}: the {1} is being refitted as {2} (about {3:0} h).", b?.Name ?? "Camp", Data.CONVERSIONS[was].Name, A(cd.Name), hrs), "info");
+                if (was != "") AddLog(string.Format("{0}: the {1} is being refitted as {2} (about {3:0} h).", b?.Name ?? "Camp", ConvNameOf(was), A(cd.Name), hrs), "info");
                 else AddLog(string.Format("{0}: survivors moved into {1} and are setting it up as {2} (about {3:0} h).", b?.Name ?? "Camp", where, A(cd.Name), hrs), "info");
             }
             else AddLog(string.Format("Inside {0}'s safe zone, survivors are turning {1} into {2} ({3}).", b?.Name ?? "camp", where, A(cd.Name), reason), "info");
             PlaySfx("hammer", D.LotCenter(l));
             EmitChanged();
         }
+
+        /// <summary>Display name of a conversion type; an id the data lacks (a Phase A "kitchen" in an old save) shows as itself.</summary>
+        public static string ConvNameOf(string type) => type != null && Data.CONVERSIONS.TryGetValue(type, out var cd) ? cd.Name : (type ?? "");
 
         void StripLot(int l)
         {
