@@ -40,57 +40,44 @@ namespace DayZero.Runtime
         static Color Lighten(Color c, float f) => new Color(c.r + (1f - c.r) * f, c.g + (1f - c.g) * f, c.b + (1f - c.b) * f, 1f);
 
         struct SheetLine { public string T; public int Size; public Color Col; }
-        struct SheetBtn { public string T, Style; public Action Click; public bool On; }
+        struct SheetBtn { public string T, Style, Sub; public Action Click; public bool On; }
 
         /// <summary>Lays out a bottom sheet: title row, wrapped lines, rows of equal-width buttons.</summary>
         static void Sheet(MenuCtx c, string title, Color titleCol, List<SheetLine> lines, List<(string label, List<SheetBtn> btns)> rows, Action close, float pw)
         {
-            float iw = pw - 32f;
-            float h = 10f + 44f;
-            var hs = lines.Select(l => Math.Max(l.Size + 6f, c.H_(l.T, l.Size, false, iw))).ToList();
-            foreach (var lh in hs) h += lh + 4f;
-            h += rows.Count * 56f + 8f;
+            var area = SheetRect(c.W, c.H, pw, 100f);
+            float iw = area.width - 24f;
+            var hs = lines.Select(l => Math.Max(l.Size + 8f, c.H_(l.T, l.Size, false, iw))).ToList();
+            float h = 24f + 48f + 8f + hs.Sum(x => x + 8f) + rows.Count * (BTN_H + 8f) + 4f;
             float maxH = c.H - 62f - 10f - 110f;
-            var p = new Rect(c.W / 2f - pw / 2f, c.H - 62f - 10f - Math.Min(h, maxH), pw, Math.Min(h, maxH));
-            c.Box(p, PANEL);
-            c.Box(new Rect(p.x, p.y, p.width, 3), titleCol);
-            float x = p.x + 16, y = p.y + 10;
-            c.Label(new Rect(x, y, iw - 140, 32), title, 22, titleCol, true, false);
-            c.Button(new Rect(p.xMax - 126, p.y + 8, 112, 44), "CLOSE", "dark", 18, close);
-            y += 46f;
-            float rowsTop = p.yMax - 8f - rows.Count * 56f;
+            var p = SheetRect(c.W, c.H, pw, Math.Min(h, maxH));
+            var L = SheetFrame(c, p, title, close);
+            // button rows from the bottom up
+            for (int ri = rows.Count - 1; ri >= 0; ri--)
+            {
+                var row = rows[ri];
+                var R = new UiLayout(L.Bottom(BTN_H), 8f);
+                if (!string.IsNullOrEmpty(row.label)) c.Fit(R.Left(Math.Min(300f, R.Rest.width * 0.34f)), row.label, 16, INK2, false);
+                var bc = UiLayout.Even(R.Rest, Math.Max(1, row.btns.Count), 8f);
+                for (int i = 0; i < row.btns.Count; i++)
+                {
+                    var b = row.btns[i];
+                    c.Btn(bc[i], b.T, MenuCtx.StyleRole(b.Style), b.Click, b.On, false, 18, b.Sub);
+                }
+            }
             for (int i = 0; i < lines.Count; i++)
             {
-                if (y + hs[i] > rowsTop + 2f) break;   // too tall: drop the tail rather than draw under the buttons
-                c.Label(new Rect(x, y, iw, hs[i]), lines[i].T, lines[i].Size, lines[i].Col);
-                y += hs[i] + 4f;
-            }
-            y = rowsTop;
-            foreach (var row in rows)
-            {
-                float bx = x, avail = iw;
-                if (!string.IsNullOrEmpty(row.label))
-                {
-                    float lw = Math.Min(260f, iw * 0.32f);
-                    c.Label(new Rect(bx, y + 4, lw, 46), row.label, 14, INK2);
-                    bx += lw + 6f; avail -= lw + 6f;
-                }
-                int n = Math.Max(1, row.btns.Count);
-                float bw = (avail - (n - 1) * 6f) / n;
-                foreach (var b in row.btns)
-                {
-                    int sz = b.T.Length > 24 ? 14 : b.T.Length > 18 ? 15 : 16;
-                    c.Button(new Rect(bx, y, bw, 50), b.T, b.Style, sz, b.Click, b.On);
-                    bx += bw + 6f;
-                }
-                y += 56f;
+                if (hs[i] > L.Rest.height + 1f) break;   // too tall: drop the tail rather than draw under the buttons
+                c.Para(L.Top(hs[i]), lines[i].T, lines[i].Size, lines[i].Col);
             }
         }
 
-        public static float SheetWidth(float w) => Math.Min(860f, w - 230f);
+        public static float SheetWidth(float w) => Math.Min(900f, w - 230f);
 
         // ---------------- faction camp sheet (main.gd _sheet_camp / _faction_body) ----------------
-        public static void FactionSheet(MenuCtx c, string cid, Action close)
+        public static void FactionSheet(MenuCtx c, string cid, Action close) { FactionSheetBody(c, cid, close); Flush(c); }
+
+        static void FactionSheetBody(MenuCtx c, string cid, Action close)
         {
             var g = c.G;
             var cp = g.CampById(cid);
@@ -120,7 +107,7 @@ namespace DayZero.Runtime
             var wv = g.WarOf(g.ViewCol);
             if (wv != null && wv.Lord == cp.Id) lines.Add(new SheetLine { T = "You are their vassal: they take 45% of what you produce. Break free under WAR.", Size = 14, Col = REDN });
             if (wv != null && wv.St == "prep" && wv.Foe == cp.Id) lines.Add(new SheetLine { T = string.Format("At war with you · battle in {0:0.0} days.", g.WarDaysLeft(wv)), Size = 14, Col = REDN });
-            if (hostile) lines.Add(new SheetLine { T = "They ambush people out near their turf, raid your nearest camp and batter its fences. Pay them off, talk (Diplomacy T5) or fight them with a squad.", Size = 13, Col = REDN });
+            if (hostile) lines.Add(new SheetLine { T = "They ambush people out near their turf, raid your nearest camp and batter its fences. Pay them off, talk (Diplomacy T5) or fight them with a squad.", Size = 14, Col = REDN });
 
             void Res(string e) { if (!string.IsNullOrEmpty(e)) c.Toast(e); }   // main.gd _res_toast: only failures toast
             var r1 = new List<SheetBtn>();
@@ -131,14 +118,14 @@ namespace DayZero.Runtime
                 r1.Add(new SheetBtn { T = string.Format("RECRUIT {0}", 2 + (int)g.Rx("recruit_n")), Style = "sel", On = true, Click = () => Res(c.Act("camp_recruit", new object[] { cid })) });
             rows.Add((null, r1));
             var r2 = new List<SheetBtn>();
-            if (hostile) r2.Add(new SheetBtn { T = "PAY OFF (25 food, 10 ammo)", Style = "olive", On = true, Click = () => Res(c.Act("camp_tribute", new object[] { cid })) });
+            if (hostile) r2.Add(new SheetBtn { T = "PAY OFF", Sub = "25 food, 10 ammo", Style = "olive", On = true, Click = () => Res(c.Act("camp_tribute", new object[] { cid })) });
             if (att == "Hostile" && cp.Att != "Raiders")
             {
                 bool un = g.HasUnlock("parley");
-                r2.Add(new SheetBtn { T = un ? "PEACE TALKS (20 food, 6 meds)" : "PEACE TALKS (Diplomacy T5)", Style = "sel", On = un, Click = () => Res(c.Act("camp_parley", new object[] { cid })) });
+                r2.Add(new SheetBtn { T = "PEACE TALKS", Sub = un ? "20 food, 6 meds" : "needs Diplomacy T5", Style = "sel", On = un, Click = () => Res(c.Act("camp_parley", new object[] { cid })) });
             }
             if (g.HasUnlock("pact") && att == "Friendly" && !pact)
-                r2.Add(new SheetBtn { T = "SIGN A PACT (30 food)", Style = "olive", On = true, Click = () => Res(c.Act("camp_pact", new object[] { cid })) });
+                r2.Add(new SheetBtn { T = "SIGN A PACT", Sub = "30 food", Style = "olive", On = true, Click = () => Res(c.Act("camp_pact", new object[] { cid })) });
             if (r2.Count > 0) rows.Add((null, r2));
             var idle = g.C.Squads.Where(q => q.St == "idle").Take(3).ToList();
             if (idle.Count > 0)
@@ -147,7 +134,7 @@ namespace DayZero.Runtime
                 foreach (var q in idle)
                 {
                     int sid = q.Id; string qn = q.Name;
-                    r3.Add(new SheetBtn { T = string.Format("{0} ({1})", q.Name.Replace("Squad ", ""), (int)g.SquadAttackPower(q)), Style = "brown", On = true, Click = () =>
+                    r3.Add(new SheetBtn { T = q.Name.Replace("Squad ", "").ToUpperInvariant(), Sub = string.Format("power {0}", (int)g.SquadAttackPower(q)), Style = "brown", On = true, Click = () =>
                     {
                         string e = c.Act("squad_attack", new object[] { sid, cid });
                         c.Toast(e != "" ? e : qn + " is moving out.");
@@ -159,6 +146,20 @@ namespace DayZero.Runtime
         }
 
         // ---------------- WAR (main.gd _show_war / _war_army_section / _show_war_report) ----------------
+        /// <summary>Blocks of a scroll list: height, then a draw at y (content coordinates).</summary>
+        sealed class Blocks
+        {
+            public readonly List<(float h, Action<float> draw)> L = new List<(float, Action<float>)>();
+            public void Add(float h, Action<float> draw) => L.Add((h, draw));
+            public void Draw(MenuCtx c, string id, Rect view, float gap)
+            {
+                c.Scroll(id, view, Total(L.Select(b => b.h).ToList(), gap));
+                float y = 0f;
+                foreach (var b in L) { b.draw(y); y += b.h + gap; }
+                c.EndScroll();
+            }
+        }
+
         static void War(MenuCtx c)
         {
             var g = c.G; var st = c.St;
@@ -166,166 +167,160 @@ namespace DayZero.Runtime
             if (w == null) { st.Open = ""; return; }
             if (st.Sub == "report" && w.Report != null && w.Report.Id > 0) { WarReportView(c, w.Report); return; }
             if (st.Sub == "report") st.Sub = "";
-            var p = Frame(c, "WAR");
-            float x = p.x + 18, iw = p.width - 36, y = p.y + 66, bottom = p.yMax - 70f;
+            bool hasRep = w.Report != null && w.Report.Id > 0;
+            var L = Frame(c, "WAR");
+            if (hasRep) Footer(c, L, "", new BarBtn("LAST BATTLE REPORT", UiRole.Primary, () => { st.Sub = "report"; st.WRPage = 0; }, true, 320f));
+            var view = L.Rest;
+            float iw = view.width - 12f;
             string stt = w.St ?? "none", lord = w.Lord ?? "";
-            const string intro = "Rival camps may demand you bend the knee (12% a day at dawn). Bend and they take 45% of everything you produce. Refuse and you get 10 days to raise an army of grown-ups; then the battle runs itself. Each soldier rolls 2 dice, +1 hand weapon, +2 pistol, +3 shotgun or rifle, +1 armour (2-6 dice). Highest single die wins a duel, ties re-roll. A side that is badly beaten may surrender (25% each round).";
-            float ih = c.H_(intro, 14, false, iw);
-            c.Label(new Rect(x, y, iw, ih), intro, 14, INK2); y += ih + 8f;
-            void L(string t, int size, Color col, bool bold = false, float pad = 4f)
-            {
-                float hh = Math.Max(size + 6f, c.H_(t, size, bold, iw - 24f));
-                c.Label(new Rect(x + 12, y, iw - 24f, hh), t, size, col, bold); y += hh + pad;
-            }
+            var B = new Blocks();
+            void P(string t, int size, Color col, float x0 = 0f) { float hh = Math.Max(size + 8f, c.H_(t, size, false, iw - x0 * 2f)); B.Add(hh, y => c.Para(new Rect(x0, y, iw - x0 * 2f, hh), t, size, col)); }
+            void T(string t, int size, Color col) => B.Add(size + 12f, y => c.Fit(new Rect(0, y, iw, size + 12f), t, size, col, true));
+            P("Rival camps may demand you bend the knee (12% a day at dawn). Bend and they take 45% of everything you produce. Refuse and you get 10 days to raise an army of grown-ups; then the battle runs itself. Each soldier rolls 2 dice, +1 hand weapon, +2 pistol, +3 shotgun or rifle, +1 armour (2-6 dice). Highest single die wins a duel, ties re-roll. A side that is badly beaten may surrender (25% each round).", 15, INK2);
             if (stt == "demand")
-                L(string.Format("{0} is waiting for your answer: bend the knee or go to war.", g.CampById(w.Foe)?.Name ?? "A rival camp"), 17, REDN, true);
+                T(string.Format("{0} is waiting for your answer: bend the knee or go to war.", g.CampById(w.Foe)?.Name ?? "A rival camp"), 19, REDN);
             if (lord != "" && stt != "prep")
             {
                 var lc = g.CampById(lord);
-                float top = y;
-                c.Box(new Rect(x, y, iw, 10), new Color(0.15f, 0.11f, 0.10f));   // card background, grown below
-                int cardItem = c.Items.Count - 1;
-                y += 8f;
-                L(string.Format("You are a vassal of {0}", lc?.Name ?? "?"), 19, REDN, true);
                 var paid = w.Paid.Where(kv => kv.Value >= 1.0).Select(kv => new KeyValuePair<string, double>(kv.Key, Math.Floor(kv.Value))).ToList();
-                L(string.Format("They take 45% of what your camps produce and your scavengers bring home. Taken since dawn: {0}.", paid.Count > 0 ? Game.FmtCost(paid) : "nothing yet"), 15, INK);
+                string t1 = string.Format("They take 45% of what your camps produce and your scavengers bring home. Taken since dawn: {0}.", paid.Count > 0 ? Game.FmtCost(paid) : "nothing yet");
                 var est = lc != null ? g.RivalArmyEstimate(lc) : (0, 0.0);
-                L(string.Format("{0} can field about {1} fighters averaging {2:0.0} dice.", lc?.Name ?? "?", est.Item1, est.Item2), 14, GOLD);
-                c.Button(new Rect(x + 12, y, Math.Min(620f, iw - 24f), 52), "DECLARE WAR TO BREAK FREE (10 days to prepare)", "brown", 17, () =>
+                string t2 = string.Format("{0} can field about {1} fighters averaging {2:0.0} dice.", lc?.Name ?? "?", est.Item1, est.Item2);
+                float h1 = c.H_(t1, 16, false, iw - 36f), h2 = c.H_(t2, 15, false, iw - 36f);
+                float ch = 12f + 32f + h1 + 4f + h2 + 10f + BTN_H + 12f;
+                B.Add(ch, y =>
                 {
-                    string e = c.Act("war_declare", new object[0]);
-                    c.Toast(e != "" ? e : "War declared. You have 10 days.");
+                    Card(c, new Rect(0, y, iw, ch), 0, REDN, true);
+                    float yy = y + 12f;
+                    c.Fit(new Rect(18f, yy, iw - 36f, 30f), string.Format("You are a vassal of {0}", lc?.Name ?? "?"), 22, REDN, true); yy += 32f;
+                    c.Para(new Rect(18f, yy, iw - 36f, h1), t1, 16, INK); yy += h1 + 4f;
+                    c.Para(new Rect(18f, yy, iw - 36f, h2), t2, 15, GOLD); yy += h2 + 10f;
+                    c.Btn(new Rect(18f, yy, Math.Min(560f, iw - 36f), BTN_H), "DECLARE WAR TO BREAK FREE", UiRole.Danger, () =>
+                    {
+                        string e = c.Act("war_declare", new object[0]);
+                        c.Toast(e != "" ? e : "War declared. You have 10 days.");
+                    }, true, false, 20, "10 days to prepare");
                 });
-                y += 60f;
-                c.Items[cardItem].R = new Rect(x, top, iw, y - top);
-                y += 6f;
             }
             var vs = g.WarVassals(g.ViewCol);
             if (vs.Count > 0)
             {
-                c.Label(new Rect(x, y, iw, 26), "Camps that answer to you", 18, AMBER, true, false); y += 30f;
-                foreach (var vc in vs) L(string.Format("{0} · {1} people · pays you 45% of its scavenging every dawn", vc.Name, vc.Pop), 15, GREEN);
+                B.Add(40f, y => c.Header(new Rect(0, y, iw, 40f), "Camps that answer to you", 20));
+                foreach (var vc in vs) P(string.Format("{0} · {1} people · pays you 45% of its scavenging every dawn", vc.Name, vc.Pop), 16, GREEN);
             }
-            bool hasRep = w.Report != null && w.Report.Id > 0;
-            if (stt == "prep") WarArmy(c, w, x, iw, y, hasRep ? bottom - 0f : bottom, p);
+            if (stt == "prep") WarArmy(c, w, iw, B);
             else if (stt == "none" && lord == "" && vs.Count == 0)
-                L("No war. " + (w.CoolT > g.S.T ? string.Format("Rival camps leave you be for {0:0.0} more days.", (w.CoolT - g.S.T) / 24.0) : "Keep an eye on the camps under COLONIES."), 16, INK);
-            if (hasRep)
-                c.Button(new Rect(p.x + 18, p.yMax - 60, 300, 50), "LAST BATTLE REPORT", "olive", 18, () => { st.Sub = "report"; st.WRPage = 0; });
+                P("No war. " + (w.CoolT > g.S.T ? string.Format("Rival camps leave you be for {0:0.0} more days.", (w.CoolT - g.S.T) / 24.0) : "Keep an eye on the camps under COLONIES."), 18, INK);
+            B.Draw(c, "war_" + stt, view, ROW_GAP);
         }
 
-        static void WarArmy(MenuCtx c, WarState w, float x, float iw, float y, float bottom, Rect p)
+        static void WarArmy(MenuCtx c, WarState w, float iw, Blocks B)
         {
-            var g = c.G; var st = c.St;
+            var g = c.G;
             var foe = g.CampById(w.Foe);
             var kit = g.WarKit(w);
             int tot = kit.Sum(k => k.Dice);
             var est = foe != null ? g.RivalArmyEstimate(foe) : (0, 0.0);
-            float top = y;
-            c.Box(new Rect(x, y, iw, 10), new Color(0.15f, 0.11f, 0.10f));
-            int cardItem = c.Items.Count - 1;
-            y += 8f;
-            void L(string t, int size, Color col, bool bold = false)
-            {
-                float hh = Math.Max(size + 6f, c.H_(t, size, bold, iw - 24f));
-                c.Label(new Rect(x + 12, y, iw - 24f, hh), t, size, col, bold); y += hh + 3f;
-            }
-            L(string.Format("WAR with {0} · battle in {1:0.0} days", foe?.Name ?? "?", g.WarDaysLeft(w)), 20, REDN, true);
-            L(string.Format("Them: about {0} fighters, {1}, averaging {2:0.0} dice (~{3} dice in all).", est.Item1, foe != null ? g.RivalStrengthWord(foe) : "?", est.Item2, (int)Math.Round(est.Item1 * est.Item2)), 15, GOLD);
-            L(string.Format("You: {0} soldiers, {1} dice in all{2}.", kit.Count, tot, kit.Count > 0 ? string.Format(", {0:0.0} each", (double)tot / kit.Count) : ""), 15, kit.Count > 0 ? GREEN : REDN);
+            float tw = iw - 36f;
             var sw = g.C.Weapons;
-            L(string.Format("Armoury: {0} rifles, {1} shotguns, {2} pistols · {3} spare hand weapons · {4} vests · {5} ammo (guns use it each round; without ammo a gun is a club). Soldiers, Cops and Scavengers carry their own hand weapon; Soldiers and Cops wear their own armour.",
-                sw.Get("rifle", 0), sw.Get("shotgun", 0), sw.Get("pistol", 0), w.Melee, w.Vests, (int)g.C.Res.Get("ammo", 0.0)), 13, INK2);
-            var acts = new[] { ("ENLIST ALL ABLE", "war_enlist_all", "sel"), ("CLEAR ARMY", "war_clear", "olive"),
-                ("HAND WEAPON (" + Game.FmtCost(Game.MELEE_COST) + ")", "craft_melee", "sel"), ("VEST (" + Game.FmtCost(Game.VEST_COST) + ")", "craft_vest", "sel") };
-            float bw = (iw - 24f - 3 * 6f) / 4f, bx = x + 12;
-            foreach (var a in acts)
+            var lines = new List<(string t, int size, Color col)>
             {
-                string act = a.Item2;
-                c.Button(new Rect(bx, y + 2, bw, 50), a.Item1, a.Item3, a.Item1.Length > 22 ? 13 : 15, () => { string e = c.Act(act, new object[0]); if (e != "") c.Toast(e); });
-                bx += bw + 6f;
-            }
-            y += 60f;
-            c.Items[cardItem].R = new Rect(x, top, iw, y - top);
-            y += 6f;
+                (string.Format("Them: about {0} fighters, {1}, averaging {2:0.0} dice (~{3} dice in all).", est.Item1, foe != null ? g.RivalStrengthWord(foe) : "?", est.Item2, (int)Math.Round(est.Item1 * est.Item2)), 16, GOLD),
+                (string.Format("You: {0} soldiers, {1} dice in all{2}.", kit.Count, tot, kit.Count > 0 ? string.Format(", {0:0.0} each", (double)tot / kit.Count) : ""), 16, kit.Count > 0 ? GREEN : REDN),
+                (string.Format("Armoury: {0} rifles, {1} shotguns, {2} pistols · {3} spare hand weapons · {4} vests · {5} ammo (guns use it each round; without ammo a gun is a club). Soldiers, Cops and Scavengers carry their own hand weapon; Soldiers and Cops wear their own armour.",
+                    sw.Get("rifle", 0), sw.Get("shotgun", 0), sw.Get("pistol", 0), w.Melee, w.Vests, (int)g.C.Res.Get("ammo", 0.0)), 14, INK2),
+            };
+            var lh = lines.Select(l => Math.Max(l.size + 6f, c.H_(l.t, l.size, false, tw))).ToList();
+            float ch = 12f + 34f + lh.Sum(h => h + 4f) + 8f + BTN_H + 12f;
+            var acts = new[] { ("ENLIST ALL ABLE", "war_enlist_all", UiRole.Accent, (string)null), ("CLEAR ARMY", "war_clear", UiRole.Danger, (string)null),
+                ("HAND WEAPON", "craft_melee", UiRole.Primary, Game.FmtCost(Game.MELEE_COST)), ("VEST", "craft_vest", UiRole.Primary, Game.FmtCost(Game.VEST_COST)) };
+            B.Add(ch, y =>
+            {
+                Card(c, new Rect(0, y, iw, ch), 0, REDN, true);
+                float yy = y + 12f;
+                c.Fit(new Rect(18f, yy, tw, 32f), string.Format("WAR with {0} · battle in {1:0.0} days", foe?.Name ?? "?", g.WarDaysLeft(w)), 23, REDN, true); yy += 34f;
+                for (int i = 0; i < lines.Count; i++) { c.Para(new Rect(18f, yy, tw, lh[i]), lines[i].t, lines[i].size, lines[i].col); yy += lh[i] + 4f; }
+                yy += 8f;
+                var bc = UiLayout.Even(new Rect(18f, yy, tw, BTN_H), 4, 10f);
+                for (int i = 0; i < acts.Length; i++)
+                {
+                    string act = acts[i].Item2;
+                    c.Btn(bc[i], acts[i].Item1, acts[i].Item3, () => { string e = c.Act(act, new object[0]); if (e != "") c.Toast(e); }, true, false, 18, acts[i].Item4);
+                }
+            });
             // "Grown-ups who can fight", enlisted first (stable)
             var by = kit.ToDictionary(k => k.Pid);
             var ppl = g.AlivePeople();
             int minors = ppl.Count(q => g.CanEnlist(q) != "");
             var able = ppl.Where(q => g.CanEnlist(q) == "").Select((q, i) => (q, i)).OrderByDescending(t => by.ContainsKey(t.q.Id) ? 1 : 0).ThenBy(t => t.i).Select(t => t.q).ToList();
             string hdr = "Grown-ups who can fight" + (minors > 0 ? string.Format("  ·  {0} children and teens stay behind the walls", minors) : "");
-            c.Label(new Rect(x, y, iw, 24), hdr, 16, AMBER, true, false); y += 28f;
-            const float RH = 54f, GAP = 4f;
-            int per = Math.Max(1, (int)((bottom - y + GAP) / (RH + GAP)));
-            int pages = Math.Max(1, (able.Count + per - 1) / per);
-            st.WPage = Math.Max(0, Math.Min(pages - 1, st.WPage));
-            foreach (var q in able.Skip(st.WPage * per).Take(per))
+            B.Add(40f, y => c.Header(new Rect(0, y, iw, 40f), hdr, 20));
+            if (able.Count == 0) B.Add(30f, y => c.Fit(new Rect(0, y, iw, 30f), "Nobody grown-up enough to fight.", 17, REDN, false));
+            int k2 = 0;
+            foreach (var q in able)
             {
                 bool on = by.ContainsKey(q.Id);
                 string txt = string.Format("{0} ({1}) · hp {2}", q.Name, q.Job, (int)q.Hp);
                 if (on) { var k = by[q.Id]; txt += string.Format(" · {0}{1} · {2} dice", Game.WAR_GEAR_NAME.TryGetValue(k.Gear ?? "", out var gn) ? gn : "", k.Armor ? " + armour" : "", k.Dice); }
-                c.Box(new Rect(x, y, iw, RH), on ? new Color(0.12f, 0.16f, 0.11f) : new Color(0.12f, 0.13f, 0.12f));
-                c.Label(new Rect(x + 12, y + 3, iw - 180f, RH - 6), txt, 15, on ? GREEN : INK);
-                int pid = q.Id; bool en = on;
-                c.Button(new Rect(x + iw - 150f, y + 3, 142, RH - 6), on ? "ENLISTED" : "ENLIST", on ? "sel" : "olive", 16, () =>
+                int pid = q.Id; bool en = on; int idx = k2++;
+                B.Add(BTN_H + 12f, y =>
                 {
-                    string e = c.Act("war_enlist", new object[] { pid, !en });
-                    if (e != "") c.Toast(e);
+                    var row = new Rect(0, y, iw, BTN_H + 12f);
+                    Card(c, row, idx, on ? GREEN : new Color(0.36f, 0.36f, 0.32f), on);
+                    c.Fit(new Rect(18f, y + 6f, iw - 240f, BTN_H), txt, 18, on ? GREEN : INK, on);
+                    c.Btn(new Rect(iw - 200f, y + 6f, 190f, BTN_H), on ? "ENLISTED" : "ENLIST", on ? UiRole.Accent : UiRole.Primary, () =>
+                    {
+                        string e = c.Act("war_enlist", new object[] { pid, !en });
+                        if (e != "") c.Toast(e);
+                    }, true, on, 19);
                 });
-                y += RH + GAP;
-            }
-            if (able.Count == 0) c.Label(new Rect(x, y, iw, 24), "Nobody grown-up enough to fight.", 15, REDN, false, false);
-            if (pages > 1)
-            {
-                float py = p.yMax - 60;
-                c.Button(new Rect(p.xMax - 392, py, 130, 50), "< PREV", "olive", 18, () => st.WPage--, st.WPage > 0);
-                c.Label(new Rect(p.xMax - 258, py + 12, 112, 28), string.Format("{0} / {1}", st.WPage + 1, pages), 18, INK, true, false, MenuAlign.Center);
-                c.Button(new Rect(p.xMax - 144, py, 130, 50), "NEXT >", "olive", 18, () => st.WPage++, st.WPage < pages - 1);
             }
         }
 
         static void WarReportView(MenuCtx c, WarReport r)
         {
             var st = c.St;
-            var p = Frame(c, string.Format(r.Won ? "VICTORY over {0}" : "DEFEAT by {0}", r.Foe));
-            c.Button(new Rect(p.xMax - 284, p.y + 10, 130, 48), "< BACK", "olive", 18, () => st.Sub = "");
-            float x = p.x + 18, iw = p.width - 36, y = p.y + 66;
+            var L = Frame(c, string.Format(r.Won ? "VICTORY over {0}" : "DEFEAT by {0}", r.Foe), () => st.Sub = "");
             string sum = Plain(r.Summary ?? "");
-            float sh = c.H_(sum, 18, false, iw);
-            c.Label(new Rect(x, y, iw, sh), sum, 18, r.Won ? GREEN : REDN); y += sh + 4f;
-            c.Label(new Rect(x, y, iw, 22), string.Format("Day {0} · {1} rounds · {2} · {3} ammo spent", r.Day, r.Rounds, r.Casualties, r.Ammo), 14, GOLD, false, false); y += 28f;
-            var all = r.Head.Select(t => (Plain(t), 14, INK2)).Concat(r.Lines.Select(t => { string s = Plain(t); bool hd = t.StartsWith("—"); return (s, hd ? 15 : 14, hd ? GOLD : INK); })).ToList();
-            var hs = all.Select(a => Math.Max(20f, c.H_(a.Item1, a.Item2, false, iw))).ToList();
-            var pages = Pages(hs, p.yMax - 70f - y, 2f);
-            st.WRPage = Math.Max(0, Math.Min(pages.Count - 1, st.WRPage));
-            int from = pages[st.WRPage], to = st.WRPage + 1 < pages.Count ? pages[st.WRPage + 1] : all.Count;
-            for (int i = from; i < to; i++) { c.Label(new Rect(x, y, iw, hs[i]), all[i].Item1, all[i].Item2, all[i].Item3); y += hs[i] + 2f; }
-            Pager(c, p, st.WRPage, pages.Count, v => st.WRPage = v, "");
+            c.Para(L.Top(c.H_(sum, 19, false, L.Rest.width)), sum, 19, r.Won ? GREEN : REDN);
+            c.Fit(L.Top(26f), string.Format("Day {0} · {1} rounds · {2} · {3} ammo spent", r.Day, r.Rounds, r.Casualties, r.Ammo), 17, GOLD, false);
+            var view = L.Rest;
+            float iw = view.width - 12f;
+            var all = r.Head.Select(t => (Plain(t), 15, INK2)).Concat(r.Lines.Select(t => { string s = Plain(t); bool hd = t.StartsWith("—"); return (s, hd ? 17 : 15, hd ? GOLD : INK); })).ToList();
+            var hs = all.Select(a => Math.Max(22f, c.H_(a.Item1, a.Item2, false, iw))).ToList();
+            c.Scroll("war_report", view, Total(hs, 3f));
+            float y = 0f;
+            for (int i = 0; i < all.Count; i++) { c.Para(new Rect(0, y, iw, hs[i]), all[i].Item1, all[i].Item2, all[i].Item3); y += hs[i] + 3f; }
+            c.EndScroll();
         }
 
         /// <summary>The "_war" demand decision (main.gd _show_decision): the full text and both answers.</summary>
         public static void WarDemand(MenuCtx c, JObject ev, Action<int> pick)
         {
-            c.Box(new Rect(0, 0, c.W, c.H), DIM);
+            c.Dim();
             var choices = ev["choices"] as JArray ?? new JArray();
-            float pw = Math.Min(980f, c.W - 60f), iw = pw - 48f;
+            float pw = Math.Min(1000f, c.W - 60f), iw = pw - 24f;
             string title = Plain((string)ev["title"] ?? "WAR"), text = Plain((string)ev["text"] ?? "");
-            float th = c.H_(title, 24, true, iw), tx = c.H_(text, 16, false, iw);
-            float ph = Math.Min(c.H - 24f, 20f + th + 10f + tx + 14f + choices.Count * 84f + 10f);
-            var p = new Rect((c.W - pw) / 2f, (c.H - ph) / 2f, pw, ph);
-            c.Box(p, PANEL);
-            c.Box(new Rect(p.x, p.y, pw, 3), REDN);
-            float x = p.x + 24, y = p.y + 18;
-            c.Label(new Rect(x, y, iw, th), title, 24, REDN, true); y += th + 10f;
-            c.Label(new Rect(x, y, iw, tx), text, 16, INK); y += tx + 14f;
+            float tx = c.H_(text, 17, false, iw);
+            var hints = new List<(string label, string hint, float hh)>();
             for (int i = 0; i < choices.Count; i++)
             {
                 var ch = choices[i] as JObject;
                 string label = Plain((string)ch?["label"] ?? ("Option " + (i + 1))), hint = Plain((string)ch?["hint"]);
-                int ii = i;
-                c.Button(new Rect(x, y, iw, 76), string.IsNullOrEmpty(hint) ? label : label + "\n" + hint, i == 0 ? "olive" : "brown", 17, () => pick(ii));
-                y += 84f;
+                hints.Add((label, hint, string.IsNullOrEmpty(hint) ? 0f : c.H_(hint, 15, false, iw)));
             }
+            float ph = Math.Min(c.H - 24f, 24f + 48f + 10f + tx + 14f + hints.Sum(hh => BTN_H + 4f + hh.hh + 10f));
+            var p = new Rect((c.W - pw) / 2f, (c.H - ph) / 2f, pw, ph);
+            var L = new UiLayout(c.Panel(p), 10f);
+            c.Header(L.Top(44f), title, 24);
+            c.Para(L.Top(Math.Min(tx, L.Rest.height)), text, 17, INK);
+            for (int i = 0; i < hints.Count; i++)
+            {
+                int ii = i;
+                c.Btn(L.Top(BTN_H), hints[i].label, i == 0 ? UiRole.Primary : UiRole.Danger, () => pick(ii), true, false, 20);
+                if (hints[i].hh > 0f) c.Para(L.Top(Math.Min(hints[i].hh, L.Rest.height)), hints[i].hint, 15, INK2);
+            }
+            Flush(c);
         }
 
         /// <summary>WAR status line under the top bar (main.gd lbl_war / _refresh_war_hud); tap opens WAR.</summary>
