@@ -52,22 +52,25 @@ namespace DayZero.Runtime
             EnsureExpStyles();
             bool on = ExpandedPref;
             Game.ExpansionRules = on;
-            float y = 430;
-            if (Btn(new Rect(60, y, 300, 64), on ? "EXPANDED: ON" : "EXPANDED: OFF", on ? _amberButton : _darkButton))
+            float y = 424;
+            if (KBtn(new Rect(60, y, 300, 72), on ? "EXPANDED: ON" : "EXPANDED: OFF", on ? UiRole.Accent : UiRole.Neutral, on, 22))
             {
                 on = !on;
                 PlayerPrefs.SetInt(PREF_EXPANDED, on ? 1 : 0);
                 PlayerPrefs.Save();
                 Game.ExpansionRules = on;
             }
-            GUI.Label(new Rect(376, y + 4, w - 440, 28), on ? "Seasons, weather, noise, district danger, traits and stress" : "Classic = original rules", _small);
-            GUI.Label(new Rect(376, y + 32, w - 440, 28), on ? "Classic = original rules (tap to switch off)" : "Tap to turn the expanded rules on", _small);
+            float tw = Mathf.Min(w - 80f, 760f) - 336f;
+            UiKit.FitLabel(new Rect(376, y + 8, tw, 26), on ? "Seasons, weather, noise, district danger, traits and stress" : "Classic = original rules", 16, TextAnchor.MiddleLeft, UiKit.Ink, false);
+            UiKit.FitLabel(new Rect(376, y + 36, tw, 26), on ? "Classic = original rules (tap to switch off)" : "Tap to turn the expanded rules on", 15, TextAnchor.MiddleLeft, UiKit.InkDim, false);
         }
 
-        /// <summary>Map layer: coloured D1..D5 label under each district name while the DANGER overlay is on.</summary>
+        /// <summary>Map layer: coloured D1..D5 tag under each district name while the DANGER overlay is on (hidden where it
+        /// would run under the HUD or another label).</summary>
         void DrawDangerOverlay(MapView map, float w, float h)
         {
             if (!Game.ExpansionRules || !_dangerOn || map == null || !map.Ready || G?.S == null) return;
+            if (Event.current.type != EventType.Repaint) return;
             EnsureExpStyles();
             var ds = Data.Instance.Districts;
             var dd = G.S.DistrictDanger;
@@ -76,65 +79,69 @@ namespace DayZero.Runtime
                 var c = ds[i].C;
                 if (c == null || c.Length < 2) continue;
                 if (!map.TryScreen(new Vector3((float)c[0], 2f, -(float)c[1]), out var sp)) continue;
-                var v = new Vector2((sp.x - _offX) / _scale, (sp.y - _offY) / _scale);
+                var v = ToVirtual(sp);
                 if (v.x < -100 || v.x > w + 100 || v.y < 0 || v.y > h) continue;
                 int lv = dd != null && i < dd.Length && dd[i] > 0 ? Mathf.Clamp(dd[i], 1, 5) : G.DistrictDangerAt((int)c[0], (int)c[1]);
                 string t = Game.DANGER_LABEL[lv];
-                var r = new Rect(v.x - 90, v.y + 12, 180, 26);
-                var oc = GUI.color;
-                GUI.color = new Color(0f, 0f, 0f, 0.55f * oc.a);
                 _gc.text = t;
-                float tw = _xDanger.CalcSize(_gc).x + 16f;
-                GUI.DrawTexture(new Rect(v.x - tw / 2, r.y + 1, tw, 24), _xWhite);
+                float tw = _xDanger.CalcSize(_gc).x + 20f;
+                var r = new Rect(v.x - tw / 2, v.y + 14, tw, 26);
+                if (!_lp.Place(r)) continue;
+                var oc = GUI.color;
+                GUI.color = new Color(0f, 0f, 0f, 0.6f * oc.a);
+                GUI.DrawTexture(r, _xWhite);
                 GUI.color = new Color(DANGER_COL[lv].r, DANGER_COL[lv].g, DANGER_COL[lv].b, oc.a);
-                GUI.DrawTexture(new Rect(v.x - tw / 2, r.y + 1, 4, 24), _xWhite);
+                GUI.DrawTexture(new Rect(r.x, r.y, 4, r.height), _xWhite);
                 GUI.color = oc;
-                _xDanger.normal.textColor = DANGER_COL[lv];
-                GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), t, _xDangerSh);
-                GUI.Label(r, t, _xDanger);
+                UiKit.FitLabel(new Rect(r.x + 6, r.y, r.width - 8, r.height), t, 17, TextAnchor.MiddleCenter, DANGER_COL[lv]);
             }
         }
 
-        /// <summary>HUD (after the stats panel): season / weather chip, noise gauge + popup, DANGER button; also drives
-        /// the weather visuals from the sim.</summary>
+        static readonly string[] WEATHER_ICON = { "sun", "water", "water", null, null };
+
+        /// <summary>HUD (next to the stats card): season / weather row and the noise gauge (tap: sources popup), the DANGER
+        /// toggle at the foot of the camera column; also drives the weather visuals from the sim.</summary>
         void DrawExpWorldHud(float w, float h, MapView map)
         {
             if (!Game.ExpansionRules || G?.S == null) return;
             EnsureExpStyles();
             int wi = Mathf.Clamp((int)G.CurrentWeather, 0, 4);
             FxWeather.Current = (FxWeatherKind)wi;   // enums share order (Clear, Rain, Storm, Fog, Snow)
+            var f = _hf;
+            UiKit.Panel(Blk(f.World));
 
-            float x = 346, cw = Mathf.Clamp(w / 2 - 88 - x, 150f, 300f);
-            // season / weather chip
-            string chip = G.SeasonLabel + " · " + WEATHER_WORD[wi];
-            var cr = Blk(new Rect(x, 8, cw, 30));
-            GUI.Box(cr, GUIContent.none, _chip);
-            GUI.Label(cr, chip, _xChip);
+            // season / weather
+            var sr = f.SeasonRow;
+            UiKit.RowPlate(sr, 0);
+            string icon = WEATHER_ICON[wi];
+            if (icon == "sun" && G.IsNight()) icon = "moon";
+            float tx = sr.x + 10f;
+            if (icon != null)
+            {
+                if (Event.current.type == EventType.Repaint)
+                    GUI.DrawTexture(new Rect(sr.x + 5f, sr.y + 3f, sr.height - 6f, sr.height - 6f), Icons.Tex(icon, icon == "sun" ? new Color(0.80f, 0.56f, 0.18f) : icon == "moon" ? new Color(0.30f, 0.38f, 0.62f) : new Color(0.30f, 0.50f, 0.72f)), ScaleMode.ScaleToFit, true);
+                tx = sr.x + sr.height + 2f;
+            }
+            UiKit.FitLabel(new Rect(tx, sr.y, sr.xMax - tx - 8f, sr.height), G.SeasonLabel + "  -  " + WEATHER_WORD[wi], 17, TextAnchor.MiddleLeft, UiKit.Ink, true, 10);
 
             // noise gauge (main camp)
             var mb = G.MainBase();
+            var gr = f.NoiseRow;
             if (mb != null)
             {
                 float noise = Mathf.Clamp(mb.Noise, 0f, 100f);
                 int band = G.NoiseBand(mb.Id);
-                var gr = Blk(new Rect(x, 42, cw, 30));
-                GUI.Box(gr, GUIContent.none, _chip);
-                GUI.Label(new Rect(gr.x + 8, gr.y, 62, gr.height), "NOISE", _xCap);
-                var bar = new Rect(gr.x + 66, gr.y + 9, gr.width - 66 - 70, 12);
-                GUI.DrawTexture(bar, _xBarBg);
-                var oc = GUI.color;
-                GUI.color = new Color(NOISE_COL[band].r, NOISE_COL[band].g, NOISE_COL[band].b, oc.a);
-                GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * noise / 100f, bar.height), _xWhite);
-                GUI.color = oc;
-                _xCap.normal.textColor = NOISE_COL[band];
-                GUI.Label(new Rect(bar.xMax + 6, gr.y, 66, gr.height), NOISE_WORD[band], _xCap);
-                _xCap.normal.textColor = _small.normal.textColor;
-                if (GUI.Button(gr, GUIContent.none, GUIStyle.none)) { _noisePopup = !_noisePopup; _b.PlayClick(); }
-                if (_noisePopup) DrawNoisePopup(new Rect(x, 76, Mathf.Max(cw, 280f), 0), mb, noise, band);
+                var cols = UiLayout.Columns(gr, 6f, -56f, 1f, -64f);
+                UiKit.FitLabel(cols[0], "NOISE", 14, TextAnchor.MiddleLeft, UiKit.InkDim, true, 9);
+                UiKit.Bar(UiLayout.Inset(cols[1], 0f, 5f, 0f, 5f), noise / 100f, band == 0 ? UiRole.Primary : band == 3 ? UiRole.Danger : UiRole.Accent);
+                UiKit.FitLabel(cols[2], NOISE_WORD[band], 14, TextAnchor.MiddleRight, NOISE_COL[band], true, 9);
+                if (GUI.Button(f.World, GUIContent.none, GUIStyle.none)) { _noisePopup = !_noisePopup; _b.PlayClick(); }
+                if (_noisePopup) DrawNoisePopup(new Rect(f.World.x, f.World.yMax + 6f, Mathf.Max(f.World.width, 300f), 0), mb, noise, band);
             }
+            else UiKit.FitLabel(gr, "NOISE  -", 14, TextAnchor.MiddleLeft, UiKit.InkMute, true, 9);
 
-            // DANGER overlay toggle, under the camera buttons
-            if (map != null && Btn(Blk(new Rect(10, 462, 76, 54)), _dangerOn ? "DANGER\nON" : "DANGER", _dangerOn ? _xDangerBtn : _camSmall))
+            // DANGER overlay toggle, at the foot of the camera column
+            if (map != null && f.Cam.Length > 4 && KBtn(Blk(f.Cam[4]), "DANGER", _dangerOn ? UiRole.Accent : UiRole.Neutral, _dangerOn, 16))
                 _dangerOn = !_dangerOn;
         }
 
@@ -142,20 +149,22 @@ namespace DayZero.Runtime
         {
             var src = G.NoiseSources(mb.Id);
             var rows = src == null ? new List<KeyValuePair<string, float>>() : src.Where(kv => kv.Value >= 0.05f).OrderByDescending(kv => kv.Value).Take(8).ToList();
-            float ph = 76 + 26 * Mathf.Max(1, rows.Count) + 12;
+            float ph = UiKit.HeaderH + 4f + 8f + 26f + 6f + 30f * Mathf.Max(1, rows.Count) + 28f + UiKit.PanelPad;
             var r = Blk(new Rect(at.x, at.y, at.width, ph));
-            GUI.Box(r, GUIContent.none, _hudBox);
-            GUI.Label(new Rect(r.x + 12, r.y + 6, r.width - 24, 24), string.Format("NOISE {0} / 100  {1}", (int)noise, NOISE_WORD[band]), _hdrAmber);
-            GUI.Label(new Rect(r.x + 12, r.y + 30, r.width - 24, 22), "This hour, at " + mb.Name, _small);
-            float y = r.y + 58;
-            if (rows.Count == 0) GUI.Label(new Rect(r.x + 12, y, r.width - 24, 24), "No noise made this hour.", _xRow);
+            var ci = UiKit.Panel(r, string.Format("Noise {0} / 100  {1}", (int)noise, NOISE_WORD[band]), 19);
+            var L = new UiLayout(ci, 4f);
+            UiKit.FitLabel(L.Top(26f), "This hour, at " + mb.Name, 15, TextAnchor.MiddleLeft, UiKit.InkDim, false);
+            UiKit.FitLabel(L.Bottom(24f), "Tap the gauge to close", 14, TextAnchor.MiddleLeft, UiKit.InkMute, false);
+            if (rows.Count == 0) UiKit.FitLabel(L.Top(26f), "No noise made this hour.", 17, TextAnchor.MiddleLeft, UiKit.Ink, false);
+            int i = 0;
             foreach (var kv in rows)
             {
-                GUI.Label(new Rect(r.x + 12, y, r.width - 90, 24), kv.Key, _xRow);
-                GUI.Label(new Rect(r.xMax - 78, y, 66, 24), "+" + kv.Value.ToString("0.#"), _xRow);
-                y += 26;
+                var row = L.Top(26f);
+                UiKit.RowPlate(row, i++);
+                var c = UiLayout.Columns(UiLayout.Inset(row, 8f, 0f, 8f, 0f), 6f, 1f, -60f);
+                UiKit.FitLabel(c[0], kv.Key, 16, TextAnchor.MiddleLeft, UiKit.Ink, false);
+                UiKit.FitLabel(c[1], "+" + kv.Value.ToString("0.#"), 16, TextAnchor.MiddleRight, UiKit.Amber);
             }
-            GUI.Label(new Rect(r.x + 12, r.yMax - 22, r.width - 24, 20), "Tap the gauge to close", _small);
         }
     }
 }

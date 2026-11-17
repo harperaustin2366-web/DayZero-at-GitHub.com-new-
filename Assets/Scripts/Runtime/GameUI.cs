@@ -18,14 +18,12 @@ namespace DayZero.Runtime
     {
         const float VH = 720f;          // virtual height (Godot viewport 1280x720)
         const float TAB_H = 52f;
-        const int PAGE = 7;
 
         static readonly string[] RES_KEYS = { "food", "water", "meds", "ammo", "fuel" };
         static readonly string[] TABS = { "Colony", "Jobs", "Log", "Menu" };
 
         readonly Bootstrap _b;
         int _tab;
-        int _jobPage, _logPage;
         bool _styled;
         GUIStyle _label, _small, _title, _button, _bigButton, _box, _chip, _warn;
         GUIStyle _amberButton, _brownButton, _darkButton, _hud, _hudR, _shadow, _mapLabel, _mapDistrict, _mapCamp, _labelShadow;
@@ -116,6 +114,7 @@ namespace DayZero.Runtime
             _lineTex = Solid(new Color(0.85f, 0.66f, 0.32f, 0.35f));
             _amberLineTex = Solid(new Color(0.95f, 0.70f, 0.28f, 0.9f));
             _sheetDimTex = Solid(new Color(0.04f, 0.045f, 0.035f, 0.80f));
+            _xWhiteTex = Solid(Color.white);
             _hud = new GUIStyle(_label) { fontSize = 21, fontStyle = FontStyle.Bold, wordWrap = false, richText = true };
             _hudR = new GUIStyle(_hud) { alignment = TextAnchor.UpperRight };
             _shadow = new GUIStyle(_hud); _shadow.normal.textColor = new Color(0, 0, 0, 0.75f);
@@ -222,46 +221,69 @@ namespace DayZero.Runtime
 
         void DrawTitle(float w, float h)
         {
-            Shadowed(new Rect(60, 50, w - 120, 60), "DAY ZERO: OUTBREAK", _title);
-            GUI.DrawTexture(new Rect(60, 92, 420, 3), _accentTex);
-            GUI.Label(new Rect(60, 98, w - 120, 34), "SURVIVE. BUILD. DEFEND. EXPAND.", _tagSt);
-            GUI.Label(new Rect(60, 132, w - 120, 30), "v" + Application.version + " · Unity port", _small);
-            float y = 190;
+            UiKit.FitLabel(new Rect(60, 44, w - 120, 58), "DAY ZERO: OUTBREAK", 46, TextAnchor.MiddleLeft, UiKit.Amber);
+            GUI.DrawTexture(new Rect(60, 104, 420, 3), _accentTex);
+            UiKit.FitLabel(new Rect(60, 110, w - 120, 32), "SURVIVE. BUILD. DEFEND. EXPAND.", 22, TextAnchor.MiddleLeft, OLIVE_INK);
+            UiKit.FitLabel(new Rect(60, 142, w - 120, 24), "v" + Application.version + "  -  Unity port", 15, TextAnchor.MiddleLeft, UiKit.InkDim, false);
+            var panel = new Rect(40, 176, Mathf.Min(w - 80, 720f), 340f);
+            UiKit.Panel(panel);
             bool has = _b.HasSave();
-            GUI.enabled = has;
-            if (Btn(new Rect(60, y, 420, 76), has ? "Continue" : "Continue (no save)", _bigButton)) _b.LoadSaved();
-            GUI.enabled = true;
-            y += 110;
-            GUI.Label(new Rect(60, y, 420, 34), "New game", _label);
-            y += 40;
+            if (KBtn(new Rect(60, 190, 420, 72), has ? "CONTINUE" : "CONTINUE (NO SAVE)", has ? UiRole.Accent : UiRole.Disabled, false, 26)) _b.LoadSaved();
+            UiKit.Header(new Rect(56, 276, panel.width - 32, 40), "New game", 20);
             for (int d = 0; d < Game.DIFF_NAMES.Length; d++)
-            {
-                if (Btn(new Rect(60 + d * 220, y, 200, 72), Game.DIFF_NAMES[d], _bigButton)) _b.NewGame(d);
-            }
+                if (KBtn(new Rect(60 + d * 220, 326, 200, 72), Game.DIFF_NAMES[d].ToUpperInvariant(), UiRole.Primary, false, 24)) _b.NewGame(d);
             DrawExpandedToggle(w, h);   // GameUI.Expansion.World.cs
-            GUI.Label(new Rect(60, h - 90, w - 120, 60),
-                "Starting a new game replaces the current save. You pick the building for your base on the map.", _small);
+            UiKit.FitLabel(new Rect(60, h - 80, w - 120, 28),
+                "Starting a new game replaces the current save. You pick the building for your base on the map.", 16, TextAnchor.MiddleLeft, UiKit.InkDim, false);
         }
 
         // ---------------- in game ----------------
-        // Layout follows the Godot build: stats top-left, MENU top-centre, kills / rescued and
-        // resources top-right, camera buttons down the left, collapsible ACTIONS panel on the right.
+        // v0.17: every HUD rect comes from HudFrame (non-overlapping docks): stats top-left, season / noise next to
+        // it, MENU top-centre, kills / rescued and the resource chips top-right, camera column down the left, one
+        // segmented time control at the bottom, collapsible ACTIONS panel on the right. All drawn with the UiKit.
+        HudFrame _hf;
+
+        bool KBtn(Rect r, string text, UiRole role = UiRole.Primary, bool selected = false, int maxSize = 22)
+        {
+            if (!UiKit.Button(r, text, role, selected, maxSize)) return false;
+            _b.PlayClick();
+            return true;
+        }
+
+        // single-line width measure + wrapped-height measure (same font as UiKit's labels)
+        GUIStyle _kitMeasure, _kitPara;
+        float TextW(string t, int size, bool bold = true)
+        {
+            if (_kitMeasure == null) _kitMeasure = new GUIStyle(GUI.skin.label) { wordWrap = false, padding = new RectOffset(0, 0, 0, 0), margin = new RectOffset(0, 0, 0, 0) };
+            _kitMeasure.fontSize = size; _kitMeasure.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal;
+            _gc.text = t ?? "";
+            return _kitMeasure.CalcSize(_gc).x;
+        }
+        float ParaH(string t, int size, float width)
+        {
+            if (_kitPara == null) _kitPara = new GUIStyle(GUI.skin.label) { wordWrap = true, padding = new RectOffset(0, 0, 0, 0), margin = new RectOffset(0, 0, 0, 0) };
+            _kitPara.fontSize = size; _kitPara.fontStyle = FontStyle.Normal;
+            _gc.text = t ?? "";
+            return _kitPara.CalcHeight(_gc, width);
+        }
+
         void DrawGame(float w, float h)
         {
             if (G?.S == null || G.C == null) { Center(w, h, "DayZero", "No game running."); return; }
+            _hf = HudFrame.Make(w, h, Game.ExpansionRules && !_b.Picking);
             var map = MapView.Instance;
             if (map != null && map.Ready) DrawMapLabels(map, w, h);
             if (map != null && map.Ready && !_b.Picking && G.C.Started) { DrawConvLabels(map, w, h); DrawRepairMarks(map, w, h); DrawWreckMarks(map, w, h); }
             if (!_b.Picking && G.C.Started) DrawDangerOverlay(map, w, h);   // GameUI.Expansion.World.cs
             if (map != null && !string.IsNullOrEmpty(map.RenderWarning))
-                Shadowed(new Rect(12, h - 30, w - 24, 24), map.RenderWarning, _small);
+                UiKit.FitLabel(new Rect(110, h - 30, w - 220, 24), map.RenderWarning, 15, TextAnchor.MiddleLeft, UiKit.InkDim, false);
             // v0.11.2a drew this every frame, so "Building the map 100%" never went away
             if (map == null || !map.Ready) Center(w, h, "Building the map", map != null ? string.Format("{0}%", (int)(map.Progress * 100f)) : "");
 
             if (_b.Picking)
             {
                 // new game: choose the building for the base (no camp, no clock yet)
-                if (Btn(Blk(new Rect(w / 2 - 80, 8, 160, 50)), "MENU", _darkButton)) _menuOpen = true;
+                if (KBtn(Blk(_hf.Menu), "MENU", UiRole.Neutral)) _menuOpen = true;
                 DrawCameraButtons(map);
                 if (map != null && map.Ready && !ModalOpen) DrawStartPick(w, h, map);
                 if (_menuOpen) { BeginAnim(ref _modalAnim, 3, null, 0f, 18f); DrawMenuOverlay(w, h); EndAnim(); }
@@ -275,10 +297,10 @@ namespace DayZero.Runtime
             if (swallow) Event.current.type = EventType.Ignore;
             DrawStats();
             DrawExpWorldHud(w, h, map);   // GameUI.Expansion.World.cs
-            if (Btn(Blk(new Rect(w / 2 - 80, 8, 160, 50)), "MENU", _darkButton)) _menuOpen = true;
+            if (KBtn(Blk(_hf.Menu), "MENU", UiRole.Neutral)) _menuOpen = true;
             DrawTopRight(w);
             DrawCameraButtons(map);
-            float by = 104f;
+            float by = _hf.BannerY;
             DrawAttackBanner(w, h, ref by);
             DrawRepairChip(w, ref by);
             DrawResearchNote(w, ref by, map);
@@ -361,33 +383,24 @@ namespace DayZero.Runtime
         /// <summary>Start-site selection: banner, then the selected building's info with Confirm / Cancel.</summary>
         void DrawStartPick(float w, float h, MapView map)
         {
-            var ban = Blk(new Rect(w / 2 - 330, 66, 660, 78));
-            GUI.Box(ban, GUIContent.none, _hudBox);
-            var bs = _bannerS;
-            Shadowed(new Rect(ban.x, ban.y + 6, ban.width, 40), "Tap any building to make it your base", _bannerT);
-            GUI.Label(new Rect(ban.x, ban.y + 46, ban.width, 26), "Start anywhere: drag to look around, pinch to zoom, then tap the building you want", bs);
+            float bw = Mathf.Clamp(w - 600f, 460f, 680f);
+            var ban = Blk(new Rect(w / 2 - bw / 2, _hf.Menu.yMax + 8f, bw, 84f));
+            var bc = UiKit.Panel(ban);
+            var br = UiLayout.Rows(bc, 2f, 1.3f, 1f);
+            UiKit.FitLabel(br[0], "TAP ANY BUILDING TO MAKE IT YOUR BASE", 24, TextAnchor.MiddleCenter, UiKit.Amber);
+            UiKit.FitLabel(br[1], "Drag to look around, pinch to zoom, then tap the building you want", 16, TextAnchor.MiddleCenter, UiKit.InkDim, false);
             if (map.SelectedLot < 0 || !map.SelectionInfo(out string type, out string size, out int floors, out string district)) return;
             string err = map.SelectError;
-            float pw = 600, ph = err != "" ? 210 : 180, px = w / 2 - pw / 2, py = h - ph - 14;
-            var panel = Blk(new Rect(px, py, pw, ph));
-            GUI.Box(panel, GUIContent.none, _box);
-            Shadowed(new Rect(px + 20, py + 10, pw - 40, 36), type.ToUpperInvariant(), _pickT);
-            GUI.Label(new Rect(px + 20, py + 50, pw - 40, 28), string.Format("Size {0}  ·  {1} floor{2}  ·  {3}", size, floors, floors == 1 ? "" : "s", district), _label);
-            float y = py + 82;
-            if (err != "")
-            {
-                GUI.Label(new Rect(px + 20, y, pw - 40, 30), err, _pickErr);
-                y += 32;
-            }
-            else
-            {
-                GUI.Label(new Rect(px + 20, y, pw - 40, 26), "Your people move in. Fence the block in from DEFENSE, then add a gate.", _small);
-                y += 30;
-            }
-            GUI.enabled = err == "";
-            if (Btn(new Rect(px + 20, y + 4, 270, 60), "CONFIRM", _amberButton)) _b.ConfirmStart();
-            GUI.enabled = true;
-            if (Btn(new Rect(px + pw - 290, y + 4, 270, 60), "CANCEL", _darkButton)) map.ClearSelection();
+            float pw = Mathf.Min(640f, w - 220f), ph = 236f;
+            var panel = Blk(new Rect(w / 2 - pw / 2, h - ph - 12f, pw, ph));
+            var pc = UiKit.Panel(panel, type);
+            var L = new UiLayout(pc, 6f);
+            UiKit.FitLabel(L.Top(28f), string.Format("Size {0}  -  {1} floor{2}  -  {3}", size, floors, floors == 1 ? "" : "s", district), 19, TextAnchor.MiddleLeft, UiKit.Ink, false);
+            if (err != "") UiKit.FitLabel(L.Top(26f), err, 17, TextAnchor.MiddleLeft, UiKit.Bad);
+            else UiKit.FitLabel(L.Top(26f), "Your people move in. Fence the block in from DEFENSE, then add a gate.", 16, TextAnchor.MiddleLeft, UiKit.InkDim, false);
+            var bb = UiLayout.Columns(L.Bottom(58f), 12f, 1f, 1f);
+            if (KBtn(bb[0], "CONFIRM", err == "" ? UiRole.Accent : UiRole.Disabled)) _b.ConfirmStart();
+            if (KBtn(bb[1], "CANCEL", UiRole.Neutral)) map.ClearSelection();
         }
 
         void Shadowed(Rect r, string text, GUIStyle st)
@@ -407,35 +420,41 @@ namespace DayZero.Runtime
         static string StripTags(string s) => s.IndexOf('<') < 0 ? s : System.Text.RegularExpressions.Regex.Replace(s, "<.*?>", "");
         static string Col(Color c, string s) => "<color=#" + ColorUtility.ToHtmlStringRGB(c) + ">" + s + "</color>";
 
+        /// <summary>Top-left stats card: four stat tiles, the clock row (tinted by the hour), the phase line and the
+        /// colony line.</summary>
         void DrawStats()
         {
-            var c = G.C;
+            var c = G.C; var f = _hf;
             var alive = G.AlivePeople();
             int beds = 0, used = 0;
             foreach (var b in c.Bases) { int r = G.CampResidents(b.Id); used += r; beds += r + G.CampFree(b); }
             int dead = c.People.Count(p => p.St == "dead");
             int z = G.ZombieCount();
-            var panel = Blk(new Rect(8, 8, 330, 190));
-            GUI.Box(panel, GUIContent.none, _hudBox);
-            float y = 14, x = 20;
-            Shadowed(new Rect(x, y, 310, 28), "SURVIVORS: " + Col(OLIVE_INK, alive.Count.ToString()), _hud); y += 27;
-            Shadowed(new Rect(x, y, 310, 28), "BEDS: " + Col(used > beds ? RED_INK : OLIVE_INK, used + "/" + beds), _hud); y += 27;
-            Shadowed(new Rect(x, y, 310, 28), "ZOMBIES: " + Col(z > 0 ? RED_INK : OLIVE_INK, z.ToString()), _hud); y += 27;
-            Shadowed(new Rect(x, y, 310, 28), "DEAD: " + dead, _hud); y += 27;
-            string timeText = "TIME: " + G.ClockText() + (G.IsNight() ? "  " + Col(AMBER, "night") : "");
-            DrawClockChip(new Rect(13, y + 1, 320, 27), x, timeText);
-            Shadowed(new Rect(x, y, 310, 28), timeText, _hud); y += 30;
-            GUI.DrawTexture(new Rect(x, y - 1, 306, 1), _lineTex);
+            UiKit.Panel(Blk(f.Stats));
+            StatTile(f.StatCell[0], "SURVIVORS", alive.Count.ToString(), OLIVE_INK);
+            StatTile(f.StatCell[1], "BEDS", used + "/" + beds, used > beds ? RED_INK : OLIVE_INK);
+            StatTile(f.StatCell[2], "ZOMBIES", z.ToString(), z > 0 ? RED_INK : OLIVE_INK);
+            StatTile(f.StatCell[3], "DEAD", dead.ToString(), UiKit.Ink);
+            DrawClockChip(f.TimeRow);
             var ri = G.RaidInfo();
             bool alert = ri != null && (ri.On || ri.Warned);
-            if (alert) DrawAlertPulse(new Rect(x + 284, y + 1, 22, 20), ri.On);
-            GUI.Label(new Rect(x, y, alert ? 280 : 310, 22), PhaseText(), _phaseSt); y += 20;
-            GUI.Label(new Rect(x, y, 310, 22), string.Format("{0}  ·  {1} survivors  ·  {2} kills", c.Name, alive.Count, c.Stat("kills")), _colonySt);
+            var pr = f.PhaseRow;
+            if (alert) DrawAlertPulse(new Rect(pr.xMax - 22f, pr.y + 1f, 22f, 22f), ri.On);
+            UiKit.FitLabel(new Rect(pr.x, pr.y, pr.width - (alert ? 28f : 0f), pr.height), PhaseText(), 17, TextAnchor.MiddleLeft, alert ? RED_INK : AMBER, true, 11);
+            UiKit.FitLabel(f.ColonyRow, string.Format("{0}  -  {1} survivors  -  {2} kills", c.Name, alive.Count, c.Stat("kills")), 15, TextAnchor.MiddleLeft, OLIVE_INK, false, 11);
         }
 
-        /// <summary>v0.14.0a: the TIME row sits on a soft chip tinted by the hour (warm day, orange dusk / dawn, blue
-        /// night) with a sun / moon glyph at its right end.</summary>
-        void DrawClockChip(Rect r, float textX, string timeText)
+        void StatTile(Rect r, string label, string value, Color vc)
+        {
+            UiKit.RowPlate(r, 0);
+            var rows = UiLayout.Rows(UiLayout.Inset(r, 9f, 3f, 6f, 2f), 0f, -13f, 1f);
+            UiKit.FitLabel(rows[0], label, 12, TextAnchor.MiddleLeft, UiKit.InkMute, true, 9, false);
+            UiKit.FitLabel(rows[1], value, 22, TextAnchor.MiddleLeft, vc, true, 12);
+        }
+
+        /// <summary>The clock row sits on a soft plate tinted by the hour (warm day, orange dusk / dawn, blue night)
+        /// with a drawn sun / moon badge at its left.</summary>
+        void DrawClockChip(Rect r)
         {
             float hour = (float)(G.S.T % 24.0);
             var oldBg = GUI.backgroundColor;
@@ -443,9 +462,13 @@ namespace DayZero.Runtime
             GUI.Box(r, GUIContent.none, _tintBox);
             GUI.backgroundColor = oldBg;
             bool night = hour >= 19.5f || hour < 5.5f;
-            _gc.text = timeText;
-            if (textX + _hud.CalcSize(_gc).x + 6f + 21f <= r.xMax - 4f)   // only where the text leaves room
-                GUI.DrawTexture(new Rect(r.xMax - 26, r.y + 3, 21, 21), night ? Icons.GlyphTex("moon", MOON) : Icons.GlyphTex("sun", SUN));
+            if (Event.current.type == EventType.Repaint)
+                GUI.DrawTexture(new Rect(r.x + 4f, r.y + 3f, r.height - 6f, r.height - 6f), night ? Icons.Tex("moon", new Color(0.30f, 0.38f, 0.62f)) : Icons.Tex("sun", new Color(0.80f, 0.56f, 0.18f)), ScaleMode.ScaleToFit, true);
+            float tx = r.x + r.height + 4f;
+            bool isNight = G.IsNight();
+            float nw = isNight ? 66f : 0f;
+            UiKit.FitLabel(new Rect(tx, r.y, r.xMax - tx - nw - 6f, r.height), G.ClockText().ToUpperInvariant(), 21, TextAnchor.MiddleLeft, UiKit.Ink, true, 12);
+            if (isNight) UiKit.FitLabel(new Rect(r.xMax - nw - 6f, r.y, nw, r.height), "NIGHT", 15, TextAnchor.MiddleRight, AMBER, true, 10);
         }
 
         /// <summary>v0.14.0a: pulsing siren glyph with a red halo (attack warned: slow, attack on: fast).</summary>
@@ -491,64 +514,85 @@ namespace DayZero.Runtime
                 if (Mathf.Abs(target - v) < 0.5f) v = target;
                 _chipShown[i] = v;
                 int n = (int)v;
-                if (_chipText[i] == null || n != _chipInt[i]) { _chipInt[i] = n; _chipText[i] = CHIP_KEYS[i] + " " + n; }
+                if (_chipText[i] == null || n != _chipInt[i]) { _chipInt[i] = n; _chipText[i] = n.ToString(); }
             }
         }
 
+        /// <summary>Top right: ZOMBIES KILLED / RESCUED counters, then the resource chips (drawn badge icon, value,
+        /// name when there is room); a change flashes the value green / red for a moment.</summary>
         void DrawTopRight(float w)
         {
-            var c = G.C;
-            GUI.DrawTexture(new Rect(w - 360, 4, 356, 60), _scrimTex);
-            Shadowed(new Rect(w - 330, 8, 320, 28), Col(AMBER, c.Stat("kills").ToString()) + " : ZOMBIES KILLED", _hudR);
-            Shadowed(new Rect(w - 330, 34, 320, 28), Col(OLIVE_INK, c.Stat("rescued").ToString()) + " : RESCUED", _hudR);
-            // resource chips, right-aligned: glyph + "name value"; a change flashes the text green / red for a moment
+            var c = G.C; var f = _hf;
+            UiKit.Panel(Blk(f.Counters));
+            Counter(f.CounterHalf[0], c.Stat("kills").ToString(), "ZOMBIES KILLED", UiKit.Amber);
+            Counter(f.CounterHalf[1], c.Stat("rescued").ToString(), "RESCUED", OLIVE_INK);
             if (Event.current.type == EventType.Layout || _chipText[0] == null) TickChips();
-            float x = w - 8, now = Time.unscaledTime;
-            var ink = _chip.normal.textColor;
-            for (int i = CHIP_KEYS.Length - 1; i >= 0; i--)
+            float now = Time.unscaledTime;
+            for (int i = 0; i < CHIP_KEYS.Length; i++)
             {
-                _gc.text = _chipText[i];
-                float cw = Mathf.Max(64f, _chip.CalcSize(_gc).x + 14f + 22f);
-                x -= cw;
-                var r = Blk(new Rect(x, 66, cw, 32));
-                GUI.Box(r, GUIContent.none, _chip);
-                GUI.DrawTexture(new Rect(r.x + 6, r.y + 5, 22, 22), Icons.GlyphTex(CHIP_KEYS[i], CHIP_COL[i]), ScaleMode.ScaleToFit, true);
-                float f = _chipDir[i] == 0 ? 0f : Mathf.Clamp01(1f - (now - _chipFlashT[i]) / 0.9f);
-                if (f > 0f) _chipTxt.normal.textColor = Color.Lerp(ink, _chipDir[i] > 0 ? new Color(0.62f, 0.92f, 0.45f) : new Color(1f, 0.45f, 0.35f), f);
-                GUI.Label(new Rect(r.x + 22, r.y, r.width - 22, r.height), _gc, _chipTxt);
-                _chipTxt.normal.textColor = ink;
-                x -= 4;
+                var r = Blk(f.Chips[i]);
+                UiKit.Chip(r, "", UiRole.Neutral);
+                float s = r.height - 8f;
+                if (Event.current.type == EventType.Repaint)
+                    GUI.DrawTexture(new Rect(r.x + 9f, r.y + 4f, s, s), Icons.Tex(CHIP_KEYS[i], CHIP_COL[i]), ScaleMode.ScaleToFit, true);
+                var ink = UiKit.Ink;
+                float fl = _chipDir[i] == 0 ? 0f : Mathf.Clamp01(1f - (now - _chipFlashT[i]) / 0.9f);
+                if (fl > 0f) ink = Color.Lerp(ink, _chipDir[i] > 0 ? new Color(0.62f, 0.92f, 0.45f) : new Color(1f, 0.45f, 0.35f), fl);
+                float tx = r.x + 9f + s + 6f, tw = r.xMax - tx - 6f;
+                if (f.ChipNames)
+                {
+                    float vw = Mathf.Min(TextW(_chipText[i], 19) + 4f, tw * 0.62f);
+                    UiKit.FitLabel(new Rect(tx, r.y, vw, r.height), _chipText[i], 19, TextAnchor.MiddleLeft, ink, true, 11);
+                    UiKit.FitLabel(new Rect(tx + vw + 3f, r.y + 1f, tw - vw - 3f, r.height), CHIP_KEYS[i], 13, TextAnchor.MiddleRight, UiKit.InkMute, false, 9, false);
+                }
+                else UiKit.FitLabel(new Rect(tx, r.y, tw, r.height), _chipText[i], 19, TextAnchor.MiddleLeft, ink, true, 11);
             }
         }
+
+        void Counter(Rect r, string value, string label, Color vc)
+        {
+            float vw = Mathf.Clamp(TextW(value, 24) + 6f, 26f, r.width * 0.45f);
+            UiKit.FitLabel(new Rect(r.x, r.y, vw, r.height), value, 24, TextAnchor.MiddleLeft, vc, true, 12);
+            UiKit.FitLabel(new Rect(r.x + vw + 4f, r.y + 2f, r.width - vw - 4f, r.height - 2f), label, 15, TextAnchor.MiddleLeft, UiKit.InkDim, true, 10);
+        }
+
+        static readonly string[] CAM_LABELS = { "HOME", "+", "-", "MAP" };
 
         void DrawCameraButtons(MapView map)
         {
-            // 76 wide + no word wrap: at 60 px "HOME" wrapped to "HOM/E" on phones (v0.11.2a)
-            float x = 10, y = 214, bw = 76;
-            var small = _camSmall;
-            if (Btn(Blk(new Rect(x, y, bw, 54)), "HOME", small)) map?.Home(); y += 62;
-            if (Btn(Blk(new Rect(x, y, bw, 54)), "+", _darkButton)) map?.ZoomIn(); y += 62;
-            if (Btn(Blk(new Rect(x, y, bw, 54)), "-", _darkButton)) map?.ZoomOut(); y += 62;
-            if (Btn(Blk(new Rect(x, y, bw, 54)), "MAP", small)) map?.Overview();
+            var f = _hf;
+            for (int i = 0; i < 4; i++)
+            {
+                if (!KBtn(Blk(f.Cam[i]), CAM_LABELS[i], UiRole.Neutral, false, i == 1 || i == 2 ? 30 : 18)) continue;
+                switch (i)
+                {
+                    case 0: map?.Home(); break;
+                    case 1: map?.ZoomIn(); break;
+                    case 2: map?.ZoomOut(); break;
+                    default: map?.Overview(); break;
+                }
+            }
         }
+
+        static UiRole ActRole(string style) => style == "sel" ? UiRole.Accent : style == "amber" ? UiRole.Accent : UiRole.Primary;
 
         void DrawActions(float w, MapView map)
         {
             var panel = SideMenus.ActionsPanel(w);
+            float ty = Mathf.Clamp(panel.y + panel.height * 0.5f - 32f, panel.y, 720f - 70f);
             if (!_actionsOpen)
             {
-                if (Btn(Blk(new Rect(w - 52, 300, 44, 64)), "<", _darkButton)) _actionsOpen = true;
+                if (KBtn(Blk(new Rect(w - 56, ty, 48, 64)), "<", UiRole.Neutral, false, 24)) _actionsOpen = true;
                 return;
             }
-            if (Btn(Blk(new Rect(panel.x - 48, 300, 44, 64)), ">", _darkButton)) _actionsOpen = false;
+            if (KBtn(Blk(new Rect(panel.x - 54, ty, 48, 64)), ">", UiRole.Neutral, false, 24)) _actionsOpen = false;
             Blk(panel);
-            GUI.Box(panel, GUIContent.none, _box);
-            GUI.Label(new Rect(panel.x + 12, panel.y + 6, panel.width - 24, 24), "ACTIONS", _hdrAmber);
-            GUI.DrawTexture(new Rect(panel.x + 10, panel.y + 27, 90, 3), _accentTex);
+            UiKit.Panel(panel);
+            UiKit.FitLabel(new Rect(panel.x + 14, panel.y + 4, panel.width - 28, SideMenus.ACT_HDR - 8f), "ACTIONS", 18, TextAnchor.MiddleLeft, UiKit.Amber);
             for (int i = 0; i < SideMenus.ACTIONS.Length; i++)
             {
                 var (label, style) = SideMenus.ACTIONS[i];
-                if (!Btn(SideMenus.ActionButton(w, i), label, MButton(style, SideMenus.ActFont(i)))) continue;
+                if (!KBtn(SideMenus.ActionButton(w, i), label, ActRole(style), false, SideMenus.ActFont(i))) continue;
                 switch (label)
                 {
                     case "BUILD": _panel = Panel.Build; map?.CancelTool(); break;
@@ -570,14 +614,16 @@ namespace DayZero.Runtime
             }
         }
 
+        /// <summary>One segmented control: PLAY / PAUSE (amber and breathing while paused), speed, +1h, +6h.</summary>
         void DrawTimeControls(float w, float h)
         {
-            float bw = 86, total = bw * 4 + 18, x = w / 2 - total / 2, y = h - 62;
-            if (_b.Paused) DrawHalo(new Rect(x, y, bw + 16, 52), new Color(1f, 0.72f, 0.30f), 2.6f);   // paused: PLAY breathes amber
-            if (Btn(Blk(new Rect(x, y, bw + 16, 52)), _b.Paused ? "PLAY" : "PAUSE", _darkButton)) _b.Paused = !_b.Paused; x += bw + 22;
-            if (Btn(Blk(new Rect(x, y, bw, 52)), "x" + _b.Speed, _darkButton)) _b.Speed = _b.Speed >= 4 ? 1 : _b.Speed * 2; x += bw + 6;
-            if (Btn(Blk(new Rect(x, y, bw, 52)), "+1h", _darkButton)) _b.Skip(1); x += bw + 6;
-            if (Btn(Blk(new Rect(x, y, bw, 52)), "+6h", _darkButton)) _b.Skip(6);
+            var f = _hf;
+            UiKit.Panel(Blk(f.TimeBar));
+            if (_b.Paused) DrawHalo(UiLayout.Inset(f.TimeSeg[0], 6f), new Color(1f, 0.72f, 0.30f), 2.6f);
+            if (KBtn(f.TimeSeg[0], _b.Paused ? "PLAY" : "PAUSE", _b.Paused ? UiRole.Accent : UiRole.Neutral)) _b.Paused = !_b.Paused;
+            if (KBtn(f.TimeSeg[1], "x" + _b.Speed, UiRole.Neutral, _b.Speed > 1)) _b.Speed = _b.Speed >= 4 ? 1 : _b.Speed * 2;
+            if (KBtn(f.TimeSeg[2], "+1h", UiRole.Neutral)) _b.Skip(1);
+            if (KBtn(f.TimeSeg[3], "+6h", UiRole.Neutral)) _b.Skip(6);
         }
 
         /// <summary>Soft pulsing halo behind a control (v0.14.0a).</summary>
@@ -591,56 +637,82 @@ namespace DayZero.Runtime
             GUI.color = oc;
         }
 
+        // ---------------- map labels ----------------
+        // v0.17: one LabelPlacer per repaint. Labels are placed in priority order (own camps, faction camps, SOS,
+        // districts, landmarks) and a label is shown only where it overlaps no HUD rect and no label placed before
+        // it, so map text never runs under the HUD or into other text.
+        readonly LabelPlacer _lp = new LabelPlacer();
+
+        void BeginLabels()
+        {
+            _lp.Clear();
+            if (!_b.Picking) _hf.Avoid(_lp.Avoid);
+            else { _lp.Avoid.Add(_hf.Menu); foreach (var r in _hf.Cam) _lp.Avoid.Add(r); }
+            _lp.Avoid.AddRange(_blocks);   // everything else on the HUD (sheets, banners, ACTIONS) from the layout pass
+        }
+
         void DrawMapLabels(MapView map, float w, float h)
         {
-            float d = map.Dist;
-            int drawn = 0;
-            foreach (var lb in map.Labels)
-            {
-                if (lb.Tier == 2 ? d < 70f : lb.Tier == 0 ? d > 150f : d > 75f) continue;
-                if (!map.TryScreen(lb.Pos, out var sp)) continue;
-                var v = new Vector2((sp.x - _offX) / _scale, (sp.y - _offY) / _scale);
-                if (v.x < -100 || v.x > w + 100 || v.y < 0 || v.y > h) continue;
-                var st = lb.Tier == 2 ? _mapDistrict : _mapLabel;
-                var r = new Rect(v.x - 160, v.y - 14, 320, 28);
-                GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), lb.Text, lb.Tier == 2 ? _mapDistrictSh : _mapLabelSh);
-                GUI.Label(r, lb.Text, st);
-                if (++drawn >= 60) break;
-            }
-            // camps
+            if (Event.current.type != EventType.Repaint) return;   // paint only; taps go to the map
+            BeginLabels();
+            // own camps first: a name tag lifted above the roof so it clears the colony name painted on the wall
             foreach (var b in G.C.Bases)
             {
                 var p = new Vector3(b.Pos.x + 0.5f, 3.6f, -(b.Pos.y + 0.5f));
                 if (!map.TryScreen(p, out var sp)) continue;
-                var v = new Vector2((sp.x - _offX) / _scale, (sp.y - _offY) / _scale);
+                var v = ToVirtual(sp);
                 string t = G.BaseLabel(b);
-                var r = new Rect(v.x - 180, v.y - 16, 360, 30);
-                GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), t, _mapCampSh);
-                GUI.Label(r, t, _mapCamp);
+                float tw = Mathf.Min(300f, TextW(t, 17) + 30f);
+                var r = new Rect(v.x - tw / 2f, v.y - 46f - 30f, tw, 30f);
+                if (!_lp.PlaceNudged(ref r, 24f)) continue;
+                var oc = GUI.color;
+                GUI.color = new Color(0.95f, 0.70f, 0.28f, 0.85f * oc.a);
+                GUI.DrawTexture(new Rect(v.x - 1f, r.yMax, 2f, Mathf.Max(0f, v.y - 6f - r.yMax)), _xWhiteTex);
+                GUI.color = oc;
+                UiKit.Chip(r, t, UiRole.Accent, 17);
             }
+            if (!_b.Picking && G.C.Started) PlanMarks(map, w, h);   // GameUI.WorldMarks.cs: reserve marker labels
+            float d = map.Dist;
+            int drawn = 0;
+            for (int pass = 0; pass < 2; pass++)
+                foreach (var lb in map.Labels)
+                {
+                    if ((lb.Tier == 2) != (pass == 0)) continue;
+                    if (lb.Tier == 2 ? d < 70f : lb.Tier == 0 ? d > 150f : d > 75f) continue;
+                    if (!map.TryScreen(lb.Pos, out var sp)) continue;
+                    var v = ToVirtual(sp);
+                    if (v.x < -100 || v.x > w + 100 || v.y < 0 || v.y > h) continue;
+                    var st = lb.Tier == 2 ? _mapDistrict : _mapLabel;
+                    _gc.text = lb.Text;
+                    float tw = st.CalcSize(_gc).x + 4f, th = lb.Tier == 2 ? 28f : 22f;
+                    var r = new Rect(v.x - tw / 2f, v.y - th / 2f, tw, th);
+                    if (!_lp.Place(r)) continue;
+                    GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), lb.Text, lb.Tier == 2 ? _mapDistrictSh : _mapLabelSh);
+                    GUI.Label(r, lb.Text, st);
+                    if (++drawn >= 60) break;
+                }
         }
+
+        Texture2D _xWhiteTex;
+
+        // ---------------- tabbed screens (COLONY / JOBS / LOG / MENU) ----------------
+        int _lastTab = -1;
 
         void DrawMenuOverlay(float w, float h)
         {
             GUI.DrawTexture(new Rect(0, 0, w, h), _dimTex);
-            var panel = new Rect(24, 24, w - 48, h - 48);
-            GUI.Box(panel, GUIContent.none, _box);
-            GUI.Box(panel, GUIContent.none, _box);   // double up for a darker sheet
-            GUI.DrawTexture(new Rect(panel.x + 12, panel.y + TAB_H + 6, panel.width - 24, 1), _lineTex);
+            var f = MenuFrame.Make(w, h);
+            UiKit.Panel(f.TabPlate);
             for (int i = 0; i < TABS.Length; i++)
-            {
-                var r = new Rect(panel.x + 12 + i * 170, panel.y + 10, 160, TAB_H - 8);
-                if (_tab == i) GUI.DrawTexture(new Rect(r.x - 6, r.yMax + 1, r.width + 12, 6), _accentTex);   // selected tab: glowing underline
-                if (Btn(r, TABS[i].ToUpperInvariant(), _tab == i ? _amberButton : _button)) _tab = i;
-            }
-            if (Btn(new Rect(panel.xMax - 132, panel.y + 10, 120, TAB_H - 8), "CLOSE", _darkButton)) { _menuOpen = false; return; }
-            var inner = new Rect(panel.x + 18, panel.y + TAB_H + 14, panel.width - 36, panel.height - TAB_H - 26);
+                if (KBtn(f.Tabs[i], TABS[i].ToUpperInvariant(), _tab == i ? UiRole.Accent : UiRole.Primary, _tab == i)) _tab = i;
+            if (KBtn(f.Close, "CLOSE", UiRole.Danger)) { _menuOpen = false; _lastTab = -1; return; }
+            if (_tab != _lastTab) { _lastTab = _tab; UiKit.ScrollTo("ui_jobs", 0f); UiKit.ScrollTo("ui_log", 0f); }
             switch (_tab)
             {
-                case 0: DrawColony(inner); break;
-                case 1: DrawJobs(inner); break;
-                case 2: DrawLog(inner); break;
-                case 3: DrawMenu(inner); break;
+                case 0: DrawColony(f.Content); break;
+                case 1: DrawJobs(f.Content); break;
+                case 2: DrawLog(f.Content); break;
+                case 3: DrawMenu(f.Content); break;
             }
         }
 
@@ -651,82 +723,161 @@ namespace DayZero.Runtime
             switch (ph)
             {
                 case "spread": t = string.Format("Infection {0}% of the city", (int)(G.SpreadPct() * 100.0)); break;
-                case "fall": t = string.Format("THE FALL · hold {0:0.0} more days", G.HoldLeft() / 24.0); break;
+                case "fall": t = string.Format("THE FALL - hold {0:0.0} more days", G.HoldLeft() / 24.0); break;
                 case "lost": t = "Overrun"; break;
                 default: t = ph; break;
             }
             var ri = G.RaidInfo();
             if (ri != null && (ph == "spread" || ph == "fall"))
             {
-                if (ri.On) t = string.Format("NIGHT ATTACK · {0} closing in", ri.Spawned);
-                else if (ri.Warned) t = string.Format("ATTACK TONIGHT · about {0}", ri.N);
+                if (ri.On) t = string.Format("NIGHT ATTACK - {0} closing in", ri.Spawned);
+                else if (ri.Warned) t = string.Format("ATTACK TONIGHT - about {0}", ri.N);
             }
             return t;
         }
 
+        static readonly HashSet<string> ICON_RES = new HashSet<string> { "food", "water", "meds", "ammo", "fuel", "mats", "morale" };
+
+        Color ResCol(string key)
+        {
+            int i = Array.IndexOf(CHIP_KEYS, key);
+            return i >= 0 ? CHIP_COL[i] : new Color(0.62f, 0.60f, 0.50f);
+        }
+
+        /// <summary>COLONY: summary card with stat chips, an attack warning strip, then CAMPS / STOCKPILE / JOBS cards.</summary>
         void DrawColony(Rect r)
         {
             var c = G.C;
-            float y = r.y;
-            GUI.Label(new Rect(r.x, y, r.width, 36), c.Name, _title); y += 44;
             var alive = G.AlivePeople();
-            GUI.Label(new Rect(r.x, y, r.width, 30), string.Format("{0} survivors · {1} camp(s) · {2} zombies on the map · kills {3} · rescued {4}",
-                alive.Count, c.Bases.Count, G.ZombieCount(), c.Stat("kills"), c.Stat("rescued")), _label);
-            y += 36;
+            var L = new UiLayout(r, 10f);
+            var top = UiKit.Panel(L.Top(104f), c.Name);
+            int z = G.ZombieCount();
+            var cr = UiLayout.Even(new Rect(top.x, top.y, top.width, Mathf.Min(38f, top.height)), 6, 8f);
+            UiKit.Chip(cr[0], alive.Count + " SURVIVORS", UiRole.Primary, 17);
+            UiKit.Chip(cr[1], c.Bases.Count + (c.Bases.Count == 1 ? " CAMP" : " CAMPS"), UiRole.Primary, 17);
+            UiKit.Chip(cr[2], z + " ZOMBIES", z > 0 ? UiRole.Danger : UiRole.Neutral, 17);
+            UiKit.Chip(cr[3], c.Stat("kills") + " KILLS", UiRole.Accent, 17);
+            UiKit.Chip(cr[4], c.Stat("rescued") + " RESCUED", UiRole.Primary, 17);
+            UiKit.Chip(cr[5], "DAY " + G.Day(), UiRole.Neutral, 17);
             var ri = G.RaidInfo();
             if (ri != null && (ri.On || ri.Warned))
-            {
-                GUI.Label(new Rect(r.x, y, r.width, 28), ri.On ? "Your camp is under attack. Guards are on the line." : "Scouts expect an attack tonight. Put Soldiers and Cops on guard.", _warn);
-                y += 32;
-            }
-            float col = Mathf.Min(560f, r.width / 2 - 10);
-            float yl = y, yr = y;
-            GUI.Label(new Rect(r.x, yl, col, 28), "Camps", _label); yl += 30;
-            foreach (var b in c.Bases.Take(6))
-            {
-                GUI.Label(new Rect(r.x + 10, yl, col - 10, 26), "• " + G.BaseLabel(b) + (b.Done < 1.0 ? string.Format(" (building {0}%)", (int)(b.Done * 100)) : ""), _small);
-                yl += 26;
-            }
-            yl += 8;
-            GUI.Label(new Rect(r.x, yl, col, 28), "Stockpile", _label); yl += 30;
-            string res = string.Join("   ", c.Res.Where(kv => kv.Value >= 1.0).Select(kv => kv.Key + " " + (int)kv.Value));
-            GUI.Label(new Rect(r.x + 10, yl, col - 10, r.yMax - yl), res, _small);
+                UiKit.Chip(L.Top(42f), ri.On ? "Your camp is under attack. Guards are on the line." : "Scouts expect an attack tonight. Put Soldiers and Cops on guard.", UiRole.Danger, 18);
+            var cols = UiLayout.Columns(L.Rest, 10f, 1.2f, 1f, 0.85f);
 
-            float xr = r.x + col + 20;
-            GUI.Label(new Rect(xr, yr, col, 28), "Jobs", _label); yr += 30;
-            foreach (var j in Data.JOBS)
+            // camps
+            var cc = UiKit.Panel(cols[0], "Camps (" + c.Bases.Count + ")");
+            var cl = UiKit.BeginList("ui_camps", cc, c.Bases.Count, 62f, 6f);
+            for (int i = cl.First; i < cl.Last; i++)
             {
-                int n = G.CountJob(j);
-                GUI.Label(new Rect(xr + 10, yr, col - 10, 26), string.Format("{0,-10} {1}", j, n), _small);
-                yr += 25;
+                var b = c.Bases[i];
+                var row = cl.Row(i);
+                UiKit.RowPlate(row, i);
+                var rr = UiLayout.Rows(UiLayout.Inset(row, 12f, 5f, 10f, 6f), 3f, 1f, 1f);
+                UiKit.FitLabel(rr[0], G.BaseLabel(b), 19, TextAnchor.MiddleLeft, UiKit.Ink);
+                if (b.Done < 1.0) UiKit.Bar(rr[1], (float)b.Done, UiRole.Accent, string.Format("BUILDING {0}%", (int)(b.Done * 100)));
+                else
+                {
+                    int res = G.CampResidents(b.Id), free = G.CampFree(b);
+                    UiKit.FitLabel(rr[1], string.Format("{0} living here  -  {1} bed{2} free", res, free, free == 1 ? "" : "s"), 15, TextAnchor.MiddleLeft, UiKit.InkDim, false);
+                }
             }
+            UiKit.EndList();
+
+            // stockpile (every resource the colony holds, two columns)
+            var sc = UiKit.Panel(cols[1], "Stockpile");
+            var res2 = c.Res.Where(kv => kv.Value >= 1.0).ToList();
+            int rowsN = (res2.Count + 1) / 2;
+            float cellH = 44f, gap = 6f;
+            var win = UiKit.BeginScroll("ui_stock", sc, Mathf.Max(0f, rowsN * (cellH + gap) - gap));
+            var area = new Rect(0f, 0f, sc.width - 10f, rowsN * (cellH + gap));
+            for (int i = 0; i < res2.Count; i++)
+            {
+                var cell = UiLayout.Cell(area, 2, i, cellH, gap);
+                if (cell.yMax < win.y || cell.y > win.yMax) continue;
+                UiKit.RowPlate(cell, i / 2);
+                string key = res2[i].Key;
+                float ix = cell.x + 8f;
+                if (ICON_RES.Contains(key))
+                {
+                    if (Event.current.type == EventType.Repaint) GUI.DrawTexture(new Rect(ix, cell.y + 7f, 30f, 30f), Icons.Tex(key, ResCol(key)), ScaleMode.ScaleToFit, true);
+                    ix += 36f;
+                }
+                else ix += 4f;
+                var parts = UiLayout.Columns(new Rect(ix, cell.y, cell.xMax - ix - 10f, cell.height), 6f, 1f, -58f);
+                UiKit.FitLabel(parts[0], key, 16, TextAnchor.MiddleLeft, UiKit.InkDim, true, 10);
+                UiKit.FitLabel(parts[1], ((int)res2[i].Value).ToString(), 19, TextAnchor.MiddleRight, UiKit.Ink, true, 11);
+            }
+            if (res2.Count == 0) UiKit.FitLabel(new Rect(0f, 0f, area.width, 30f), "Nothing stored yet.", 16, TextAnchor.MiddleLeft, UiKit.InkDim, false);
+            UiKit.EndScroll();
+
+            // jobs
+            var jc = UiKit.Panel(cols[2], "Jobs");
+            var JL = new UiLayout(jc, 8f);
+            if (KBtn(JL.Bottom(58f), "MANAGE JOBS", UiRole.Accent)) _tab = 1;
             int kids = alive.Count(p => p.Job == "Child");
-            if (kids > 0) { GUI.Label(new Rect(xr + 10, yr, col - 10, 26), "Children " + kids, _small); yr += 25; }
-            yr += 8;
-            if (Btn(new Rect(xr, yr, 260, 52), "Manage jobs")) _tab = 1;
+            int nj = Data.JOBS.Length + (kids > 0 ? 1 : 0);
+            var jl = UiKit.BeginList("ui_jobcount", JL.Rest, nj, 30f, 3f);
+            for (int i = jl.First; i < jl.Last; i++)
+            {
+                var row = jl.Row(i);
+                UiKit.RowPlate(row, i);
+                string name = i < Data.JOBS.Length ? Data.JOBS[i] : "Children";
+                int n = i < Data.JOBS.Length ? G.CountJob(Data.JOBS[i]) : kids;
+                var parts = UiLayout.Columns(UiLayout.Inset(row, 12f, 2f, 12f, 2f), 6f, 1f, -48f);
+                UiKit.FitLabel(parts[0], name, 17, TextAnchor.MiddleLeft, n > 0 ? UiKit.Ink : UiKit.InkMute, false);
+                UiKit.FitLabel(parts[1], n.ToString(), 19, TextAnchor.MiddleRight, n > 0 ? UiKit.Amber : UiKit.InkMute);
+            }
+            UiKit.EndList();
         }
 
+        /// <summary>JOBS: every survivor in one scroll list; name, HP bar, status / stage / trait chips, and a
+        /// scroll-wheel job picker per row (stable id per survivor).</summary>
         void DrawJobs(Rect r)
         {
             var people = G.AlivePeople();
-            int pages = Math.Max(1, (people.Count + PAGE - 1) / PAGE);
-            _jobPage = Mathf.Clamp(_jobPage, 0, pages - 1);
-            GUI.Label(new Rect(r.x, r.y, r.width - 360, 32), string.Format("Survivors ({0}) · tap < > to change a job", people.Count), _label);
-            if (Btn(new Rect(r.xMax - 340, r.y - 4, 110, 44), "< Prev")) _jobPage = Math.Max(0, _jobPage - 1);
-            GUI.Label(new Rect(r.xMax - 222, r.y + 4, 100, 32), string.Format("{0}/{1}", _jobPage + 1, pages), _label);
-            if (Btn(new Rect(r.xMax - 110, r.y - 4, 110, 44), "Next >")) _jobPage = Math.Min(pages - 1, _jobPage + 1);
+            var c = UiKit.Panel(r, string.Format("Survivors ({0})  -  drag the wheel to change a job", people.Count));
+            var lst = UiKit.BeginList("ui_jobs", c, people.Count, 104f, 6f);
+            for (int i = lst.First; i < lst.Last; i++) JobRow(lst.Row(i), i, people[i]);
+            UiKit.EndList();
+        }
 
-            float y = r.y + 50, rowH = (r.height - 50) / PAGE;
-            foreach (var p in people.Skip(_jobPage * PAGE).Take(PAGE))
-            {
-                string info = string.Format("{0}  ·  {1}  ·  hp {2}{3}", p.Name, StateText(p), (int)p.Hp, p.Stage != null && p.Stage != "adult" ? "  ·  " + p.Stage : "");
-                GUI.Label(new Rect(r.x, y + 4, r.width - 430, rowH - 4), info, _label);
-                float bx = r.xMax - 420;
-                if (Btn(new Rect(bx, y + 2, 64, rowH - 8), "<")) CycleJob(p, -1);
-                GUI.Label(new Rect(bx + 70, y + 8, 200, rowH - 8), p.Job, _chip);
-                if (Btn(new Rect(bx + 276, y + 2, 64, rowH - 8), ">")) CycleJob(p, 1);
-                y += rowH;
-            }
+        void JobRow(Rect row, int i, Person p)
+        {
+            UiKit.RowPlate(row, i);
+            var parts = UiLayout.Columns(UiLayout.Inset(row, 14f, 8f, 8f, 8f), 14f, 1f, -230f);
+            var info = UiLayout.Rows(parts[0], 8f, 1.15f, 1f);
+            var top = UiLayout.Columns(info[0], 14f, 1f, -210f);
+            UiKit.FitLabel(top[0], p.Name, 24, TextAnchor.MiddleLeft, UiKit.Ink, true, 14);
+            int hp = (int)p.Hp;
+            UiKit.Bar(UiLayout.Inset(top[1], 0f, 4f, 0f, 4f), (float)(p.Hp / 100.0), hp >= 60 ? UiRole.Primary : hp >= 30 ? UiRole.Accent : UiRole.Danger, "HP " + hp);
+            // chips flow left to right while they fit
+            var cr = info[1];
+            float x = cr.x, ch = cr.height - 2f, cy = cr.y + 1f;
+            bool busy = p.St == "work" || p.St == "move";
+            ChipFlow(ref x, cr.xMax, cy, ch, StateText(p).ToUpperInvariant(), busy ? UiRole.Accent : UiRole.Primary);
+            if (p.Stage != null && p.Stage != "adult") ChipFlow(ref x, cr.xMax, cy, ch, p.Stage.ToUpperInvariant(), UiRole.Neutral);
+            if (Game.ExpansionRules && p.Traits != null)
+                foreach (var id in p.Traits)
+                {
+                    bool hid = id == p.TraitHidden;
+                    string t = hid ? "?" : (Game.Traits.TryGetValue(id, out var td) ? td.Name : id).ToUpperInvariant();
+                    if (!ChipFlow(ref x, cr.xMax, cy, ch, t, UiRole.Neutral)) break;
+                }
+            // job wheel
+            int cur = Array.IndexOf(Data.JOBS, p.Job);
+            if (cur < 0) { UiKit.Chip(UiLayout.Center(parts[1], parts[1].width, 44f), p.Job.ToUpperInvariant(), UiRole.Neutral, 18); return; }
+            int pick = UiWheel.Vertical("job_" + p.Id, parts[1], Data.JOBS, cur, 3, 20);
+            if (pick >= 0 && pick != cur) SetJob(p, Data.JOBS[pick]);
+        }
+
+        /// <summary>A chip sized to its text at x (advanced past it); false when it would not fit before maxX.</summary>
+        bool ChipFlow(ref float x, float maxX, float y, float h, string text, UiRole role)
+        {
+            float cw = Mathf.Clamp(TextW(text, 15) + 30f, 52f, 220f);
+            if (x + cw > maxX) return false;
+            UiKit.Chip(new Rect(x, y, cw, h), text, role, 15);
+            x += cw + 8f;
+            return true;
         }
 
         static string StateText(Person p)
@@ -740,127 +891,174 @@ namespace DayZero.Runtime
             }
         }
 
-        void CycleJob(Person p, int dir)
+        /// <summary>The wheel landed on a job: same set_job call as before; a job the survivor can't take (a child,
+        /// no free gear...) shows its reason and the wheel rolls back.</summary>
+        void SetJob(Person p, string job)
         {
-            // Step through Data.JOBS in the chosen direction; a job the survivor can't take
-            // (JobBlock: a child, no free gear...) is skipped and its reason shown.
-            var jobs = Data.JOBS;
-            int n = jobs.Length;
-            int i = Math.Max(0, Array.IndexOf(jobs, p.Job));
-            string firstErr = null;
-            for (int k = 1; k < n; k++)
+            string err = _b.Act("set_job", p.Id, job);
+            if (err == "")
             {
-                string next = jobs[(((i + dir * k) % n) + n) % n];
-                string err = _b.Act("set_job", p.Id, next);
-                if (err == "")
-                {
-                    string desc;
-                    string msg = p.Name + " is now a " + next + (Data.JOB_DESC.TryGetValue(next, out desc) ? ". " + desc : ".");
-                    if (firstErr != null) msg += "\n(skipped: " + firstErr + ")";
-                    _b.Toast(msg);
-                    return;
-                }
-                if (firstErr == null) firstErr = err;
-                if (err.StartsWith("That survivor") || err.StartsWith("Error") || err.StartsWith("Your colony") || err.StartsWith("No colony")) break;
+                string desc;
+                _b.Toast(p.Name + " is now a " + job + (Data.JOB_DESC.TryGetValue(job, out desc) ? ". " + desc : "."));
             }
-            _b.Toast(firstErr ?? "No other job available.");
+            else _b.Toast(err);
         }
 
+        // log rows: wrapped text, heights cached until the log or the width changes
+        readonly List<float> _logH = new List<float>();
+        int _logN = -1; float _logW = -1f; object _logTop;
+
+        /// <summary>LOG: newest first in one scroll list; time chip + wrapped text, deaths / sirens / major events in red.</summary>
         void DrawLog(Rect r)
         {
             var log = G.S.Log.Where(e => e.Col < 0 || e.Col == G.CurCol).Reverse().ToList();
-            const int per = 12;
-            int pages = Math.Max(1, (log.Count + per - 1) / per);
-            _logPage = Mathf.Clamp(_logPage, 0, pages - 1);
-            GUI.Label(new Rect(r.x, r.y, 400, 32), "Log (newest first)", _label);
-            if (Btn(new Rect(r.xMax - 340, r.y - 4, 110, 44), "< Newer")) _logPage = Math.Max(0, _logPage - 1);
-            GUI.Label(new Rect(r.xMax - 222, r.y + 4, 100, 32), string.Format("{0}/{1}", _logPage + 1, pages), _label);
-            if (Btn(new Rect(r.xMax - 110, r.y - 4, 110, 44), "Older >")) _logPage = Math.Min(pages - 1, _logPage + 1);
-            float y = r.y + 48, rowH = (r.height - 48) / per;
-            foreach (var e in log.Skip(_logPage * per).Take(per))
+            var c = UiKit.Panel(r, string.Format("Log ({0})  -  newest first", log.Count));
+            float rowW = c.width - 10f, textW = rowW - 12f - 118f - 12f - 10f;
+            object topE = log.Count > 0 ? log[0] : null;
+            if (log.Count != _logN || Mathf.Abs(textW - _logW) > 0.5f || !ReferenceEquals(topE, _logTop))
             {
-                string when = string.Format("d{0} {1:00}:00", (int)(e.T / 24.0) + 1, (int)e.T % 24);
-                var st = e.Kind == "death" || e.Kind == "siren" || e.Kind == "major" ? _warn : _small;
-                GUI.Label(new Rect(r.x, y, r.width, rowH), when + "  " + e.Text, st);
-                y += rowH;
+                _logN = log.Count; _logW = textW; _logTop = topE; _logH.Clear();
+                foreach (var e in log) _logH.Add(Mathf.Max(46f, ParaH(e.Text, 17, textW) + 18f));
             }
+            float total = 0f; foreach (var hh in _logH) total += hh + 6f;
+            var win = UiKit.BeginScroll("ui_log", c, Mathf.Max(0f, total - 6f));
+            float y = 0f;
+            for (int i = 0; i < log.Count && i < _logH.Count; i++)
+            {
+                float rh = _logH[i];
+                if (y + rh >= win.y && y <= win.yMax)
+                {
+                    var e = log[i];
+                    bool bad = e.Kind == "death" || e.Kind == "siren" || e.Kind == "major";
+                    var row = new Rect(0f, y, rowW, rh);
+                    UiKit.RowPlate(row, i);
+                    string when = string.Format("D{0} {1:00}:00", (int)(e.T / 24.0) + 1, (int)e.T % 24);
+                    UiKit.Chip(new Rect(row.x + 12f, row.y + 8f, 118f, 30f), when, bad ? UiRole.Danger : UiRole.Neutral, 15);
+                    UiKit.Paragraph(new Rect(row.x + 142f, row.y + 9f, textW, rh - 14f), e.Text, 17, bad ? new Color(1f, 0.62f, 0.52f) : UiKit.InkDim);
+                }
+                y += rh + 6f;
+            }
+            if (log.Count == 0) UiKit.FitLabel(new Rect(0f, 0f, rowW, 32f), "Nothing has happened yet.", 17, TextAnchor.MiddleLeft, UiKit.InkDim, false);
+            UiKit.EndScroll();
         }
 
+        static readonly string[] VOL_ITEMS = { "0%", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "100%" };
+
+        /// <summary>MENU: GAME card (save / load / title) and SETTINGS card (sound, volume wheel, film look, help).</summary>
         void DrawMenu(Rect r)
         {
-            float y = r.y;
-            if (Btn(new Rect(r.x, y, 300, 64), "Save now", _bigButton)) _b.SaveNow();
-            if (Btn(new Rect(r.x + 320, y, 300, 64), "Load last save", _bigButton)) _b.LoadSaved();
-            if (Btn(new Rect(r.x + 640, y, 300, 64), "Title screen", _bigButton)) _b.ToTitle();
-            y += 90;
+            var cols = UiLayout.Columns(new Rect(r.x, r.y, r.width, Mathf.Min(r.height, 430f)), 10f, 1f, 1.25f);
+            var gc = UiKit.Panel(cols[0], "Game");
+            var G2 = new UiLayout(gc, 12f);
+            if (KBtn(G2.Top(62f), "SAVE NOW", UiRole.Accent)) _b.SaveNow();
+            if (KBtn(G2.Top(62f), "LOAD LAST SAVE")) _b.LoadSaved();
+            if (KBtn(G2.Top(62f), "TITLE SCREEN", UiRole.Danger)) _b.ToTitle();
+            G2.Top(2f);
+            UiKit.Paragraph(G2.Rest, "The game autosaves every few minutes and when the app goes to the background.", 16);
+
+            var sc = UiKit.Panel(cols[1], "Settings");
+            var S = new UiLayout(sc, 12f);
             var sfx = _b.Sfx;
             if (sfx != null)
             {
-                GUI.Label(new Rect(r.x, y, 200, 36), "Sound", _label);
-                if (Btn(new Rect(r.x + 200, y - 4, 160, 48), sfx.Enabled ? "On" : "Off")) { sfx.Enabled = !sfx.Enabled; sfx.SaveSettings(); }
-                if (Btn(new Rect(r.x + 380, y - 4, 70, 48), "-")) { sfx.Volume = Math.Max(0.0, Math.Round(sfx.Volume - 0.1, 1)); sfx.SaveSettings(); }
-                GUI.Label(new Rect(r.x + 460, y + 4, 120, 36), (int)(sfx.Volume * 100) + "%", _label);
-                if (Btn(new Rect(r.x + 560, y - 4, 70, 48), "+")) { sfx.Volume = Math.Min(1.0, Math.Round(sfx.Volume + 0.1, 1)); sfx.SaveSettings(); }
-                y += 70;
+                var a = UiLayout.Columns(S.Top(62f), 12f, 1f, -220f);
+                UiKit.FitLabel(a[0], "SOUND", 20, TextAnchor.MiddleLeft, UiKit.Ink);
+                if (KBtn(a[1], sfx.Enabled ? "ON" : "OFF", sfx.Enabled ? UiRole.Primary : UiRole.Neutral, sfx.Enabled)) { sfx.Enabled = !sfx.Enabled; sfx.SaveSettings(); }
+                var v = UiLayout.Columns(S.Top(62f), 12f, 1f, -340f);
+                UiKit.FitLabel(v[0], "VOLUME", 20, TextAnchor.MiddleLeft, UiKit.Ink);
+                int cur = Mathf.Clamp((int)Math.Round(sfx.Volume * 10.0), 0, 10);
+                int pick = UiWheel.Horizontal("ui_volume", v[1], VOL_ITEMS, cur, 5, 18);
+                if (pick >= 0 && pick != cur) { sfx.Volume = Math.Round(pick / 10.0, 1); sfx.SaveSettings(); }
             }
-            GUI.Label(new Rect(r.x, y, 200, 36), "Film look", _label);
-            if (Btn(new Rect(r.x + 200, y - 4, 160, 48), FxView.Film ? "On" : "Off")) FxView.SetFilmLook(!FxView.Film);
-            y += 70;
-            GUI.Label(new Rect(r.x, y, r.width, 120),
-                "The game autosaves every few minutes and when the app goes to the background. " +
-                "Drag to pan the map, pinch to zoom, twist with two fingers to rotate. Survivors work on their own: set jobs, answer events and control time.", _small);
+            var fl = UiLayout.Columns(S.Top(62f), 12f, 1f, -220f);
+            UiKit.FitLabel(fl[0], "FILM LOOK", 20, TextAnchor.MiddleLeft, UiKit.Ink);
+            if (KBtn(fl[1], FxView.Film ? "ON" : "OFF", FxView.Film ? UiRole.Primary : UiRole.Neutral, FxView.Film)) FxView.SetFilmLook(!FxView.Film);
+            UiKit.Divider(S.Top(8f));
+            UiKit.Paragraph(S.Rest, "Drag to pan the map, pinch to zoom, twist with two fingers to rotate. Survivors work on their own: set jobs, answer events and control time.", 16);
         }
 
         // ---------------- popups ----------------
+        object _decLast;
+
+        /// <summary>Event decision: titled panel, wrapped text, one large button per choice (label + hint line);
+        /// many choices scroll instead of running off the panel.</summary>
         void DrawDecision(float w, float h, JObject ev)
         {
             var choices = ev["choices"] as JArray ?? new JArray();
-            float pw = Mathf.Min(900f, w - 60), ph = Mathf.Min(h - 60, 230f + choices.Count * 84f);
-            var p = new Rect((w - pw) / 2, (h - ph) / 2, pw, ph);
+            if (!ReferenceEquals(ev, _decLast)) { _decLast = ev; UiKit.ScrollTo("ui_decision", 0f); }
             GUI.DrawTexture(new Rect(0, 0, w, h), _sheetDimTex);
-            GUI.Box(p, GUIContent.none, _hudBox);
-            Shadowed(new Rect(p.x + 24, p.y + 16, pw - 48, 44), (string)ev["title"] ?? "Event", _title);
-            GUI.DrawTexture(new Rect(p.x + 24, p.y + 60, Mathf.Min(320f, pw - 48), 3), _accentTex);
-            GUI.Label(new Rect(p.x + 24, p.y + 66, pw - 48, 140), (string)ev["text"] ?? "", _label);
-            float y = p.y + 210;
+            float pw = Mathf.Min(900f, w - 60f), textW = pw - 2f * UiKit.PanelPad - 4f;
+            string text = (string)ev["text"] ?? "";
+            float th = Mathf.Ceil(ParaH(text, 19, textW)) + 4f;
+            const float CH = 66f, CG = 8f;
+            float listH = Mathf.Max(0f, choices.Count * (CH + CG) - CG);
+            float chrome = UiKit.HeaderH + 4f + 8f + UiKit.PanelPad;
+            float ph = Mathf.Min(h - 40f, chrome + th + 14f + listH + 8f);
+            var p = new Rect((w - pw) / 2f, (h - ph) / 2f, pw, ph);
+            var ci = UiKit.Panel(p, (string)ev["title"] ?? "Event", 24);
+            float maxText = Mathf.Max(40f, ci.height - 14f - Mathf.Min(listH, CH * 2f + CG));
+            var L = new UiLayout(ci, 14f);
+            UiKit.Paragraph(L.Top(Mathf.Min(th, maxText)), text, 19, UiKit.Ink);
+            var view = L.Rest;
+            int picked = -1;
+            UiKit.BeginScroll("ui_decision", view, listH);
+            float bw = view.width - (listH > view.height + 0.5f ? 12f : 0f);
             for (int i = 0; i < choices.Count; i++)
             {
                 var ch = choices[i] as JObject;
                 string label = (string)ch?["label"] ?? ("Option " + (i + 1));
                 string hint = (string)ch?["hint"];
-                if (Btn(new Rect(p.x + 24, y, pw - 48, 76), string.IsNullOrEmpty(hint) ? label : label + "\n" + hint)) { _b.Answer(ev, i); return; }
-                y += 84;
+                var br = new Rect(0f, i * (CH + CG), bw, CH);
+                if (KBtn(br, "", UiRole.Primary)) picked = i;
+                var face = UiKit.ButtonFace(br, false);
+                if (string.IsNullOrEmpty(hint)) UiKit.FitLabel(face, label, 22, TextAnchor.MiddleCenter, UiKit.Ink, true, 12);
+                else
+                {
+                    var rr = UiLayout.Rows(UiLayout.Inset(face, 10f, 4f, 10f, 3f), 0f, 1.15f, 0.85f);
+                    UiKit.FitLabel(rr[0], label, 21, TextAnchor.MiddleCenter, UiKit.Ink, true, 12);
+                    UiKit.FitLabel(rr[1], hint, 15, TextAnchor.MiddleCenter, UiKit.InkDim, false, 10, false);
+                }
             }
+            UiKit.EndScroll();
+            if (picked >= 0) _b.Answer(ev, picked);
         }
 
         void DrawGameOver(float w, float h)
         {
-            float pw = Mathf.Min(760f, w - 60);
-            var p = new Rect((w - pw) / 2, h / 2 - 170, pw, 340);
+            float pw = Mathf.Min(760f, w - 60f);
+            var p = new Rect((w - pw) / 2f, h / 2f - 150f, pw, 300f);
             GUI.DrawTexture(new Rect(0, 0, w, h), _sheetDimTex);
-            GUI.Box(p, GUIContent.none, _hudBox);
-            Shadowed(new Rect(p.x + 24, p.y + 20, pw - 48, 44), _b.Won ? "You held out" : "Your colony has fallen", _title);
-            GUI.DrawTexture(new Rect(p.x + 24, p.y + 66, Mathf.Min(320f, pw - 48), 3), _accentTex);
+            var ci = UiKit.Panel(p, _b.Won ? "You held out" : "Your colony has fallen", 26);
+            var L = new UiLayout(ci, 12f);
+            var bb = UiLayout.Columns(L.Bottom(66f), 14f, 1f, 1f);
             var c = G.C;
-            GUI.Label(new Rect(p.x + 24, p.y + 80, pw - 48, 100), string.Format("Day {0}. {1} zombies killed, {2} survivors rescued.",
-                G.Day(), c?.Stat("kills") ?? 0, c?.Stat("rescued") ?? 0), _label);
-            if (Btn(new Rect(p.x + 24, p.y + 240, 300, 70), "New game", _bigButton)) _b.NewGame(1);
-            if (Btn(new Rect(p.x + pw - 324, p.y + 240, 300, 70), "Title screen", _bigButton)) _b.ToTitle();
+            UiKit.Paragraph(L.Rest, string.Format("Day {0}. {1} zombies killed, {2} survivors rescued.",
+                G.Day(), c?.Stat("kills") ?? 0, c?.Stat("rescued") ?? 0), 20, UiKit.Ink);
+            if (KBtn(bb[0], "NEW GAME", UiRole.Accent)) _b.NewGame(1);
+            if (KBtn(bb[1], "TITLE SCREEN", UiRole.Neutral)) _b.ToTitle();
         }
 
         void DrawToasts(float w, float h)
         {
             if (_b.Toasts.Count == 0) return;
-            float y = h - 16;
+            bool hud = _b.State == Bootstrap.Screen2.Playing && _hf != null && !_b.Picking;
+            float y = hud ? _hf.TimeBar.y - 8f : h - 16f;
+            // centred in the band between the camera column and the right-side panel, so a toast never covers ACTIONS
+            float lo = 10f, hi = w - 10f;
+            if (hud)
+            {
+                lo = _hf.Cam[0].xMax + 10f;
+                hi = _panel != Panel.None ? w - 350f : _actionsOpen ? SideMenus.ActionsPanel(w).x - 64f : w - 66f;
+            }
+            float tw = Mathf.Min(Mathf.Min(760f, w * 0.56f), hi - lo), tx = lo + (hi - lo - tw) / 2f;
             for (int i = _b.Toasts.Count - 1; i >= 0; i--)
             {
-                _gc.text = _b.Toasts[i];
-                float th = Mathf.Max(40f, _small.CalcHeight(_gc, w * 0.6f) + 12f);
-                y -= th + 6;
-                var r = new Rect(w * 0.2f, y, w * 0.6f, th);
-                GUI.Box(r, GUIContent.none, _box);
-                GUI.DrawTexture(new Rect(r.x + 4, r.y + 8, 3, r.height - 16), _amberLineTex);
-                GUI.Label(new Rect(r.x + 10, r.y + 6, r.width - 20, r.height - 8), _b.Toasts[i], _small);
+                float th = Mathf.Max(48f, Mathf.Ceil(ParaH(_b.Toasts[i], 17, tw - 40f)) + 22f);
+                y -= th + 6f;
+                var r = new Rect(tx, y, tw, th);
+                UiKit.Panel(r);
+                GUI.DrawTexture(new Rect(r.x + 8f, r.y + 9f, 4f, r.height - 18f), _amberLineTex);
+                UiKit.Paragraph(UiLayout.Inset(r, 22f, 11f, 16f, 8f), _b.Toasts[i], 17, UiKit.Ink);
             }
         }
     }
