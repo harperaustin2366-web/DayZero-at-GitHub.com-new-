@@ -114,6 +114,7 @@ namespace DayZero.Core
         public string Site = "";
         public bool GarageOk;
         public ODict<string, bool> Auto;   // per-camp overrides (null = use colony default)
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public float Noise;   // expansion #3 noise meter 0..100
         public int U(string k) => Up.Get(k, 0);
     }
 
@@ -402,6 +403,7 @@ namespace DayZero.Core
         public List<WallRun> Walls = new List<WallRun>();
         public ODict<int, Breach> Breaches = new ODict<int, Breach>();
         public bool WallsInit;
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public bool ExpRules;   // run started with Game.ExpansionRules
         public byte[] Ctrl;
         public float[] CtrlH, Scout, Loot, Zinf, Srch;
         public byte[] SrchC;

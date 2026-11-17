@@ -276,10 +276,15 @@ namespace DayZero.Core
             }
         }
 
-        void GunShot(WeaponDef w) => _gunNoise[CurCol] = _gunNoise.GetOr(CurCol, 0.0) + (w.Noise ?? 0);
+        void GunShot(WeaponDef w)
+        {
+            if (ExpansionRules) { var nb = MainBase(); if (nb != null) AddNoise(nb.Id, (w.Noise ?? 0) * 0.3f, "Gunfire"); return; }
+            _gunNoise[CurCol] = _gunNoise.GetOr(CurCol, 0.0) + (w.Noise ?? 0);
+        }
 
         void StepNoise()
         {
+            if (ExpansionRules) { StepExpNoise(); return; }
             double n = _gunNoise.GetOr(CurCol, 0.0);
             _gunNoise[CurCol] = 0.0;
             if (n < 120.0 || MaxZombies <= 0) return;

@@ -312,6 +312,7 @@ namespace DayZero.Core
             Zp = new List<float>(d.Zp ?? new float[0]); Zh = new List<byte>(d.Zh ?? new byte[0]);
             d.Zc = null; d.Zn = null; d.Zp = null; d.Zh = null;
             S = d;
+            ExpansionRules = S.ExpRules;
             CurCol = -1;
             ViewCol = V.Clampi(ViewCol, 0, S.Cols.Count - 1);
             Rng.SetSeed(S.Seed + (long)(S.T * 7.0));

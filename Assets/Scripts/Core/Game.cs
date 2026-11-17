@@ -216,6 +216,7 @@ namespace DayZero.Core
                 FallT = -1.0, NextHordeT = 0.0, NextGroupT = 36.0, NextRaidT = 90.0, NextJumpT = 72.0,
                 Mode = ncols > 1 ? "separate" : "solo", VehN = 1, VehVer = 1,
             };
+            S.ExpRules = ExpansionRules;
             Zc.Clear(); Zn.Clear(); Zp.Clear(); Zh.Clear();
             _peopleById.Clear(); _claimed.Clear(); _baseLots.Clear(); _fxCache.Clear(); _encl.Clear(); _enclVer = -1; _claimVer = -1; _claimSig = 0;
             _seedCache.Clear(); _tileSegVer = -1;

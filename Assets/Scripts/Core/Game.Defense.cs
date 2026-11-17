@@ -727,6 +727,16 @@ namespace DayZero.Core
         /// touched, and the inner tiles that touch a wall.</summary>
         (int[] all, int tier, int[] edge, int[] inner) FloodEnclosure(Base b, RectInt? wboxArg = null)
         {
+            var r = FloodEnclosureCore(b, wboxArg, null);
+            if (r.all.Length > 0 || !S.Walls.Any(w => w.Starter)) return r;
+            // P2: a player wall ring that cuts across the starter palisade can fail to close; retry once with the starter posts open
+            var open = new HashSet<int>();
+            foreach (var w in S.Walls) if (w.Starter) foreach (int k in LineTiles(w.A, w.B)) open.Add(k);
+            return FloodEnclosureCore(b, wboxArg, open);
+        }
+
+        (int[] all, int tier, int[] edge, int[] inner) FloodEnclosureCore(Base b, RectInt? wboxArg, HashSet<int> open)
+        {
             var empty = (new int[0], -1, new int[0], new int[0]);
             bool scratch = !wboxArg.HasValue;
             RectInt wbox = scratch ? (ColonyWallBoxes().TryGetValue(b.Col, out var wb) ? wb : new RectInt(0, 0, 0, 0)) : wboxArg.Value;
@@ -751,10 +761,12 @@ namespace DayZero.Core
             foreach (var kv in S.Fences)
             {
                 int k = kv.Key, px = k % W - x0, py = k / W - y0;
+                if (open != null && open.Contains(k)) continue;
                 if (px >= 0 && py >= 0 && px < bw && py < bh) g[py * bw + px] = (byte)(2 + V.Clampi(kv.Value.Tier, 0, 4));
             }
             foreach (int k in GateWalls())
             {
+                if (open != null && open.Contains(k)) continue;
                 int px = k % W - x0, py = k / W - y0;
                 if (px >= 0 && py >= 0 && px < bw && py < bh) g[py * bw + px] = (byte)(2 + V.Clampi(GateTier(k), 0, 4));
             }
