@@ -55,6 +55,7 @@ namespace DayZero.Runtime
             FxLights.Tick(cam, g, s.Lights);   // night light pools around fires / towers / lit lots
             FxFires.Tick(cam, g, s.Lights);    // burning buildings + smoke columns (idea #7)
             FxCrows.Tick(cam, g);              // crows that scatter from zombies + blowing paper (idea #11)
+            FxDamageReadout.Tick(cam, g);      // soot / sparks / flames / wrench on damaged own defences (idea #14)
             FxWeatherView.Tick(g); FxMuzzle.Tick(cam, g);   // rain / snow / lightning, gunfire glow + tracer streaks
             if (_ov == null)
             {
