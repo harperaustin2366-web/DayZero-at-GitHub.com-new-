@@ -238,6 +238,7 @@ namespace DayZero.Runtime
             {
                 if (Btn(new Rect(60 + d * 220, y, 200, 72), Game.DIFF_NAMES[d], _bigButton)) _b.NewGame(d);
             }
+            DrawExpandedToggle(w, h);   // GameUI.Expansion.World.cs
             GUI.Label(new Rect(60, h - 90, w - 120, 60),
                 "Starting a new game replaces the current save. You pick the building for your base on the map.", _small);
         }
@@ -251,6 +252,7 @@ namespace DayZero.Runtime
             var map = MapView.Instance;
             if (map != null && map.Ready) DrawMapLabels(map, w, h);
             if (map != null && map.Ready && !_b.Picking && G.C.Started) { DrawConvLabels(map, w, h); DrawRepairMarks(map, w, h); DrawWreckMarks(map, w, h); }
+            if (!_b.Picking && G.C.Started) DrawDangerOverlay(map, w, h);   // GameUI.Expansion.World.cs
             if (map != null && !string.IsNullOrEmpty(map.RenderWarning))
                 Shadowed(new Rect(12, h - 30, w - 24, 24), map.RenderWarning, _small);
             // v0.11.2a drew this every frame, so "Building the map 100%" never went away
@@ -272,6 +274,7 @@ namespace DayZero.Runtime
             bool swallow = sheet && (evType == EventType.MouseDown || evType == EventType.MouseUp || evType == EventType.MouseDrag || evType == EventType.ScrollWheel);
             if (swallow) Event.current.type = EventType.Ignore;
             DrawStats();
+            DrawExpWorldHud(w, h, map);   // GameUI.Expansion.World.cs
             if (Btn(Blk(new Rect(w / 2 - 80, 8, 160, 50)), "MENU", _darkButton)) _menuOpen = true;
             DrawTopRight(w);
             DrawCameraButtons(map);
