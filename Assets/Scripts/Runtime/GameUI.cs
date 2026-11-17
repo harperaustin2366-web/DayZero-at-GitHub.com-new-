@@ -800,6 +800,9 @@ namespace DayZero.Runtime
                 if (Btn(new Rect(r.x + 560, y - 4, 70, 48), "+")) { sfx.Volume = Math.Min(1.0, Math.Round(sfx.Volume + 0.1, 1)); sfx.SaveSettings(); }
                 y += 70;
             }
+            GUI.Label(new Rect(r.x, y, 200, 36), "Film look", _label);
+            if (Btn(new Rect(r.x + 200, y - 4, 160, 48), FxView.Film ? "On" : "Off")) FxView.SetFilmLook(!FxView.Film);
+            y += 70;
             GUI.Label(new Rect(r.x, y, r.width, 120),
                 "The game autosaves every few minutes and when the app goes to the background. " +
                 "Drag to pan the map, pinch to zoom, twist with two fingers to rotate. Survivors work on their own: set jobs, answer events and control time.", _small);
