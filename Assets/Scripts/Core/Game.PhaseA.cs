@@ -28,6 +28,8 @@ namespace DayZero.Core
         /// raid sizing, siren lead, conversion set-up time, convert-after-scavenge) are dormant. The game plays by the
         /// original v0.10.8a rules; set true only to experiment.</summary>
         public static bool PhaseARules = false;
+        /// <summary>SYSTEMS_30 expansion rules (traits, stress, fatigue...). Off = classic v0.10.8a.</summary>
+        public static bool ExpansionRules;
 
         public const int WALL_MAX_LEN = 24;            // tiles per placed run
         public static readonly int[] WALL_PATH = { 0, 2, 3 };   // wood palisade -> scrap metal -> concrete

@@ -67,6 +67,25 @@ namespace DayZero.Core
         public int? Vid;
         public bool Tow;
 
+        // Expansion: people (SYSTEMS_30 #5 Stress, #6 Traits, #18 Fatigue). Only touched while Game.ExpansionRules
+        // is on; every field defaults to 0 / null so it is left out of the save and a classic run never sees it.
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public List<string> Traits;   // null = not rolled yet
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public string TraitHidden;    // shown as "?" until JoinT + 24 h
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public double JoinT;
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public double Stress;         // 0..100
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public double Fatigue;        // 0..100
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public int TalkDay;           // Day() of the last TALK
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public double RestEndT;       // REST DAY until
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public double FreezeEndT;     // break: refuses work until
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public double SleepEndT;      // sleeping off a watch / collapse until
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public bool Collapsed;
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public int Shift;             // night-watch shift 1..3 (0 = none)
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public bool Dozing;           // dozed off on watch this hour
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public ODict<string, double> Stash;   // stolen goods (break: Steal)
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public double StashT;         // when the stash may be found
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public double DesertT;        // break: Desert, leaves at this hour
+        // end Expansion: people
+
         // client-side interpolation (net clients only, never saved)
         [JsonIgnore] public Vector2? CFrom, CTo;
         [JsonIgnore] public double CLt, CLd;
@@ -267,9 +286,26 @@ namespace DayZero.Core
         public TradeCfg Trade;
         public Vector2Int? Spawn;
         public bool Away;           // set by the network layer when the player is offline
+        // Expansion: people (night watch shifts, AUTO talk, breach / death bookkeeping); null in classic runs
+        public PeopleCfg Ppl;
+        // end Expansion: people
         public int Stat(string k) => Stats.Get(k, 0);
         public void AddStat(string k, int v) => Stats[k] = Stats.Get(k, 0) + v;
     }
+
+    // Expansion: people
+    /// <summary>SYSTEMS_30 #18 / #5 colony settings and bookkeeping (Colony.Ppl, created on the first expansion hour).</summary>
+    public sealed class PeopleCfg
+    {
+        public int Shifts = 1;                 // night watch: 1, 2 or 3 shifts
+        public bool AutoRotate = true;         // most rested guards take the watch
+        public bool AutoTalk = true;           // AUTO: Leaders (and Medics) talk to strained people
+        public int RaidBreaks;                 // breaks of the current night raid already turned into Stress
+        public double RaidStart = -1.0;
+        public ODict<string, int> DeathDay = new ODict<string, int>();   // base id -> last Day() someone there died
+        public int Breaks, Deserted, Steals, Snaps, Steeled, Freezes, Dozed, Collapses, Talks;   // stats (balance checks, COLONY)
+    }
+    // end Expansion: people
 
     public sealed class Group
     {

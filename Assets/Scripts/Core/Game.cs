@@ -654,6 +654,7 @@ namespace DayZero.Core
             C.People.Add(p);
             _peopleById[p.Id] = p;
             _rtNeed[CurCol] = true;
+            if (ExpansionRules) RollTraits(p);   // Expansion: people
             return p;
         }
 
@@ -1032,6 +1033,7 @@ namespace DayZero.Core
             PostGuards(); Dbg("PostGuards");
             StepNightRaid(); Dbg("StepNightRaid");
             StepFamily(); Dbg("StepFamily");
+            if (ExpansionRules) { PeopleHour(); Dbg("PeopleHour"); }   // Expansion: people
             MaybeEvents(); Dbg("MaybeEvents");
             StepWar(); Dbg("StepWar");
         }

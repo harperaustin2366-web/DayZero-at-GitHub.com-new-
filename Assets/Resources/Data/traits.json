@@ -1,0 +1,184 @@
+{
+ "traits": {
+  "sharpshooter": {
+   "name": "Sharpshooter",
+   "weight": 6,
+   "desc": "Gun hit +12%; tower crew +10%.",
+   "fx": {
+    "hit_add": 0.12,
+    "tower_crew": 0.1
+   }
+  },
+  "ex_medic": {
+   "name": "Ex-Medic",
+   "weight": 5,
+   "desc": "As Medic heals +40% and finds hidden bites +50%; counts as half a medic in any job.",
+   "fx": {
+    "heal_mult": 0.4,
+    "detect_mult": 0.5,
+    "medic_part": 0.5,
+    "amputate_add": 0.1
+   }
+  },
+  "green_thumb": {
+   "name": "Green Thumb",
+   "weight": 6,
+   "desc": "Farmer +30%; herb plots +50%.",
+   "fx": {
+    "farmer_mult": 0.3,
+    "herb_mult": 0.5
+   }
+  },
+  "tinkerer": {
+   "name": "Tinkerer",
+   "weight": 6,
+   "desc": "Engineer +25%; craft time -25%.",
+   "fx": {
+    "engineer_mult": 0.25,
+    "craft_time": -0.25
+   }
+  },
+  "insomniac": {
+   "name": "Insomniac",
+   "weight": 5,
+   "desc": "Sleep recovers fatigue 30% less; night shift fatigue -50%; night hit +5%.",
+   "fx": {
+    "sleep_rec": -0.3,
+    "night_fatigue": -0.5,
+    "night_hit": 0.05
+   }
+  },
+  "night_owl": {
+   "name": "Night Owl",
+   "weight": 4,
+   "desc": "No hit penalty in darkness.",
+   "fx": {
+    "dark_pen": -1.0
+   }
+  },
+  "coward": {
+   "name": "Coward",
+   "weight": 6,
+   "desc": "Stress +25% in combat, flees above 60 stress; loses encounters more but survives them 50% more often.",
+   "fx": {
+    "combat_stress": 0.25,
+    "flee_stress": 60,
+    "enc_win": -0.08,
+    "enc_survive": 0.5
+   }
+  },
+  "hoarder": {
+   "name": "Hoarder",
+   "weight": 5,
+   "desc": "Keeps 0.2 food a day; carries 15% more loot; breaks always steal.",
+   "fx": {
+    "food_take": 0.2,
+    "carry_mult": 0.15,
+    "break_steal": 1
+   }
+  },
+  "tough": {
+   "name": "Tough",
+   "weight": 5,
+   "desc": "Max hp 120; bites take 30% longer; illness -30%.",
+   "fx": {
+    "max_hp": 120,
+    "bite_timer": 1.3,
+    "illness": -0.3
+   }
+  },
+  "glass_jaw": {
+   "name": "Glass Jaw",
+   "weight": 3,
+   "desc": "Max hp 80.",
+   "fx": {
+    "max_hp": 80
+   }
+  },
+  "quiet": {
+   "name": "Quiet",
+   "weight": 5,
+   "desc": "Half the noise; scavenging encounters -20%.",
+   "fx": {
+    "noise_mult": -0.5,
+    "enc_chance": -0.2
+   }
+  },
+  "loudmouth": {
+   "name": "Loudmouth",
+   "weight": 3,
+   "desc": "Noise +0.5 an hour; their TALK cheers people up.",
+   "fx": {
+    "noise_flat": 0.5,
+    "talk_add": -20
+   }
+  },
+  "leader": {
+   "name": "Leader",
+   "weight": 3,
+   "desc": "Friends in the same camp gain 10% less stress; can TALK; one per camp.",
+   "fx": {
+    "camp_stress": -0.1,
+    "can_talk": 1
+   }
+  },
+  "mechanic": {
+   "name": "Mechanic",
+   "weight": 4,
+   "desc": "Vehicle repairs cost 30% less; clears roads 1.5x faster.",
+   "fx": {
+    "repair_cost": -0.3,
+    "road_speed": 0.5
+   }
+  },
+  "dog_person": {
+   "name": "Dog Person",
+   "weight": 3,
+   "desc": "Trains dogs twice as fast.",
+   "fx": {
+    "dog_train": 1.0
+   }
+  },
+  "scout": {
+   "name": "Scout",
+   "weight": 4,
+   "desc": "Expedition outcomes +10%; finds blueprints 1.5x.",
+   "fx": {
+    "expedition": 0.1,
+    "blueprint": 0.5
+   }
+  },
+  "hardened": {
+   "name": "Hardened",
+   "weight": 0,
+   "desc": "Earned through hardship: hit +8%, stress gain -20%.",
+   "fx": {
+    "hit_add": 0.08,
+    "stress_mult": -0.2
+   }
+  }
+ },
+ "earned": [
+  "hardened"
+ ],
+ "conflicts": [
+  [
+   "coward",
+   "leader"
+  ],
+  [
+   "quiet",
+   "loudmouth"
+  ],
+  [
+   "tough",
+   "glass_jaw"
+  ]
+ ],
+ "roll": {
+  "none": 0.25,
+  "one": 0.6,
+  "two": 0.15
+ },
+ "reveal_h": 24
+}

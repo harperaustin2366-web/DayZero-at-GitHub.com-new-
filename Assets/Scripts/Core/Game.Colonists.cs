@@ -56,13 +56,14 @@ namespace DayZero.Core
                         double f = 4.0 * (1.0 + 0.5 * b.U("garden")) * agri;
                         f *= 1.0 + Rx("farmer_mult");
                         if (b.Site == "farmhouse") f *= 1.5;
+                        if (ExpansionRules) f *= 1.0 + Tx(p, "farmer_mult");   // Expansion: Green Thumb
                         r["food"] += f;
                         break;
                     case "Civilian":
                         r["water"] += 1.6 * wm; r["food"] += 0.6; r["materials"] += 1.0;
                         break;
                     case "Engineer":
-                        r["materials"] += (1.5 + (b.U("workshop") > 0 ? 2.0 : 0.0)) * (1.0 + Rx("salvage_mult"));
+                        r["materials"] += (1.5 + (b.U("workshop") > 0 ? 2.0 : 0.0)) * (1.0 + Rx("salvage_mult")) * (ExpansionRules ? 1.0 + Tx(p, "engineer_mult") : 1.0);   // Expansion: Tinkerer
                         break;
                     case "Medic":
                         r["meds"] += 0.6 * b.U("medbay");
@@ -179,7 +180,7 @@ namespace DayZero.Core
                 if (BasePeople(b.Id).Count > BaseBeds(b)) heal *= 0.6;
                 foreach (var p in here)
                 {
-                    if (p.Hp < 100.0) p.Hp = Math.Min(100.0, p.Hp + heal);
+                    if (p.Hp < MaxHp(p)) p.Hp = Math.Min(MaxHp(p), p.Hp + heal);   // MaxHp = 100 unless ExpansionRules (Tough/Glass Jaw)
                     if (p.Inf >= 0.0 && !p.Known && medics > 0 && Rng.Randf() < detect)
                     {
                         p.Known = true;
@@ -771,6 +772,7 @@ namespace DayZero.Core
                 if (guard)
                 {
                     hit = Data.GunHit(wd) + (p.Job == "Soldier" ? 0.06 : 0.0) + Rx("hit_add") + (onSq ? Rx("squad_power") * 0.5 : 0.0) + (duty ? 0.04 : 0.0) + Math.Min(0.09, 0.03 * ConvN("armory"));
+                    if (ExpansionRules) hit += Tx(p, "hit_add");   // Expansion: Sharpshooter / Hardened
                     if (wd.Ammo > 0.0)
                     {
                         C.Res["ammo"] = R("ammo") - wd.Ammo;
