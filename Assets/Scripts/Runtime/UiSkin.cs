@@ -252,6 +252,323 @@ namespace DayZero.Runtime
             return night;
         }
 
+        // =====================================================================================================
+        // v0.17 UI kit skin (UiKit / UiWheel). Rugged military-survival plates: dark #1e1d18 base, chamfered
+        // corners, 2 px bevel, inner shadow, corner rivets, tiled grain (KitGrain, drawn over plates so the 9-slice
+        // never stretches the noise). Buttons have a raised face over a darker lip; pressed sinks into the socket.
+        // Everything below is pure pixel code (the offline preview composites the same pixels).
+        // =====================================================================================================
+
+        public static readonly Color KitBase = new Color(0.118f, 0.114f, 0.094f, 0.95f);   // #1e1d18
+        public static readonly Color KitOlive = new Color(0.43f, 0.42f, 0.23f, 1f);        // primary (art bible BUILD #7d7744, a touch darker)
+        public static readonly Color KitAmber = new Color(0.74f, 0.53f, 0.18f, 1f);        // accent  (CAMP #bd882f)
+        public static readonly Color KitRust = new Color(0.58f, 0.25f, 0.16f, 1f);         // danger
+        public static readonly Color KitSteel = new Color(0.25f, 0.25f, 0.21f, 1f);        // neutral
+        public static readonly Color KitInk = new Color(0.93f, 0.92f, 0.81f, 1f);          // #edeace
+        public static readonly Color KitInkDim = new Color(0.82f, 0.78f, 0.68f, 1f);       // #d1c6ad
+        public static readonly Color KitInkMute = new Color(0.60f, 0.58f, 0.50f, 1f);
+        public static readonly Color KitGood = new Color(0.48f, 0.60f, 0.29f, 1f);         // #7a9a4a
+        public static readonly Color KitBad = new Color(0.69f, 0.29f, 0.23f, 1f);          // #b04a3a
+
+        static uint Hash(int x, int y, int s)
+        {
+            uint h = (uint)(x * 374761393 + y * 668265263 + s * 2147483647);
+            h = (h ^ (h >> 13)) * 1274126177u;
+            return h ^ (h >> 16);
+        }
+        static float Hash01(int x, int y, int s) => (Hash(x, y, s) & 0xffffff) / 16777216f;
+
+        /// <summary>Distance to a rect [0,w]x[0,h] with 45-degree chamfered corners of size c (negative inside).</summary>
+        static float Chamfer(float x, float y, float w, float h, float c)
+        {
+            float px = Mathf.Abs(x - w * 0.5f), py = Mathf.Abs(y - h * 0.5f);
+            float db = Mathf.Max(px - w * 0.5f, py - h * 0.5f);
+            float dc = (px + py - (w * 0.5f + h * 0.5f - c)) * 0.70710678f;
+            return Mathf.Max(db, dc);
+        }
+
+        static Color Over(Color c, Color o, float a) => new Color(Mathf.Lerp(c.r, o.r, a), Mathf.Lerp(c.g, o.g, a), Mathf.Lerp(c.b, o.b, a), c.a);
+
+        /// <summary>Straight-alpha pixel = fill (coverage aIn) over a soft drop shadow.</summary>
+        static Color32 WithShadow(Color c, float aIn, float shadowA, float ds, float blur)
+        {
+            float aC = c.a * aIn;
+            float aS = 0f;
+            if (shadowA > 0f) { float s = 1f - Smooth((ds + 1f) / Mathf.Max(1f, blur)); aS = shadowA * s * s * (1f - aIn); }
+            float a = aC + aS * (1f - aC);
+            if (a <= 0.0005f) return new Color32(0, 0, 0, 0);
+            float m = aC / a;
+            return new Color(c.r * m, c.g * m, c.b * m, a);
+        }
+
+        /// <summary>Which bevel side a point at (x,y) inside a w x h rect is nearest: +1 lit (top/left), -1 shade.</summary>
+        static float LitSide(float x, float y, float w, float h)
+        {
+            float t = y, b = h - y, l = x, r = w - x;
+            float m = Mathf.Min(Mathf.Min(t, b), Mathf.Min(l, r));
+            if (m == t) return 1f; if (m == l) return 0.55f; if (m == r) return -0.55f; return -1f;
+        }
+
+        /// <summary>Main panel plate: chamfer 6, 2 px bevel, inner shadow ring, four rivets, soft drop shadow.</summary>
+        public static Sheet KitPlate()
+        {
+            const int iw = 72, ih = 72, pad = 10; const float ch = 6f, dy = 4f, blur = 9f;
+            int W = iw + pad * 2, H = ih + pad * 2;
+            var px = new Color32[W * H];
+            float[] rx = { 9.5f, iw - 9.5f, 9.5f, iw - 9.5f }, ry = { 9.5f, 9.5f, ih - 9.5f, ih - 9.5f };
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float fx = x + 0.5f - pad, fy = y + 0.5f - pad;
+                    float d = Chamfer(fx, fy, iw, ih, ch), aIn = Cov(d), e = -d;
+                    float t = Mathf.Clamp01(fy / ih);
+                    Color c = Color.Lerp(Mul(KitBase, 1.12f), Mul(KitBase, 0.86f), t); c.a = KitBase.a;
+                    // inner shadow ring just inside the bevel
+                    if (e > 3f) { float k = Mathf.Clamp01(1f - (e - 3f) / 10f); c = Mul(c, 1f - 0.30f * k * k); c.a = KitBase.a; }
+                    // 2 px bevel: lit top/left, shaded bottom/right
+                    if (e >= 1f && e < 3f)
+                    {
+                        float side = LitSide(fx, fy, iw, ih);
+                        c = side > 0 ? Over(c, new Color(0.62f, 0.58f, 0.44f), 0.30f * side) : Mul(c, 1f + 0.55f * side);
+                        c.a = 0.97f;
+                    }
+                    if (e < 1f) c = new Color(0.035f, 0.033f, 0.027f, 0.96f);   // outer keyline
+                    // rivets
+                    for (int i = 0; i < 4; i++)
+                    {
+                        float vx = fx - rx[i], vy = fy - ry[i], r = Mathf.Sqrt(vx * vx + vy * vy);
+                        if (r > 3.9f) continue;
+                        float cov = Mathf.Clamp01(3.6f - r);
+                        float lit = Mathf.Clamp01(0.5f - (vx + vy) / 5f);
+                        var rc = r > 2.6f ? new Color(0.03f, 0.03f, 0.025f)
+                            : Color.Lerp(new Color(0.24f, 0.22f, 0.17f), new Color(0.78f, 0.73f, 0.58f), lit * lit);
+                        if (r < 1.0f && vx < 0f && vy < 0f) rc = new Color(0.92f, 0.88f, 0.74f);
+                        c = Over(c, rc, cov); c.a = Mathf.Max(c.a, 0.97f * cov + c.a * (1f - cov));
+                    }
+                    float ds = Chamfer(fx, fy - dy, iw, ih, ch) + 1f;
+                    px[y * W + x] = WithShadow(c, aIn, 0.55f, ds, blur);
+                }
+            return new Sheet { Px = px, W = W, H = H, PadL = pad, PadR = pad, PadT = pad, PadB = pad, Slice = 15 };
+        }
+
+        /// <summary>Tileable grain (64 x 64): light and dark specks + soft blotches, low alpha. Tile it over plates.</summary>
+        public static Sheet KitGrain(int n = 64)
+        {
+            var px = new Color32[n * n];
+            const int cell = 8;
+            int L = n / cell;
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    // tileable value noise (lattice wraps every L cells)
+                    float gx = (float)x / cell, gy = (float)y / cell;
+                    int x0 = (int)gx, y0 = (int)gy; float u = Smooth(gx - x0), v = Smooth(gy - y0);
+                    float a00 = Hash01(x0 % L, y0 % L, 7), a10 = Hash01((x0 + 1) % L, y0 % L, 7), a01 = Hash01(x0 % L, (y0 + 1) % L, 7), a11 = Hash01((x0 + 1) % L, (y0 + 1) % L, 7);
+                    float blot = Mathf.Lerp(Mathf.Lerp(a00, a10, u), Mathf.Lerp(a01, a11, u), v);
+                    float fine = Hash01(x, y, 3);
+                    float val = blot * 0.55f + fine * 0.45f - 0.5f;   // -0.5..0.5
+                    var c = val > 0 ? new Color(0.95f, 0.90f, 0.75f, val * 0.10f) : new Color(0f, 0f, 0f, -val * 0.15f);
+                    // occasional scratch / speck
+                    if (Hash01(x, y, 11) > 0.992f) c = new Color(0.9f, 0.86f, 0.7f, 0.10f);
+                    px[y * n + x] = c;
+                }
+            return new Sheet { Px = px, W = n, H = n };
+        }
+
+        /// <summary>Header strip: dark olive-black, top highlight, amber stencil notch at the left, 2 px amber rule below.</summary>
+        public static Sheet KitHeader()
+        {
+            const int W = 48, H = 40;
+            var px = new Color32[W * H];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float t = (y + 0.5f) / H;
+                    Color c = Color.Lerp(new Color(0.20f, 0.195f, 0.15f, 0.96f), new Color(0.125f, 0.12f, 0.095f, 0.96f), t);
+                    if (y == 0) c = Over(c, new Color(0.8f, 0.76f, 0.6f), 0.14f);
+                    if (y >= H - 2) c = new Color(0.78f, 0.56f, 0.20f, 1f);
+                    else if (y == H - 3) c = new Color(0.05f, 0.05f, 0.04f, 0.96f);
+                    if (x < 5 && y > 4 && y < H - 6) c = new Color(0.78f, 0.56f, 0.20f, 1f);
+                    px[y * W + x] = c;
+                }
+            return new Sheet { Px = px, W = W, H = H, Slice = 8 };
+        }
+
+        public const int KitLip = 5, KitPressDrop = 3, KitBtnPad = 4;
+
+        /// <summary>Kit button sheet. state 0 normal, 1 pressed (face sunk into its socket), 2 selected (amber frame),
+        /// 3 disabled. The face is raised over a darker lip (KitLip px) at the bottom; label rect = UiKit.ButtonFace.</summary>
+        public static Sheet KitButton(Color b, int state)
+        {
+            const int iw = 48, ih = 64, pad = KitBtnPad; const float ch = 4f, blur = 4f;
+            int W = iw + pad * 2, H = ih + pad * 2;
+            var px = new Color32[W * H];
+            bool dis = state == 3, down = state == 1, sel = state == 2;
+            if (dis) b = new Color(0.30f, 0.30f, 0.27f, 0.80f);
+            float faceTop = down ? KitPressDrop : 0f, faceBot = ih - (down ? KitLip - KitPressDrop + 1 : KitLip);
+            var lip = Mul(b, 0.42f); lip.a = Mathf.Max(b.a, 0.92f);
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float fx = x + 0.5f - pad, fy = y + 0.5f - pad;
+                    float d = Chamfer(fx, fy, iw, ih, ch), aIn = Cov(d), e = -d;
+                    Color c;
+                    if (fy < faceTop) c = new Color(0.05f, 0.05f, 0.04f, 0.95f);           // socket shows above a pressed face
+                    else if (fy >= faceBot) { c = lip; if (fy < faceBot + 1f) c = Mul(lip, 0.6f); }
+                    else
+                    {
+                        float t = Mathf.Clamp01((fy - faceTop) / Mathf.Max(1f, faceBot - faceTop));
+                        c = Color.Lerp(Tint(Mul(b, down ? 0.95f : 1.18f), new Color(1f, 0.96f, 0.82f), 0.04f), Mul(b, down ? 0.80f : 0.86f), t);
+                        c.a = Mathf.Max(b.a, 0.9f);
+                        float de = fy - faceTop;   // depth below the face top
+                        if (!down && !dis && de < 2f && e > 1f) c = Over(c, new Color(1f, 0.97f, 0.85f), 0.34f * (2f - de) / 2f);   // top highlight
+                        if (!down && !dis && e > 1f && e < 2f && fx < iw * 0.5f) c = Over(c, new Color(1f, 0.97f, 0.85f), 0.10f);
+                        if (down && de < 4f) c = Mul(c, 0.78f + 0.055f * de);   // inner shade under the socket rim
+                        // faint brushed texture
+                        c = Mul(c, 0.985f + 0.03f * Hash01(x, (int)(y / 3), 5));
+                    }
+                    if (e < 1f) c = new Color(0.03f, 0.03f, 0.025f, 0.95f);
+                    if (sel)
+                    {
+                        if (e >= 1f && e < 3f) c = new Color(0.95f, 0.70f, 0.26f, 1f);
+                        else if (e >= 3f && e < 6f) c = Over(c, new Color(1f, 0.75f, 0.3f), 0.22f * (6f - e) / 3f);
+                    }
+                    float ds = Chamfer(fx, fy - (down ? 0.5f : 2f), iw, ih, ch) + 1f;
+                    px[y * W + x] = WithShadow(c, aIn, dis ? 0.2f : 0.5f, ds, blur);
+                }
+            return new Sheet { Px = px, W = W, H = H, PadL = pad, PadR = pad, PadT = pad, PadB = pad, Slice = 9 };
+        }
+
+        /// <summary>Chip / badge: small dark plate, keyline, coloured tab on the left (tinted at draw time, so pass white).</summary>
+        public static Sheet KitChip(Color tab)
+        {
+            const int W = 40, H = 28; const float ch = 3f;
+            var px = new Color32[W * H];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float fx = x + 0.5f, fy = y + 0.5f;
+                    float d = Chamfer(fx, fy, W, H, ch), aIn = Cov(d), e = -d;
+                    Color c = Color.Lerp(new Color(0.15f, 0.145f, 0.12f, 0.92f), new Color(0.085f, 0.08f, 0.065f, 0.92f), fy / H);
+                    if (e < 1f) c = new Color(0.45f, 0.41f, 0.30f, 0.75f);
+                    else if (fx < 5f) c = new Color(tab.r, tab.g, tab.b, 1f);
+                    px[y * W + x] = WithShadow(c, aIn, 0f, 0f, 1f);
+                }
+            return new Sheet { Px = px, W = W, H = H, Slice = 6 };
+        }
+
+        /// <summary>Recessed well (behind scroll wheels and bars): darker, inverted bevel (shade on top, light lip below).</summary>
+        public static Sheet KitWell()
+        {
+            const int W = 40, H = 40; const float ch = 3f;
+            var px = new Color32[W * H];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float fx = x + 0.5f, fy = y + 0.5f;
+                    float d = Chamfer(fx, fy, W, H, ch), aIn = Cov(d), e = -d;
+                    Color c = new Color(0.055f, 0.053f, 0.045f, 0.94f);
+                    if (e < 1f) c = new Color(0.02f, 0.02f, 0.016f, 0.96f);
+                    else if (e < 3f)
+                    {
+                        float side = LitSide(fx, fy, W, H);
+                        c = side > 0 ? new Color(0.025f, 0.024f, 0.02f, 0.96f) : new Color(0.30f, 0.28f, 0.22f, 0.85f);
+                    }
+                    px[y * W + x] = WithShadow(c, aIn, 0f, 0f, 1f);
+                }
+            return new Sheet { Px = px, W = W, H = H, Slice = 6 };
+        }
+
+        /// <summary>Selection band across the middle of a wheel: faint amber fill, amber rules on its long sides.
+        /// horizontal=false: rules top and bottom (vertical drum).</summary>
+        public static Sheet KitBand(bool horizontal)
+        {
+            int W = horizontal ? 32 : 48, H = horizontal ? 48 : 32;
+            var px = new Color32[W * H];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    int along = horizontal ? x : y, len = horizontal ? W : H;
+                    Color c = new Color(0.95f, 0.72f, 0.30f, 0.13f);
+                    if (along < 2 || along >= len - 2) c = new Color(0.92f, 0.66f, 0.24f, 0.95f);
+                    else if (along < 4 || along >= len - 4) c = new Color(0.95f, 0.72f, 0.30f, 0.22f);
+                    px[y * W + x] = c;
+                }
+            return new Sheet { Px = px, W = W, H = H, Slice = 6 };
+        }
+
+        /// <summary>Drum curvature shade: opaque dark at both ends of the wheel axis, clear in the middle.</summary>
+        public static Sheet KitDrumShade(bool horizontal)
+        {
+            int W = horizontal ? 64 : 4, H = horizontal ? 4 : 64;
+            var px = new Color32[W * H];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float v = horizontal ? (x + 0.5f) / W * 2f - 1f : (y + 0.5f) / H * 2f - 1f;
+                    float a = Mathf.Pow(Mathf.Clamp01((Mathf.Abs(v) - 0.25f) / 0.75f), 1.6f) * 0.80f;
+                    px[y * W + x] = new Color(0.04f, 0.04f, 0.032f, a);
+                }
+            return new Sheet { Px = px, W = W, H = H };
+        }
+
+        /// <summary>Engraved divider: a dark line over a faint light line, fading out at both ends.</summary>
+        public static Sheet KitDivider()
+        {
+            const int W = 64, H = 3;
+            var px = new Color32[W * H];
+            for (int x = 0; x < W; x++)
+            {
+                float vx = Mathf.Abs((x + 0.5f) / W * 2f - 1f), f = 1f - Smooth((vx - 0.6f) / 0.4f);
+                px[x] = new Color(0f, 0f, 0f, 0.55f * f);
+                px[W + x] = new Color(0.02f, 0.02f, 0.015f, 0.35f * f);
+                px[2 * W + x] = new Color(0.85f, 0.80f, 0.62f, 0.16f * f);
+            }
+            return new Sheet { Px = px, W = W, H = H };
+        }
+
+        /// <summary>Vertical fade (8 x 32): dark plate colour at the top row to clear at the bottom (scroll list edges).</summary>
+        public static Sheet KitFade()
+        {
+            const int W = 8, H = 32;
+            var px = new Color32[W * H];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float t = (y + 0.5f) / H, a = (1f - Smooth(t)) * 0.9f;
+                    px[y * W + x] = new Color(0.08f, 0.078f, 0.064f, a);
+                }
+            return new Sheet { Px = px, W = W, H = H };
+        }
+
+        /// <summary>Scroll indicator thumb: a 6 px cream pill.</summary>
+        public static Sheet KitThumb()
+        {
+            const int W = 8, H = 24;
+            var px = new Color32[W * H];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float d = RRect(x + 0.5f - 1f, y + 0.5f, 6f, H, 3f);
+                    px[y * W + x] = new Color(0.90f, 0.86f, 0.72f, 0.55f * Cov(d));
+                }
+            return new Sheet { Px = px, W = W, H = H, Slice = 4 };
+        }
+
+        /// <summary>Progress bar fill (tinted by GUI.color, so white): top highlight, darker bottom.</summary>
+        public static Sheet KitFill()
+        {
+            const int W = 8, H = 16;
+            var px = new Color32[W * H];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float t = (y + 0.5f) / H, k = y == 0 ? 1f : Mathf.Lerp(0.95f, 0.62f, t);
+                    px[y * W + x] = new Color(k, k, k, 1f);
+                }
+            return new Sheet { Px = px, W = W, H = H, Slice = 2 };
+        }
+
 #if !DZ_PREVIEW
         // ---------------- Unity side ----------------
         static readonly Dictionary<long, Texture2D> _btn = new Dictionary<long, Texture2D>();
