@@ -301,6 +301,7 @@ namespace DayZero.Runtime
             foreach (int l in lots) AddLot(g, l);
             Stat("lots");
             DistrictPass(g, x0, y0, x1, y1, lots); Stat("districts");   // MapDistricts.cs: district palettes + props
+            StreetPass(g, x0, y0, x1, y1, lots); Stat("street+graffiti");   // MapGen.Street.cs: street clutter + graffiti
             AddVegetation(g, x0, y0, x1, y1); Stat("vegetation");
             return new Chunk { Mesh = g.M, Shadow = g.S, Center = new Vector3(x0 + CH * 0.5f, 0f, -(y0 + CH * 0.5f)) };
         }
