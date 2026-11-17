@@ -316,6 +316,7 @@ namespace DayZero.Core
                 if (Zh[i] == 255) { i++; continue; }
                 if (Zc[i] >= k0 && ZoneFrozen(ZoneOf(Tp(Zc[i])))) { i++; continue; }
                 double spd = Zh[i] != 0 ? (Zh[i] == 3 ? Z_RAID : Z_FAST) : Z_SPEED;
+                if (ExpansionRules) spd *= ExpZombieSpeedMul();   // Expansion: season + snow
                 Zp[i] = (float)(Zp[i] + dh * spd);
                 int hops = 0;
                 while (Zp[i] >= 1.0f && hops < 8)

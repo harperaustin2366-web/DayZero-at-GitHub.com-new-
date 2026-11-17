@@ -404,6 +404,10 @@ namespace DayZero.Core
         public ODict<int, Breach> Breaches = new ODict<int, Breach>();
         public bool WallsInit;
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public bool ExpRules;   // run started with Game.ExpansionRules
+        // Expansion world (SYSTEMS_30 #2 weather/seasons, #23 district danger); untouched while ExpRules is off
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public int Season, SeasonDay, Weather;
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public double WeatherEndT;
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public int[] DistrictDanger;
         public byte[] Ctrl;
         public float[] CtrlH, Scout, Loot, Zinf, Srch;
         public byte[] SrchC;

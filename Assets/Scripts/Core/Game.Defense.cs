@@ -1119,7 +1119,7 @@ namespace DayZero.Core
                     if (power < td.Power.Value) continue;
                     power -= td.Power.Value;
                 }
-                var near = ZombiesNear(p, td.Range + Rx("tower_range"), 8);
+                var near = ZombiesNear(p, ExpansionRules ? (td.Range + Rx("tower_range")) * ExpSightMul() : td.Range + Rx("tower_range"), 8);   // Expansion: fog
                 if (near.Count == 0) continue;
                 double ammo = td.Ammo;
                 if (ammo > 0.0)

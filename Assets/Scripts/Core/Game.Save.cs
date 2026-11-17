@@ -295,7 +295,7 @@ namespace DayZero.Core
             if (!HasSave(path)) return false;
             var rs = ReadSave(path);
             if (rs.d == null) return false;
-            if ((int)rs.d["ver"] != SAVE_VERSION) { LastLoadError = "Unsupported save version " + (int)rs.d["ver"]; return false; }
+            if ((int)rs.d["ver"] != SAVE_VERSION && (int)rs.d["ver"] != 17) { LastLoadError = "Unsupported save version " + (int)rs.d["ver"]; return false; }
             GameState d;
             try { d = rs.d.ToObject<GameState>(Ser); }
             catch (Exception e) { LastLoadError = "Damaged save: " + e.Message; Debug.LogWarning("load: " + LastLoadError); return false; }

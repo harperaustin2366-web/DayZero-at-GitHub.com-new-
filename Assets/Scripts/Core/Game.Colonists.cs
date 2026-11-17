@@ -32,6 +32,7 @@ namespace DayZero.Core
             up["ammo"] += 0.4 * guards; up["cloth"] += 0.03 * ppl.Count; up["wood"] += 0.03 * ppl.Count;
             double agri = 1.0 + Rx("food_mult");
             double wm = 1.0 + Rx("water_mult");
+            if (ExpansionRules) { agri *= ExpCropMul(); wm *= ExpWaterMul(); }   // Expansion: seasons + rain
             r["water"] += (b.Main ? 5.0 : 2.5) * wm + Rx("water_flat");
             r["water"] += 5.0 * b.U("water") * wm;
             r["food"] += 5.0 * b.U("garden") * agri;
@@ -546,6 +547,7 @@ namespace DayZero.Core
             foreach (var kv in tab)
             {
                 double v = Rng.RandfRange(kv.Value[0], kv.Value[1]) * left * mult;
+                if (ExpansionRules) v *= ExpLootMul(l, kv.Key);   // Expansion: district danger, autumn harvest, rain
                 if (v > 0.0) p.Carry[kv.Key] = p.Carry.Get(kv.Key, 0.0) + v;
             }
             MarkSearched(l, CurCol + 1);
@@ -559,6 +561,7 @@ namespace DayZero.Core
             bool sq = p.Sq > 0 && p.Goal == "sq";
             double engage = 0.65 * (1.0 - Math.Min(0.6, Rx("quiet"))) * (p.Veh ? (0.45 - Math.Min(0.3, Rx("veh_safe"))) : 1.0);
             if (sq) engage = 0.9;
+            if (ExpansionRules) engage = Math.Min(0.97, engage * ExpEncounterMul(p.Pos));   // Expansion: danger, fog
             if (Rng.Randf() > engage) return;
             double win = p.Job == "Soldier" ? 0.93 : p.Job == "Cop" ? 0.87 : p.Job == "Scavenger" ? 0.74 : 0.6;
             foreach (var q in _openHumans)
@@ -681,7 +684,7 @@ namespace DayZero.Core
                 if (srch[l] >= 0f || S.Loot[l] < 0.2f || _claimed.ContainsKey(l) || _factionLots.ContainsKey(l)) continue;
                 var door = D.LotDoor(l);
                 double inf = InfAt(door);
-                if (inf > 0.95) continue;
+                if (ExpansionRules ? DistrictDangerAt(door.x, door.y) >= 4 : inf > 0.95) continue;   // Expansion: skip D4-D5
                 double s = e.d + 70.0 * inf + 12.0 * (1.0 - S.Loot[l]) - (D.Scavenge[D.LotKind(l)] != null ? 8.0 : 0.0);
                 if (s < bs) { bs = s; best = l; }
             }

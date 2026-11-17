@@ -42,7 +42,7 @@ namespace DayZero.Core
         // ---------------- constants ----------------
         public const string SAVE_PATH = "dayzero_v4.json";
         public const string MP_SAVE_PATH = "dayzero_v4_mp.json";
-        public const int SAVE_VERSION = 17;
+        public const int SAVE_VERSION = 18;   // 18: expansion weather/seasons/district danger (17 still loads)
         /// <summary>Format tag written into C# saves (they are JSON, not Godot store_var).</summary>
         public const string SAVE_FORMAT = "dayzero-unity-json-1";
         public const int MAX_COLONIES = 11;
@@ -1042,6 +1042,7 @@ namespace DayZero.Core
         void TickHourPost()
         {
             StepControl(); Dbg("StepControl");
+            if (ExpansionRules) { StepExpWorld(); Dbg("StepExpWorld"); }   // Expansion: weather, seasons, district danger
             StepGroups(); Dbg("StepGroups");
             StepCamps(); Dbg("StepCamps");
             StepFactions(); Dbg("StepFactions");

@@ -707,6 +707,7 @@ namespace DayZero.Core
                 var cp = CampById(cid);
                 if (cp != null && cp.Alive) { n *= 0.8; break; }
             }
+            if (ExpansionRules) n *= ExpRaidMul();   // Expansion: summer x1.05, winter x0.85
             return V.Clampi((int)Gd.Round(n), 3, RAID_CAP);
         }
 
