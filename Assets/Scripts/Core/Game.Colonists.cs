@@ -51,6 +51,7 @@ namespace DayZero.Core
             if ((b.U("workshop") > 0 || b.U("armory") > 0) && here.Count > 0) r["ammo"] += Rx("ammo_daily");
             foreach (var p in here)
             {
+                var pre = ExpansionRules ? PplSnap(r) : null;   // Expansion: fatigue / morale output
                 switch (p.Job)
                 {
                     case "Farmer":
@@ -73,6 +74,7 @@ namespace DayZero.Core
                         r["materials"] += 0.5;
                         break;
                 }
+                if (pre != null) PplScale(r, pre, PplOutMult(p));   // Expansion: fatigue / morale output
             }
             if (b.U("armory") > 0 && R("ammo") < 80.0 && R("metal") > 3.0 && here.Count > 0)
             {
@@ -220,6 +222,7 @@ namespace DayZero.Core
         {
             var pos = p.Pos;
             bool inside = p.St == "base";
+            if (ExpansionRules && inside) PplOnTurn(p.Base);   // Expansion: stress
             KillPerson(p, "turned", false);
             C.AddStat("turned", 1);
             int k = Ti(D.NearestWalkable(V.I(pos)));
@@ -241,6 +244,7 @@ namespace DayZero.Core
             p.Path = new List<Vector2>();
             _claimed.Remove(p.Lot);
             FamilyOnDeath(p);
+            if (ExpansionRules) PplOnDeath(p);   // Expansion: stress
             C.AddStat("dead", 1);
             if (logIt) AddLog(string.Format("{0} ({1}) {2}.", p.Name, p.Job, cause), "death");
             C.People.Remove(p);
@@ -624,6 +628,7 @@ namespace DayZero.Core
                     if (p.Hp < 40.0) continue;
                     if (p.Sq > 0) continue;
                     if (p.Hold) continue;
+                    if (ExpansionRules && PplNoWork(p)) continue;   // Expansion: frozen / resting / asleep
                     if (IsKid(p)) continue;
                     if (p.Guard && (Hour() >= 18 || Hour() < 6)) continue;
                     bool autoScav = CampAuto(b, "scav");
@@ -761,6 +766,7 @@ namespace DayZero.Core
                 bool guard = p.Job == "Soldier" || p.Job == "Cop" || onSq || (p.Guard && p.St == "base") || (p.St == "base" && p.Wpn != "" && !IsMinor(p));
                 bool at = p.St == "base" || (p.St == "work" && (p.Goal == "hunt" || p.Goal == "patrol")) || (p.St == "move" && p.Goal == "hunt") || onSq;
                 if (!at) continue;
+                if (ExpansionRules && PplSkipFight(p)) continue;   // Expansion: dozing / asleep / off-shift
                 var b = BaseById(p.Base);
                 double rngR = 1.3;
                 var wd = guard ? WeaponOf(p) : Data.UNARMED;
@@ -775,7 +781,7 @@ namespace DayZero.Core
                 if (guard)
                 {
                     hit = Data.GunHit(wd) + (p.Job == "Soldier" ? 0.06 : 0.0) + Rx("hit_add") + (onSq ? Rx("squad_power") * 0.5 : 0.0) + (duty ? 0.04 : 0.0) + Math.Min(0.09, 0.03 * ConvN("armory"));
-                    if (ExpansionRules) hit += Tx(p, "hit_add");   // Expansion: Sharpshooter / Hardened
+                    if (ExpansionRules) hit += Tx(p, "hit_add") + FatigueHitAdd(p);   // Expansion: Sharpshooter / Hardened, fatigue
                     if (wd.Ammo > 0.0)
                     {
                         C.Res["ammo"] = R("ammo") - wd.Ammo;

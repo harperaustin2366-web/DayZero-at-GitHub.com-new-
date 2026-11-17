@@ -46,6 +46,7 @@ namespace DayZero.Core
                 var ppl = BasePeople(b.Id);
                 int have = ppl.Count(p => p.Guard);
                 int want = GuardsWanted(b);
+                if (ExpansionRules) want *= PplShifts;   // Expansion: night-watch shifts
                 if (have >= want) continue;
                 var cand = new List<(double pr, Person p)>();
                 foreach (var p in ppl)
@@ -55,6 +56,7 @@ namespace DayZero.Core
                     if (p.Gauto == false) continue;
                     double pr = GUARD_PRI.GetOr(p.Job, 5.0);
                     if (p.Wpn != "") pr -= 0.5;
+                    if (ExpansionRules) pr += PplGuardPri(p);   // Expansion: most rested take the watch
                     if (p.St != "base") pr += 6.0;
                     if (new[] { "tf", "sq", "sqs", "sqa", "build" }.Contains(p.Goal)) pr += 20.0;
                     cand.Add((pr, p));

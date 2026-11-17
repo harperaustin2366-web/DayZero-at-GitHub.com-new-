@@ -308,6 +308,7 @@ namespace DayZero.Core
 
         string DoActionInner(string action, IList<object> a)
         {
+            if (action.StartsWith("ppl_")) return PplAction(action);   // Expansion: TALK / REST DAY
             switch (action)
             {
                 case "start_at": return StartAt((Vector2Int)a[0]);

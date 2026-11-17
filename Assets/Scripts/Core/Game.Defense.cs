@@ -1112,6 +1112,7 @@ namespace DayZero.Core
                     if (b == null) continue;
                     int used = crewUsed.GetOr(b.Id, 0);
                     if (AtBase(b.Id).Count <= used) continue;
+                    if (ExpansionRules && AtBase(b.Id).Count(x => !PplSkipFight(x)) <= used) continue;   // Expansion: dozing crew don't fire
                     crewUsed[b.Id] = used + 1;
                 }
                 if ((td.Power ?? 0) > 0)
