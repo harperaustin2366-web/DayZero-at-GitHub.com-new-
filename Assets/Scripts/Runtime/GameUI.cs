@@ -574,46 +574,6 @@ namespace DayZero.Runtime
             }
         }
 
-        static UiRole ActRole(string style) => style == "sel" ? UiRole.Accent : style == "amber" ? UiRole.Accent : UiRole.Primary;
-
-        void DrawActions(float w, MapView map)
-        {
-            var panel = SideMenus.ActionsPanel(w);
-            float ty = Mathf.Clamp(panel.y + panel.height * 0.5f - 32f, panel.y, 720f - 70f);
-            if (!_actionsOpen)
-            {
-                if (KBtn(Blk(new Rect(w - 56, ty, 48, 64)), "<", UiRole.Neutral, false, 24)) _actionsOpen = true;
-                return;
-            }
-            if (KBtn(Blk(new Rect(panel.x - 54, ty, 48, 64)), ">", UiRole.Neutral, false, 24)) _actionsOpen = false;
-            Blk(panel);
-            UiKit.Panel(panel);
-            UiKit.FitLabel(new Rect(panel.x + 14, panel.y + 4, panel.width - 28, SideMenus.ACT_HDR - 8f), "ACTIONS", 18, TextAnchor.MiddleLeft, UiKit.Amber);
-            for (int i = 0; i < SideMenus.ACTIONS.Length; i++)
-            {
-                var (label, style) = SideMenus.ACTIONS[i];
-                if (!KBtn(SideMenus.ActionButton(w, i), label, ActRole(style), false, SideMenus.ActFont(i))) continue;
-                switch (label)
-                {
-                    case "BUILD": _panel = Panel.Build; map?.CancelTool(); break;
-                    case "BUILD OUTPOST": StartOutpost(map); break;                         // GameUI.Camp.cs
-                    case "CAMPS": SideMenus.CampsPage = 0; OpenSide("camps", map); break;   // main.gd _show_bases
-                    case "GATHER": _tab = 1; _menuOpen = true; break;
-                    case "CREW & JOBS": SideMenus.CrewPage = 0; OpenSide("crew", map); break; // main.gd _show_crew
-                    case "DEFENSE": _panel = Panel.Defense; map?.ClearBuilding(); break;
-                    case "SQUADS": _side.Camp = -1; OpenSide("squads", map); break;        // main.gd _pick_default_camp: the main camp
-                    case "WAR": _side.Sub = ""; OpenSide("war", map); break;                // main.gd _show_war (GameUI.Factions.cs)
-                    case "TASK FORCE": _side.Camp = -1; OpenSide("taskforce", map); break;
-                    case "COLONY": _tab = 0; _menuOpen = true; break;
-                    case "TRADE": OpenSide("trade", map); break;
-                    case "ARMORY": OpenSide("armory", map); break;
-                    case "GARAGE": OpenSide("garage", map); break;
-                    case "RESEARCH": OpenSide("research", map); break;
-                    case "LOG": _tab = 2; _menuOpen = true; break;
-                }
-            }
-        }
-
         /// <summary>One segmented control: PLAY / PAUSE (amber and breathing while paused), speed, +1h, +6h.</summary>
         void DrawTimeControls(float w, float h)
         {
@@ -1043,13 +1003,9 @@ namespace DayZero.Runtime
             if (_b.Toasts.Count == 0) return;
             bool hud = _b.State == Bootstrap.Screen2.Playing && _hf != null && !_b.Picking;
             float y = hud ? _hf.TimeBar.y - 8f : h - 16f;
-            // centred in the band between the camera column and the right-side panel, so a toast never covers ACTIONS
+            // centred in the sheet lane (right of the camera column, left of the right dock), so a toast never covers ACTIONS
             float lo = 10f, hi = w - 10f;
-            if (hud)
-            {
-                lo = _hf.Cam[0].xMax + 10f;
-                hi = _panel != Panel.None ? w - 350f : _actionsOpen ? SideMenus.ActionsPanel(w).x - 64f : w - 66f;
-            }
+            if (hud) { var sa = SheetArea(w, h, MapView.Instance); lo = sa.x; hi = sa.xMax; }   // GameUI.PhaseA.cs docks
             float tw = Mathf.Min(Mathf.Min(760f, w * 0.56f), hi - lo), tx = lo + (hi - lo - tw) / 2f;
             for (int i = _b.Toasts.Count - 1; i >= 0; i--)
             {
