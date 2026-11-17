@@ -558,6 +558,7 @@ namespace DayZero.Runtime
 
         void Ivy(Geo g, int l, ORect R, float H, bool[] faces)
         {
+            if (FxOvergrowth.ReplacesStaticIvy) return;   // v0.16: 3D vines in FxOvergrowth replace these streaks
             if (Hf(l, 90) < 0.3f) return;
             for (int f = 0; f < 4; f++)
             {
