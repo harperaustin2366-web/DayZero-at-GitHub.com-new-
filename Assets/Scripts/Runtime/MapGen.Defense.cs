@@ -332,92 +332,7 @@ namespace DayZero.Runtime
 
         static float WallStep(int tier) => tier == 0 ? 0.105f : tier == 1 ? 0.6f : tier == 2 ? 0.34f : 0.55f;
 
-        void WallPiece(Geo g, Vector2 p, Vector2 dir, Vector2 nrm, float st, int tier, float frac, int salt)
-        {
-            float dmg = 1f - frac;
-            // damage: missing pieces, lean, darker
-            if (dmg > 0.34f && Hf(salt, 3) < dmg * 0.45f) { if (Hf(salt, 4) < 0.5f) Debris1(g, p + nrm * (Hf(salt, 5) - 0.5f) * 0.4f, dir, salt); return; }
-            float lean = dmg > 0.2f ? (Hf(salt, 6) - 0.35f) * dmg * 0.35f : 0f;
-            float hMul = 1f - (dmg > 0.5f ? Hf(salt, 7) * dmg * 0.45f : 0f);
-            switch (tier)
-            {
-                case 0:   // sharpened logs
-                {
-                    float h = (0.9f + Hf(salt, 1) * 0.12f) * hMul;
-                    Color lc = Lerp(LOG, LOG_SHADE, Hf(salt, 2) * 0.4f);
-                    if (dmg > 0.25f) lc = Lerp(lc, Hex("#2a201a"), dmg * 0.5f);
-                    var q = new ORect(p, dir, 0.05f, 0.05f).Quad();
-                    if (Mathf.Abs(lean) < 0.01f) { g.Box(q, 0f, h, lc, lc, 0.2f, false); g.Pyramid(q, h, p, h + 0.12f, Lerp(lc, LOG_TIP, 0.5f)); }
-                    else
-                    {
-                        var top = p + nrm * lean;
-                        g.Beam(Geo.W(p, 0f), Geo.W(top, h), 0.05f, lc);
-                        g.Pyramid(new ORect(top, dir, 0.05f, 0.05f).Quad(), h, top, h + 0.1f, Lerp(lc, LOG_TIP, 0.5f));
-                    }
-                    break;
-                }
-                case 1:   // chain-link: post + mesh panel
-                {
-                    float h = 0.78f * hMul;
-                    g.Cyl(p - dir * st * 0.5f, 0.025f, 0f, 0.82f, Hex("#6e7476"), Hex("#8a9092"), 5);
-                    var a0 = p - dir * st * 0.5f; var a1 = p + dir * st * 0.5f;
-                    var top0 = a0 + nrm * lean; var top1 = a1 + nrm * lean;
-                    Color mc = Lerp(CHAIN, Hex("#5a5e5e"), dmg * 0.6f);
-                    g.QuadRaw(Geo.W(a0, 0.03f), Geo.W(a1, 0.03f), Geo.W(top1, h), Geo.W(top0, h), Mul(mc, 0.8f), Mul(mc, 0.8f), mc, mc);
-                    g.QuadRaw(Geo.W(a1, 0.03f), Geo.W(a0, 0.03f), Geo.W(top0, h), Geo.W(top1, h), Mul(mc, 0.7f), Mul(mc, 0.7f), Mul(mc, 0.9f), Mul(mc, 0.9f));
-                    g.Beam(Geo.W(top0, h), Geo.W(top1, h), 0.012f, Hex("#7a8082"));
-                    break;
-                }
-                case 2:   // scrap-metal sheets: mixed rusty panels, ragged tops, rivets
-                {
-                    float h = (0.95f + (Hf(salt, 1) - 0.5f) * 0.14f) * hMul;
-                    Color[] pal = { SCRAP_A, SCRAP_B, SCRAP_C, SCRAP_D };
-                    Color pc = pal[(int)(Hf(salt, 2) * 4f) & 3];
-                    if (dmg > 0.25f) pc = Lerp(pc, Hex("#2e2622"), dmg * 0.45f);
-                    var c0 = p - dir * st * 0.52f; var c1 = p + dir * st * 0.52f;
-                    var t0 = c0 + nrm * lean; var t1 = c1 + nrm * lean;
-                    float h0 = h, h1 = h * (0.93f + Hf(salt, 9) * 0.1f);
-                    var o = nrm * 0.03f;
-                    g.QuadRaw(Geo.W(c0 - o, 0f), Geo.W(c1 - o, 0f), Geo.W(t1 - o, h1), Geo.W(t0 - o, h0), Shade(Mul(pc, 0.9f), -nrm), Shade(Mul(pc, 0.9f), -nrm), Shade(pc, -nrm), Shade(pc, -nrm));
-                    g.QuadRaw(Geo.W(c1 + o, 0f), Geo.W(c0 + o, 0f), Geo.W(t0 + o, h0), Geo.W(t1 + o, h1), Shade(Mul(pc, 0.85f), nrm), Shade(Mul(pc, 0.85f), nrm), Shade(pc, nrm), Shade(pc, nrm));
-                    g.QuadRaw(Geo.W(t0 - o, h0), Geo.W(t1 - o, h1), Geo.W(t1 + o, h1), Geo.W(t0 + o, h0), Lerp(pc, Hex("#9a8a76"), 0.3f), Lerp(pc, Hex("#9a8a76"), 0.3f), pc, pc);
-                    // corrugation lines + rust streak
-                    for (int c = 1; c < 3; c++)
-                    {
-                        var cp = Vector2.Lerp(c0, c1, c / 3f) - o * 1.4f;
-                        g.Beam(Geo.W(cp, 0.03f), Geo.W(cp + nrm * lean, h * 0.95f), 0.008f, Mul(pc, 0.7f));
-                    }
-                    if (Hf(salt, 11) < 0.4f) { var rp = Vector2.Lerp(c0, c1, 0.3f + Hf(salt, 12) * 0.4f) - o * 1.5f; g.Beam(Geo.W(rp, 0.05f), Geo.W(rp, h * 0.7f), 0.02f, RUST); }
-                    if ((salt & 3) == 0) g.Cyl(c0, 0.03f, 0f, h + 0.05f, Hex("#4a4440"), Hex("#5a5450"), 5);
-                    break;
-                }
-                default:  // concrete slabs (3) / reinforced (4)
-                {
-                    float h = (tier >= 4 ? 1.15f : 1.05f) * hMul;
-                    Color cc = Lerp(CONC, CONC_D, Hf(salt, 2) * 0.35f);
-                    if (dmg > 0.25f) cc = Lerp(cc, Hex("#4a463e"), dmg * 0.5f);
-                    var slab = new ORect(p + nrm * lean * 0.3f, dir, st * 0.48f, 0.08f);
-                    g.Box(slab.Quad(), 0f, h, cc, CONC_TOP, 0.25f);
-                    // base footing + top chamfer
-                    g.Box(new ORect(p, dir, st * 0.5f, 0.12f).Quad(), 0f, 0.12f, Mul(cc, 0.85f), Mul(CONC_TOP, 0.9f));
-                    if (tier >= 4) g.Box(new ORect(p, dir, st * 0.5f, 0.1f).Quad(), h - 0.08f, h, Hex("#7a7466"), Hex("#8a8476"));
-                    // cracks / exposed rebar when hurt
-                    if (dmg > 0.3f)
-                    {
-                        var cp = p - nrm * 0.085f + dir * (Hf(salt, 14) - 0.5f) * st * 0.6f;
-                        g.Beam(Geo.W(cp, h * 0.3f), Geo.W(cp + dir * 0.12f, h * 0.8f), 0.01f, Hex("#2a2622"));
-                        if (dmg > 0.55f) g.Beam(Geo.W(cp + dir * 0.05f, h - 0.05f), Geo.W(cp + dir * 0.1f - nrm * 0.1f, h + 0.18f), 0.008f, Hex("#3a2a22"));
-                    }
-                    // stencilled hazard band on every 3rd slab
-                    if ((salt % 3) == 0)
-                    {
-                        var bp0 = p - dir * st * 0.4f - nrm * 0.082f; var bp1 = p + dir * st * 0.4f - nrm * 0.082f;
-                        g.QuadRaw(Geo.W(bp0, h * 0.62f), Geo.W(bp1, h * 0.62f), Geo.W(bp1, h * 0.7f), Geo.W(bp0, h * 0.7f), Hex("#a87a2a"), Hex("#a87a2a"), Hex("#b88a3a"), Hex("#b88a3a"));
-                    }
-                    break;
-                }
-            }
-        }
+        // WallPiece (one fence element per tier and damage stage) lives in FenceLooks.cs
 
         static Color Shade(Color c, Vector2 n2) => Geo.Shade(c, new Vector3(n2.x, 0f, -n2.y));
 
@@ -475,15 +390,7 @@ namespace DayZero.Runtime
             g.BoxAt(p, new Vector2(dir.y, -dir.x), 0.12f, 0.03f, 0f, 0.05f, Hex("#4a3a2a"), Hex("#5a4632"));
         }
 
-        void GateLeaf(Geo g, Vector2 p, Vector2 dir, Vector2 nrm, int tier, float frac)
-        {
-            Color c = tier == 0 ? Lerp(LOG, LOG_TIP, 0.25f) : tier == 2 ? SCRAP_C : tier == 1 ? CHAIN : Hex("#6e6a5e");
-            g.Cyl(p - dir * 0.45f, 0.07f, 0f, 1.25f, LOG, LOG_TIP, 6);
-            g.Cyl(p + dir * 0.45f, 0.07f, 0f, 1.25f, LOG, LOG_TIP, 6);
-            g.Box(new ORect(p, dir, 0.42f, 0.035f).Quad(), 0.02f, 0.95f, c, Mul(c, 1.1f));
-            g.Beam(Geo.W(p - dir * 0.4f + nrm * 0.05f, 0.15f), Geo.W(p + dir * 0.4f + nrm * 0.05f, 0.85f), 0.025f, TIMBER);
-            g.Beam(Geo.W(p - dir * 0.5f, 1.2f), Geo.W(p + dir * 0.5f, 1.2f), 0.04f, TIMBER);
-        }
+        // GateLeaf (gate in the fence's own material) lives in FenceLooks.cs
 
         // ================= towers & traps =================
         void DrawTowersTraps(Geo g, Game game)
