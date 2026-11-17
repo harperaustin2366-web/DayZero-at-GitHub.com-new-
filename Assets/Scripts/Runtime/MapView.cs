@@ -742,6 +742,7 @@ namespace DayZero.Runtime
             foreach (var kv in S.Traps) sb.Append(kv.Key).Append(kv.Value.Kind).Append(kv.Value.Hp > 0 ? 'a' : 'x').Append(',');
             sb.Append('|');
             foreach (var kv in conv) sb.Append(kv.Value.Type).Append(kv.Value.Ready > S.T ? (int)(g.ConvProgress(kv.Key) * 5.0) : 9).Append(',');
+            sb.Append('|').Append(FxCampGrowth.Key(g));   // v0.16 idea #12: camps grow with their facilities
             string key = sb.ToString();
             if (key == _dynKey) return;
             _dynKey = key;
@@ -750,6 +751,7 @@ namespace DayZero.Runtime
             _dyn = new GameObject("Map Dynamic");
             _dyn.transform.SetParent(transform, false);
             var ch = _gen.BuildDynamic(g);
+            FxCampGrowth.Build(_gen, g, ch);
             if (ch.Mesh.Count > 0) MakeObject("Dynamic", ToMesh("Dynamic", ch.Mesh), _objMat, _dyn.transform);
             if (_shadowMat != null && ch.Shadow.Count > 0) MakeObject("Dynamic Shadows", ToMesh("Dynamic Shadows", ch.Shadow), _shadowMat, _dyn.transform);
         }
