@@ -54,6 +54,7 @@ namespace DayZero.Runtime
             Frame = Time.frameCount;
             FxLights.Tick(cam, g, s.Lights);   // night light pools around fires / towers / lit lots
             FxFires.Tick(cam, g, s.Lights);    // burning buildings + smoke columns (idea #7)
+            FxCrows.Tick(cam, g);              // crows that scatter from zombies + blowing paper (idea #11)
             FxWeatherView.Tick(g); FxMuzzle.Tick(cam, g);   // rain / snow / lightning, gunfire glow + tracer streaks
             if (_ov == null)
             {
