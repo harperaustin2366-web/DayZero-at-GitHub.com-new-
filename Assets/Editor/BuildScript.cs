@@ -23,7 +23,7 @@ namespace DayZero.EditorTools
     {
         public const string COMPANY = "Austin Harper";
         public const string PRODUCT = "DayZero";
-        public const string VERSION = "0.15.0a";
+        public const string VERSION = "0.16.0a";
         public const int VERSION_CODE = 10;
         public const string APP_ID = "com.austinharper.dayzero";
         public const string BOOT_SCENE = "Assets/Scenes/Boot.unity";
