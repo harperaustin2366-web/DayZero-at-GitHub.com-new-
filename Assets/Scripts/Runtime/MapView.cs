@@ -158,6 +158,7 @@ namespace DayZero.Runtime
             EnsureCamera();
             HandleInput(b);
             UpdateCamera();
+            FxView.Apply(_cam, b.Game, _dist);   // v0.15 day/night tint, haze, film look (visual only)
             if (!_streaming) StartCoroutine(StreamLod0());
             _dynT -= Time.unscaledDeltaTime;
             if (_dynT <= 0f) { _dynT = 0.75f; UpdateDynamic(); }
