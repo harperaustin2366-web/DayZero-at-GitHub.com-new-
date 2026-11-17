@@ -206,6 +206,7 @@ namespace DayZero.Runtime
             var info = _info[l];
             if (!info.Valid) return;
             if (!_campLots.Contains(l) && ClearedRect(info.R)) return;   // cleared for a camp yard
+            if (RuinLot(g, l, info)) return;                               // collapsed building (MapGen.Ruins.cs)
             if (lo) { LoLot(g, l, info); return; }
             switch (info.A)
             {
@@ -445,6 +446,7 @@ namespace DayZero.Runtime
                         Color tc = Lerp(TRIM, info.Wall, 0.45f);
                         Pane(g, c, dir, o, ww * 0.5f + fr, y0 - fr * 1.6f, y1 + fr, tc, tc, 0.006f, false);
                     }
+                    if (ShatterPane(g, l * 131 + salt * 17, fl, k, c, dir, o, ww * 0.5f, y0, y1, info, h, 0.86f)) continue;   // MapGen.Ruins.cs
                     if (info.Dmg >= 1 && h > 0.97f) continue;                                   // pane missing entirely, frame only
                     Color top, bot;
                     if (h < 0.6f) { top = GLASS_HI; bot = GLASS; }
@@ -699,6 +701,7 @@ namespace DayZero.Runtime
                     if (fl == 0 && f == info.Front && k == n / 2 && !gableEnd) { Door(g, c, dir, o, info); continue; }
                     float h = Hf(l * 37 + f * 5 + fl, k + 11);
                     Pane(g, c, dir, o, 0.15f, y0 - 0.05f, y1 + 0.035f, Lerp(TRIM, info.Wall, 0.3f), Lerp(TRIM, info.Wall, 0.25f), 0.006f, false);
+                    if (ShatterPane(g, l * 37 + f * 5, fl, k, c, dir, o, 0.12f, y0, y1, info, h, 0.8f)) continue;   // MapGen.Ruins.cs
                     Color top, bot;
                     if (h < 0.5f) { top = GLASS_HI; bot = GLASS; } else if (h < 0.8f) { top = Mul(VOIDC, 1.4f); bot = VOIDC; } else { top = BOARD; bot = Mul(BOARD, 0.8f); }
                     Pane(g, c, dir, o, 0.12f, y0, y1, bot, top, 0.011f, false);

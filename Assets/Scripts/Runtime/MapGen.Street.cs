@@ -200,7 +200,7 @@ namespace DayZero.Runtime
         {
             if (l < 0 || l >= _info.Length) return;
             var info = _info[l];
-            if (!info.Valid || info.Dmg >= 3 || _campLots.Contains(l)) return;
+            if (!info.Valid || info.Dmg >= 3 || _campLots.Contains(l) || _ruin.ContainsKey(l)) return;
             if (info.A != Arch.House && info.A != Arch.Apartment && info.A != Arch.Office && info.A != Arch.Industrial && info.A != Arch.Shop && info.A != Arch.Civic) return;
             if (Hf(l, 910) > 0.075f || info.WallTop < 0.34f || ClearedRect(info.R)) return;
             // a face whose outside is street / sidewalk; side faces first so the paint avoids the door

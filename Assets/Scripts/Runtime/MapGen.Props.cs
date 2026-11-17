@@ -347,7 +347,7 @@ namespace DayZero.Runtime
         public void SetCamps(Game game)
         {
             _clear.Clear(); _campLots.Clear();
-            if (game?.S == null) return;
+            if (game?.S == null) { PlanRuins(game); return; }
             foreach (var b in game.AllBases())
             {
                 CampRect(b, out var c, out float half, out _);
@@ -360,6 +360,7 @@ namespace DayZero.Runtime
                     if (inf.Valid && inf.Dmg > 1) { inf.Dmg = 1; if (inf.Top < inf.WallTop) inf.Top = inf.WallTop + 0.17f; _info[b.Lot] = inf; LotH[b.Lot] = inf.Top; }
                 }
             }
+            PlanRuins(game);   // collapsed buildings avoid camps (MapGen.Ruins.cs)
         }
 
         /// <summary>City axis (+-U / +-V) pointing most toward the default camera (MapView.YAW = 75).</summary>
