@@ -345,6 +345,7 @@ namespace DayZero.Runtime
         {
             var g = c.G;
             var p = Frame(c, "CREW & JOBS");
+            if (PplCrewModal(c, p)) return;   // Expansion: survivor sheet / NIGHT WATCH (GameUI.Expansion.People.cs)
             float x = p.x + 18, iw = p.width - 36, y = p.y + 64;
             var alive = g.AlivePeople();
             var counts = new Dictionary<string, int>();
@@ -365,7 +366,7 @@ namespace DayZero.Runtime
             var bases = g.C.Bases.Where(b => b.Done >= 1.0).ToList();
             var ppl = alive.Select((q, i) => (q, i)).OrderBy(t => { int j = Array.IndexOf(Data.JOBS, t.q.Job); return j < 0 ? 99 : j; }).ThenBy(t => t.i).Select(t => t.q).ToList();
             const float RH = 48f, GAP = 4f;
-            var hs = ppl.Select(q => RH + (g.FamilyText(q) != "" ? 20f : 0f)).ToList();
+            var hs = ppl.Select(q => RH + (g.FamilyText(q) != "" ? 20f : 0f) + PplRowH(g, q)).ToList();
             float avail = p.yMax - 66f - y;
             var starts = Pages(hs, avail, GAP);
             int pages = starts.Count;
@@ -403,6 +404,7 @@ namespace DayZero.Runtime
                 c.Label(new Rect(rx, y + 11, x + iw - rx, 22), stt.text, 15, stt.col, false, false);
                 string ft = g.FamilyText(q);
                 if (ft != "") c.Label(new Rect(x + 30, y + RH, iw - 30, 20), ft, 14, CAMP_FAMILY, false, false);
+                PplRow(c, q, x, iw, y + RH + (ft != "" ? 20f : 0f));   // Expansion: traits, stress, fatigue
                 y += hs[i] + GAP;
             }
             Pager(c, p, CrewPage, pages, v => CrewPage = v, "Bites can be hidden: keep Medics at every camp.");
