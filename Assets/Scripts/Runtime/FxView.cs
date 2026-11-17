@@ -57,6 +57,7 @@ namespace DayZero.Runtime
             FxCrows.Tick(cam, g);              // crows that scatter from zombies + blowing paper (idea #11)
             FxDamageReadout.Tick(cam, g);      // soot / sparks / flames / wrench on damaged own defences (idea #14)
             FxWeatherView.Tick(g); FxMuzzle.Tick(cam, g);   // rain / snow / lightning, gunfire glow + tracer streaks
+            FxColonyBanner.Tick(cam, g);      // colony name on the wall, roof flag, day tally board (idea #15)
             if (_ov == null)
             {
                 var go = new GameObject("FxOverlay"); Object.DontDestroyOnLoad(go);
