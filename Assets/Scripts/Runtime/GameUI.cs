@@ -286,7 +286,7 @@ namespace DayZero.Runtime
             BeginAnim(ref _sideAnim, _panel != Panel.None ? 1 + (int)_panel : _actionsOpen ? 1 : 0, null, 28f, 0f);
             bool sidePanel = DrawSidePanel(w, map);
             EndAnim();
-            if (!sidePanel) DrawActions(w, map);
+            if (!sidePanel) DrawActionsDock(w, h, map);   // v0.17 kit dock (GameUI.PhaseA.cs)
             if (map != null && !ModalOpen)
             {
                 BeginAnim(ref _sheetAnim, SheetKey(map), map.SelectedCamp, 0f, 22f);

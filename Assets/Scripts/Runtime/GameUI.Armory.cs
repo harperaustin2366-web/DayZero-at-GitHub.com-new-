@@ -1,5 +1,5 @@
-// IMGUI side of the ARMORY / GARAGE menus (layout in SideMenus.Armory.cs, drawn by DrawSideMenu) and the wreck
-// sheet. The map markers (wrecks, camps, rescue pins, tow jobs) are drawn in GameUI.WorldMarks.cs.
+// IMGUI side of the ARMORY / GARAGE menus (layout in SideMenus.Armory.cs, drawn by DrawSideMenu on the UI kit) and
+// the wreck sheet (docked into the sheet area). The map markers (wrecks, camps, rescue pins, tow jobs) are drawn in GameUI.WorldMarks.cs.
 using DayZero.Core;
 using UnityEngine;
 
@@ -14,10 +14,7 @@ namespace DayZero.Runtime
         /// <summary>main.gd _sheet_wreck: SIPHON FUEL / TOW WITH squad, at the bottom like the other map sheets.</summary>
         void DrawWreckSheet(float w, float h, MapView map)
         {
-            var ctx = NewCtx(w, h, map);
-            Blk(SideMenus.WreckSheetRect(w, h, SideMenus.IdleSquads(G)));
-            SideMenus.WreckSheet(ctx, map.SelectedWreck, () => map.ClearBuilding());
-            DrawItems(ctx);
+            DrawDockedSheet(w, h, map, ctx => SideMenus.WreckSheet(ctx, map.SelectedWreck, () => map.ClearBuilding()));   // v0.17 kit, docked
         }
     }
 }

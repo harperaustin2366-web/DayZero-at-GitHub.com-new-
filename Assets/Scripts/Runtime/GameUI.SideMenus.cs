@@ -1,6 +1,7 @@
 // IMGUI renderer for the RESEARCH, TRADE, SQUADS and TASK FORCE side menus (layout in SideMenus*.cs), the
 // squad / air-support target bar and the survivor-group SOS sheet, plus the original's
-// "Research complete · tap to open RESEARCH" note (main.gd show_research_note).
+// "Research complete · tap to open RESEARCH" note (main.gd show_research_note). v0.17: the display lists are
+// painted with the UI kit (InWorld.RenderItems) and bottom sheets dock into the sheet area (DrawDockedSheet).
 using System;
 using System.Collections.Generic;
 using DayZero.Core;
@@ -85,53 +86,46 @@ namespace DayZero.Runtime
         /// <summary>Squad / drone / strike target bar at the bottom while a map target is picked.</summary>
         void DrawTargetBar(float w, float h, MapView map)
         {
-            var ctx = NewCtx(w, h, map);
-            Blk(SideMenus.TargetBarRect(w, h));
             string send = map.ActiveTool == MapView.Tool.Drone ? "SCOUT" : map.ActiveTool == MapView.Tool.Strike ? "STRIKE" : "SEND";
-            SideMenus.TargetBar(ctx, map.TargetText, send, () =>
+            DrawDockedSheet(w, h, map, ctx => SideMenus.TargetBar(ctx, map.TargetText, send, () =>
             {
                 string e = map.ConfirmTool();
                 _b.Toast(e != "" ? e : send == "SEND" ? "On their way." : send == "SCOUT" ? "The drone is up." : "Gunship inbound.");
-            }, () => map.CancelTool());
-            DrawItems(ctx);
+            }, () => map.CancelTool()));
         }
 
         /// <summary>SOS sheet of a survivor group tapped on the map (main.gd _sheet_group).</summary>
         void DrawGroupSheet(float w, float h, MapView map)
         {
-            var ctx = NewCtx(w, h, map);
-            Blk(SideMenus.GroupSheetRect(w, h));
-            SideMenus.GroupSheet(ctx, map.SelectedGroup, () => map.ClearBuilding());
-            DrawItems(ctx);
+            DrawDockedSheet(w, h, map, ctx => SideMenus.GroupSheet(ctx, map.SelectedGroup, () => map.ClearBuilding()));
         }
 
+        /// <summary>v0.17: every SideMenus display list (side-menu host frame, sheets, bars) is painted with the UI kit:
+        /// textured plates with header strips, kit buttons (CLOSE rust, selected tabs amber, off grey), fitted labels.</summary>
         void DrawItems(MenuCtx ctx)
         {
+            if (_kp == null) _kp = new KitPainter(this);
             var old = GUI.color;
-            foreach (var it in ctx.Items)
-            {
-                switch (it.Kind)
-                {
-                    case MenuKind.Box: GUI.DrawTexture(it.R, Solid2(it.Fill)); break;
-                    case MenuKind.Bar:
-                        GUI.DrawTexture(it.R, Solid2(new Color(0f, 0f, 0f, 0.6f)));
-                        GUI.DrawTexture(new Rect(it.R.x, it.R.y, it.R.width * it.Frac, it.R.height), Solid2(it.Col));
-                        break;
-                    case MenuKind.Label:
-                        {
-                            var st = MLabel(it.Size, it.Bold, it.Align, it.Wrap);
-                            st.normal.textColor = it.Col;
-                            GUI.Label(it.R, it.Text, st);
-                            break;
-                        }
-                    case MenuKind.Button:
-                        GUI.enabled = it.On;
-                        if (Btn(it.R, it.Text, MButton(it.Style, it.Size))) { GUI.enabled = true; it.Click?.Invoke(); }
-                        GUI.enabled = true;
-                        break;
-                }
-            }
+            InWorld.RenderItems(_kp, ctx.Items);
             GUI.color = old;
+            GUI.enabled = true;
+        }
+
+        /// <summary>A SideMenus bottom sheet / bar docked into the sheet area (left of the right dock, above PLAY /
+        /// speed): laid out for a virtual screen as wide as the area, then drawn shifted into it, so it can never run
+        /// under ACTIONS. Blocks map taps under the sheet.</summary>
+        void DrawDockedSheet(float w, float h, MapView map, Action<MenuCtx> layout)
+        {
+            var area = SheetArea(w, h, map);
+            var ctx = NewCtx(area.width + 200f, h, map);
+            layout(ctx);
+            var b = InWorld.Bounds(ctx.Items);
+            float dx = b.width > 0f ? Mathf.Round(area.x + area.width * 0.5f - (b.x + b.width * 0.5f)) : area.x;
+            if (b.width > 0f) Blk(new Rect(b.x + dx, b.y, b.width, b.height));
+            var m = GUI.matrix;
+            GUI.matrix = m * Matrix4x4.Translate(new Vector3(dx, 0f, 0f));
+            DrawItems(ctx);
+            GUI.matrix = m;
         }
 
         /// <summary>main.gd show_research_note: a finished project shows a green note for a few seconds; tap opens RESEARCH on its tree.</summary>
@@ -154,10 +148,10 @@ namespace DayZero.Runtime
                 if (log.Count > 0 && log[log.Count - 1].T > _rnoteSeenT && string.IsNullOrEmpty(_rnoteRid)) _rnoteSeenT = log[log.Count - 1].T;
             }
             if (_rnoteRid == "" || Time.unscaledTime > _rnoteUntil) { _rnoteRid = ""; return; }
-            var r = Blk(SideMenus.ResearchNoteRect(w, y));
+            var rn = SideMenus.ResearchNoteRect(w, y);
+            var r = Blk(Docks.Banner(TopLane(w), rn.width, y, Mathf.Max(rn.height, 52f)));   // v0.17: in the banner lane, clear of ACTIONS
             string name = (string)Data.Instance.Research[_rnoteRid]["name"];
-            var st = MButton("olive", 18);
-            if (Btn(r, "Research complete: " + name + "  ·  tap to open RESEARCH", st))
+            if (UiKit.Button(r, "RESEARCH COMPLETE: " + name.ToUpperInvariant() + "  -  TAP TO OPEN", UiRole.Primary, false, 18))
             {
                 _side.Cat = (string)Data.Instance.Research[_rnoteRid]["cat"];
                 _rnoteRid = "";

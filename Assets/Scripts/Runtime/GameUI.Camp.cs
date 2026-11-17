@@ -1,6 +1,6 @@
 // IMGUI side of the camp UI (layout in SideMenus.Camp.cs, map state in MapView.Camp.cs): ACTIONS entries BUILD OUTPOST,
 // CAMPS and CREW & JOBS, the BUILD OUTPOST bar, the trap-line toolbar, the camp sheet, the trap sheet and the
-// GUT row on the building sheet.
+// GUT row on the building sheet. v0.17: every bar / sheet docks into the sheet area on the UI kit (DrawDockedSheet).
 using System;
 using DayZero.Core;
 using UnityEngine;
@@ -25,38 +25,26 @@ namespace DayZero.Runtime
             if (SideMenus.PendingFly.HasValue) { map.FlyTo(SideMenus.PendingFly.Value); SideMenus.PendingFly = null; }
             if (map.OutpostMode)
             {
-                var ctx = NewCtx(w, h, map);
-                Blk(SideMenus.OutpostBarRect(w, h));
-                SideMenus.OutpostBar(ctx, () => map.EndOutpost());
-                DrawItems(ctx);
+                DrawDockedSheet(w, h, map, ctx => SideMenus.OutpostBar(ctx, () => map.EndOutpost()));
                 return true;
             }
             if (map.TrapLine)
             {
-                var ctx = NewCtx(w, h, map);
-                Blk(SideMenus.TrapBarRect(w, h));
-                SideMenus.TrapBar(ctx, map.TrapKind, map.TrapTiles, map.TrapAnchor.x >= 0, k => map.SetTrapKind(k), map.TrapUndo, map.TrapClear,
+                DrawDockedSheet(w, h, map, ctx => SideMenus.TrapBar(ctx, map.TrapKind, map.TrapTiles, map.TrapAnchor.x >= 0, k => map.SetTrapKind(k), map.TrapUndo, map.TrapClear,
                     () => { string e = map.ConfirmTool(); _b.Toast(e == "" ? "Traps placed." : e); map.DirtyDynamic(); },
-                    () => map.CancelTool());
-                DrawItems(ctx);
+                    () => map.CancelTool()));
                 return true;
             }
             if (map.ActiveTool != MapView.Tool.None) return false;
             if (map.SelectedBase >= 0)
             {
-                var ctx = NewCtx(w, h, map);
-                Blk(SideMenus.BaseSheetRect(w, h));
-                SideMenus.BaseSheet(ctx, map.SelectedBase, () => map.ClearBuilding());
-                DrawItems(ctx);
+                DrawDockedSheet(w, h, map, ctx => SideMenus.BaseSheet(ctx, map.SelectedBase, () => map.ClearBuilding()));
                 return true;
             }
             if (map.SelectedTrap >= 0)
             {
-                var ctx = NewCtx(w, h, map);
-                Blk(SideMenus.TrapSheetRect(w, h));
                 int kind = G.S.Traps.TryGetValue(map.SelectedTrap, out var t) ? t.Kind : 0;
-                SideMenus.TrapSheet(ctx, map.SelectedTrap, () => map.ClearBuilding(), () => { map.ClearBuilding(); Start(map, MapView.Tool.Trap, 0, G.TrapUnlocked(kind) ? kind : 0); });
-                DrawItems(ctx);
+                DrawDockedSheet(w, h, map, ctx => SideMenus.TrapSheet(ctx, map.SelectedTrap, () => map.ClearBuilding(), () => { map.ClearBuilding(); Start(map, MapView.Tool.Trap, 0, G.TrapUnlocked(kind) ? kind : 0); }));
                 return true;
             }
             return false;

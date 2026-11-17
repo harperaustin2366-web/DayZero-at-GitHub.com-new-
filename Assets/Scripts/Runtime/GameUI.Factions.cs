@@ -14,10 +14,7 @@ namespace DayZero.Runtime
         /// <summary>Faction camp sheet for the camp tapped on the map.</summary>
         void DrawFactionSheet(float w, float h, MapView map)
         {
-            var ctx = NewCtx(w, h, map);
-            SideMenus.FactionSheet(ctx, map.SelectedCamp, () => map.ClearBuilding());
-            foreach (var it in ctx.Items) if (it.Kind == MenuKind.Box) Blk(it.R);
-            DrawItems(ctx);
+            DrawDockedSheet(w, h, map, ctx => SideMenus.FactionSheet(ctx, map.SelectedCamp, () => map.ClearBuilding()));   // v0.17 kit, docked
         }
 
         /// <summary>main.gd lbl_war / _refresh_war_hud: war status under the top bar (tap opens WAR), and the
@@ -36,9 +33,9 @@ namespace DayZero.Runtime
             }
             string t = SideMenus.Plain(G.WarStatusText(G.ViewCol));
             if (string.IsNullOrEmpty(t)) return;
-            var r = Blk(SideMenus.WarHudRect(w, y));
-            var st = MButton("brown", 17);
-            if (Btn(r, t, st)) OpenSide("war", map);
+            var wr = SideMenus.WarHudRect(w, y);
+            var r = Blk(Docks.Banner(TopLane(w), wr.width, y, Mathf.Max(wr.height, 46f)));   // v0.17: banner lane, clear of ACTIONS
+            if (UiKit.Button(r, t, UiRole.Neutral, false, 17)) OpenSide("war", map);
             y += r.height + 6;
         }
 
