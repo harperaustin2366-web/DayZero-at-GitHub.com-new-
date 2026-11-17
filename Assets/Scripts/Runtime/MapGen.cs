@@ -367,9 +367,9 @@ namespace DayZero.Runtime
                     {
                         int near = 0;
                         for (int k = 0; k < 4; k++) { int tx = x - 2 + (k & 1) * 3, ty = y - 2 + (k >> 1) * 3; if (TileAt(tx, ty) == Data.T_WATER) near++; }
-                        if (near > 0) col = Lerp(col, BANK, 0.25f * near);
+                        if (near > 0) col = Mul(Lerp(col, BANK, 0.3f * near), 1f - 0.03f * near);   // damp, darker bank ring
                     }
-                    else col = Lerp(Lerp(col, BANK, 0.8f), BANK_DEEP, f);
+                    else col = Mul(Lerp(Lerp(col, BANK, 0.85f), BANK_DEEP, f), 0.9f);              // wet mud at the waterline
                     float h = water == 0 ? 0f : -0.03f - 0.27f * f;
                     m.V.Add(new Vector3(x, h, -y));
                     m.C.Add(new Color32((byte)(Mathf.Clamp01(col.r) * 255f), (byte)(Mathf.Clamp01(col.g) * 255f), (byte)(Mathf.Clamp01(col.b) * 255f), 255));
@@ -384,8 +384,12 @@ namespace DayZero.Runtime
 
         static readonly Color WATER = Hex("#454e45"), WATER_DEEP = Hex("#364338");
 
+        // Water surface quads carry a marker in vertex alpha: every other map vertex is 255, water is
+        // 0..200 = shore..deep. DayZero/Map animates those pixels (ripples, sky sheen, sparkle, shore
+        // foam); the fallback shader and the offline preview ignore alpha and show the static colours.
         void AddWater(Geo g, int x0, int y0, int x1, int y1)
         {
+            var m = g.M;
             for (int y = y0; y < y1; y++)
             {
                 int x = x0;
@@ -394,11 +398,26 @@ namespace DayZero.Runtime
                     if (!NearWater(x, y)) { x++; continue; }
                     int xe = x + 1;
                     while (xe < x1 && xe - x < 16 && NearWater(xe, y)) xe++;
-                    Color a = WaterCol(x, y), b = WaterCol(xe, y), c = WaterCol(xe, y + 1), e = WaterCol(x, y + 1);
-                    g.QuadRaw(new Vector3(x, WATER_Y, -y), new Vector3(xe, WATER_Y, -y), new Vector3(xe, WATER_Y, -(y + 1)), new Vector3(x, WATER_Y, -(y + 1)), a, b, c, e);
+                    int i = m.V.Count;
+                    m.V.Add(new Vector3(x, WATER_Y, -y)); m.V.Add(new Vector3(xe, WATER_Y, -y));
+                    m.V.Add(new Vector3(xe, WATER_Y, -(y + 1))); m.V.Add(new Vector3(x, WATER_Y, -(y + 1)));
+                    m.C.Add(WaterV(x, y)); m.C.Add(WaterV(xe, y)); m.C.Add(WaterV(xe, y + 1)); m.C.Add(WaterV(x, y + 1));
+                    m.T.Add(i); m.T.Add(i + 1); m.T.Add(i + 2); m.T.Add(i); m.T.Add(i + 2); m.T.Add(i + 3);
                     x = xe;
                 }
             }
+        }
+
+        static readonly Color FOAM = Hex("#8c9688");
+
+        Color32 WaterV(int x, int y)
+        {
+            int n = 0;
+            for (int dy = -3; dy <= 3; dy += 3) for (int dx = -3; dx <= 3; dx += 3) if (TileAt(x + dx, y + dy) == Data.T_WATER) n++;
+            float depth = Mathf.Clamp01((n - 2) / 6f);
+            Color c = WaterCol(x, y);
+            c = Lerp(c, FOAM, (1f - Mathf.Clamp01(depth / 0.2f)) * 0.3f);   // static pale shore strip (fallback / preview)
+            return new Color32((byte)(Mathf.Clamp01(c.r) * 255f + 0.5f), (byte)(Mathf.Clamp01(c.g) * 255f + 0.5f), (byte)(Mathf.Clamp01(c.b) * 255f + 0.5f), (byte)(depth * 200f + 0.5f));
         }
 
         bool NearWater(int x, int y)
