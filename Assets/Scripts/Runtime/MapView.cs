@@ -165,6 +165,7 @@ namespace DayZero.Runtime
             if (!Picking && SelectedLot >= 0) ClearSelection();
             UpdateTools();
             UpdateCrowd(b);
+            UpdateOvergrowth();   // v0.16: rebuild chunks when the 5-day overgrowth step changes
         }
 
         /// <summary>Force a full rebuild on the next frame (new game / load may reuse the same world seed).</summary>
@@ -527,6 +528,7 @@ namespace DayZero.Runtime
         {
             var go = new GameObject(name);
             go.transform.SetParent(_root.transform, false);
+            FxOvergrowth.Apply(ch.Mesh, OvergrowthLevel(), name.EndsWith("LOD0"));   // v0.16 spreading overgrowth (visual only)
             if (ch.Mesh.Count > 0) MakeObject("Mesh", ToMesh(name, ch.Mesh), _objMat, go.transform);
             if (_shadowMat != null && ch.Shadow != null && ch.Shadow.Count > 0) MakeObject("Shadows", ToMesh(name + " shadows", ch.Shadow), _shadowMat, go.transform);
             return go;
