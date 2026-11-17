@@ -53,6 +53,7 @@ namespace DayZero.Runtime
             if (Time.frameCount - _filmCheckFrame > 30) { _filmCheckFrame = Time.frameCount; Film = PlayerPrefs.GetInt(PREF_FILM, 1) != 0; }
             Frame = Time.frameCount;
             FxLights.Tick(cam, g, s.Lights);   // night light pools around fires / towers / lit lots
+            FxWeatherView.Tick(g); FxMuzzle.Tick(cam, g);   // rain / snow / lightning, gunfire glow + tracer streaks
             if (_ov == null)
             {
                 var go = new GameObject("FxOverlay"); Object.DontDestroyOnLoad(go);
