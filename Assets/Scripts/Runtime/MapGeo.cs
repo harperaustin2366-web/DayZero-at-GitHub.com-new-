@@ -329,7 +329,7 @@ namespace DayZero.Runtime
         }
 
         // ---------------- shadows (alpha-blended ground decals) ----------------
-        static readonly List<Vector2> _hullIn = new List<Vector2>(32);
+        readonly List<Vector2> _hullIn = new List<Vector2>(32);   // per Geo (not static): chunks are built on a worker thread too
 
         /// <summary>Ground shadow of a prism footprint pts raised to height h (convex hull of footprint and its sun projection).</summary>
         public void Shadow(IList<Vector2> pts, float h, float alpha)

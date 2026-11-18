@@ -763,15 +763,14 @@ namespace DayZero.Runtime
             _ogRebuilding = true;
             _ogStep = FxOvergrowth.Step(G.Day());
             var lod1 = _lod1;
-            foreach (var kv in _lod0) if (kv.Value != null) DestroyChunk(kv.Value);
-            _lod0.Clear();
+            InvalidateLod0();   // v0.17.1: also empties the LOD0 cache and discards an in-flight worker chunk
             for (int c = 0; c < lod1.Length; c++)
             {
                 if (lod1 != _lod1 || Building || _root == null) break;   // a full rebuild took over
                 if (lod1[c] != null) DestroyChunk(lod1[c]);
                 var ch = _gen.BuildChunk(c % _ncx, c / _ncx, _buckets[c], 1);
                 lod1[c] = MakeChunk("Chunk " + (c % _ncx) + "," + (c / _ncx) + " LOD1", ch);
-                lod1[c].SetActive(!_lod0.ContainsKey(c));
+                lod1[c].SetActive(!(_lod0.TryGetValue(c, out var l0) && l0 != null && l0.activeSelf));
                 yield return null;
             }
             _ogRebuilding = false;

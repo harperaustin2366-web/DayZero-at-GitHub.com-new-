@@ -56,7 +56,6 @@ namespace DayZero.Runtime
         int _ncx, _ncy;
         GameObject[] _lod1 = new GameObject[0];
         readonly Dictionary<int, GameObject> _lod0 = new Dictionary<int, GameObject>();
-        bool _streaming;
         string _builtKey = "";
 
         // camera state
@@ -159,7 +158,7 @@ namespace DayZero.Runtime
             HandleInput(b);
             UpdateCamera();
             FxView.Apply(_cam, b.Game, _dist);   // v0.15 day/night tint, haze, film look (visual only)
-            if (!_streaming) StartCoroutine(StreamLod0());
+            StreamLod0();   // v0.17.1: LOD0 built on a worker thread, cached (no per-frame coroutine)
             _dynT -= Time.unscaledDeltaTime;
             if (_dynT <= 0f) { _dynT = 0.75f; UpdateDynamic(); }
             if (!Picking && SelectedLot >= 0) ClearSelection();
@@ -386,9 +385,9 @@ namespace DayZero.Runtime
                 var ch = _gen.BuildChunk(c % _ncx, c / _ncx, _buckets[c], 1);
                 _lod1[c] = MakeChunk("Chunk " + (c % _ncx) + "," + (c / _ncx) + " LOD1", ch);
             }
-            // drop all full-detail chunks: they re-stream (one per frame) with the yard cleared
-            foreach (var kv in _lod0) if (kv.Value != null) DestroyChunk(kv.Value);
-            _lod0.Clear();
+            // drop all full-detail chunks (and the LOD0 cache): they re-stream with the yard cleared
+            InvalidateLod0();
+            SyncWorkerCamps();
             for (int c = 0; c < _lod1.Length; c++) if (_lod1[c] != null) _lod1[c].SetActive(true);
             _dynKey = "";
             _crowd?.Clear();
@@ -457,6 +456,7 @@ namespace DayZero.Runtime
             Game.YardProvider = _gen.YardFor;   // v0.12.0a: the sim's starter palisade follows the drawn yard
             G?.EnsureWallsNow();
             _gen.SetCamps(G);
+            StartWorkerGen(d);
             if (_crowd != null && _sfxGame != null) _sfxGame.SfxRequested -= _crowd.OnSfx;
             _sfxGame = null;
             _crowd = new Crowd(_gen);
@@ -515,6 +515,7 @@ namespace DayZero.Runtime
             foreach (var c in _lod1) if (c != null) Destroy(c);
             foreach (var c in _lod0.Values) if (c != null) Destroy(c);
             _lod1 = new GameObject[0]; _lod0.Clear();
+            _lod0Ver++; _lod0Seen.Clear(); _lod0Verts.Clear();
             if (_root != null) Destroy(_root);
             if (_dyn != null) Destroy(_dyn);
             ClearSelection();
@@ -524,11 +525,11 @@ namespace DayZero.Runtime
             Labels.Clear();
         }
 
-        GameObject MakeChunk(string name, MapGen.Chunk ch)
+        GameObject MakeChunk(string name, MapGen.Chunk ch, bool overgrown = false)
         {
             var go = new GameObject(name);
             go.transform.SetParent(_root.transform, false);
-            FxOvergrowth.Apply(ch.Mesh, OvergrowthLevel(), name.EndsWith("LOD0"));   // v0.16 spreading overgrowth (visual only)
+            if (!overgrown) FxOvergrowth.Apply(ch.Mesh, OvergrowthLevel(), name.EndsWith("LOD0"));   // v0.16 spreading overgrowth (visual only)
             if (ch.Mesh.Count > 0) MakeObject("Mesh", ToMesh(name, ch.Mesh), _objMat, go.transform);
             if (_shadowMat != null && ch.Shadow != null && ch.Shadow.Count > 0) MakeObject("Shadows", ToMesh(name + " shadows", ch.Shadow), _shadowMat, go.transform);
             return go;
@@ -550,31 +551,106 @@ namespace DayZero.Runtime
         {
             int cx = c % _ncx, cy = c / _ncx;
             var ch = _gen.BuildChunk(cx, cy, _buckets[c], 0);
-            _lod0[c] = MakeChunk("Chunk " + cx + "," + cy + " LOD0", ch);
+            AddLod0(c, ch, false);
             if (c < _lod1.Length && _lod1[c] != null) _lod1[c].SetActive(false);
         }
 
-        /// <summary>Chunks that should be at full detail: those near the point the camera looks at
-        /// (shifted forward, the view extends further up the screen), only when zoomed in.</summary>
-        List<int> WantedLod0()
+        void AddLod0(int c, MapGen.Chunk ch, bool overgrown)
         {
-            var o = new List<int>();
-            if (_dist > LOD0_MAX_DIST || _ncx == 0) return o;
+            int cx = c % _ncx, cy = c / _ncx;
+            _lod0[c] = MakeChunk("Chunk " + cx + "," + cy + " LOD0", ch, overgrown);
+            _lod0Verts[c] = ch.Mesh.V.Count + (ch.Shadow != null ? ch.Shadow.V.Count : 0);
+            _lod0Seen[c] = Time.frameCount;
+        }
+
+        // ---------------- LOD0 streaming (v0.17.1 perf) ----------------
+        // Full-detail chunks are built off the main thread by a second, private MapGen (+ FxOvergrowth vines) and
+        // only turned into meshes here, at most one upload per frame. Chunks that leave the view are hidden, not
+        // destroyed (LRU cache), so panning back is free; they are dropped from view only outside the wanted
+        // area + one chunk ring. The cache is invalidated wherever chunks were force-rebuilt before (new map,
+        // camp founded -> SetCamps/ruins, overgrowth step). Output is bit-identical to a main-thread build
+        // (checked by the preview harness: --chunkbench).
+        const int LOD0_CACHE = 24, LOD0_ACTIVE_MAX = 12;
+        const long LOD0_CACHE_VERTS = 3000000;
+        readonly Dictionary<int, int> _lod0Seen = new Dictionary<int, int>();    // chunk -> frame last shown
+        readonly Dictionary<int, int> _lod0Verts = new Dictionary<int, int>();
+        int _lod0Ver;                         // bumped on invalidation: in-flight results of an older version are discarded
+        MapGen _wgen; System.Threading.Tasks.Task<MapGen> _wgenTask; bool _wgenCamps, _wgenFailed;
+        System.Threading.Tasks.Task<MapGen.Chunk> _job; int _jobC = -1, _jobVer;
+        readonly List<int> _want = new List<int>(32), _keepRing = new List<int>(32), _pre = new List<int>(32), _lodTmp = new List<int>(32);
+        Vector3 _sortP, _prevFocus; Vector3 _panDir;
+        Comparison<int> _byDist;
+
+        void StartWorkerGen(Data d)
+        {
+            _lod0Ver++;
+            _wgen = null; _wgenCamps = false; _wgenFailed = false; _job = null;
+            _wgenTask = System.Threading.Tasks.Task.Run(() => new MapGen(d));   // ~0.5 s desktop: keep it off the loading frame
+        }
+
+        /// <summary>Drop every cached full-detail chunk (callers re-show LOD1) and discard any chunk being built.</summary>
+        void InvalidateLod0()
+        {
+            _lod0Ver++;
+            foreach (var kv in _lod0)
+            {
+                if (kv.Value == null) continue;
+                if (kv.Value.activeSelf && kv.Key < _lod1.Length && _lod1[kv.Key] != null) _lod1[kv.Key].SetActive(true);   // no hole until it re-streams
+                DestroyChunk(kv.Value);
+            }
+            _lod0.Clear(); _lod0Seen.Clear(); _lod0Verts.Clear();
+        }
+
+        /// <summary>Give the worker generator the same camps / ruins as _gen (call right after _gen.SetCamps).</summary>
+        void SyncWorkerCamps()
+        {
+            if (_wgen == null) { _wgenCamps = false; return; }   // applied when the worker generator is ready
+            try { _job?.Wait(); } catch (Exception) { }
+            _job = null;
+            _wgen.SetCamps(G); _wgenCamps = true;
+        }
+
+        bool WorkerReady()
+        {
+            if (_wgenFailed) return false;
+            if (_wgen == null)
+            {
+                if (_wgenTask == null || !_wgenTask.IsCompleted) return false;
+                if (_wgenTask.Status != System.Threading.Tasks.TaskStatus.RanToCompletion)
+                { _wgenFailed = true; Debug.LogWarning("[MapView] worker MapGen failed, LOD0 builds on the main thread: " + _wgenTask.Exception); return false; }
+                _wgen = _wgenTask.Result; _wgenTask = null;
+            }
+            if (!_wgenCamps && _job == null) { _wgen.SetCamps(G); _wgenCamps = true; }
+            return _wgenCamps;
+        }
+
+        /// <summary>Chunks within reach of point p (nearest first, at most cap) into o; empty when zoomed out past maxDist.</summary>
+        void WantedLod0(List<int> o, Vector3 shift, float extra, int cap, float maxDist)
+        {
+            o.Clear();
+            if (_dist > maxDist || _ncx == 0) return;
             var fwd = Quaternion.Euler(0f, _yaw, 0f) * Vector3.forward;
-            var p = _focus + fwd * (_dist * 0.45f);
-            float r = CH * 0.72f + _dist * 1.25f;
-            for (int cy = 0; cy < _ncy; cy++)
-                for (int cx = 0; cx < _ncx; cx++)
+            var p = _focus + fwd * (_dist * 0.45f) + shift;
+            float r = CH * 0.72f + _dist * 1.25f + extra;
+            int cx0 = Mathf.Max(0, Mathf.FloorToInt((p.x - r) / CH)), cx1 = Mathf.Min(_ncx - 1, Mathf.FloorToInt((p.x + r) / CH));
+            int cy0 = Mathf.Max(0, Mathf.FloorToInt((-p.z - r) / CH)), cy1 = Mathf.Min(_ncy - 1, Mathf.FloorToInt((-p.z + r) / CH));
+            for (int cy = cy0; cy <= cy1; cy++)
+                for (int cx = cx0; cx <= cx1; cx++)
                 {
                     float x = Mathf.Clamp(p.x, cx * CH, cx * CH + CH), z = Mathf.Clamp(-p.z, cy * CH, cy * CH + CH);
                     float dx = x - p.x, dz = z + p.z;
                     if (dx * dx + dz * dz < r * r) o.Add(cy * _ncx + cx);
                 }
             // nearest first
-            o.Sort((a, b) => DistTo(a, p).CompareTo(DistTo(b, p)));
-            if (o.Count > 9) o.RemoveRange(9, o.Count - 9);
-            return o;
+            _sortP = p;
+            if (_byDist == null) _byDist = (a, b) => DistTo(a, _sortP).CompareTo(DistTo(b, _sortP));
+            o.Sort(_byDist);
+            if (o.Count > cap) o.RemoveRange(cap, o.Count - cap);
         }
+
+        /// <summary>Chunks that should be at full detail: those near the point the camera looks at
+        /// (shifted forward, the view extends further up the screen), only when zoomed in.</summary>
+        List<int> WantedLod0() { var o = new List<int>(); WantedLod0(o, Vector3.zero, 0f, 9, LOD0_MAX_DIST); return o; }
 
         float DistTo(int c, Vector3 p)
         {
@@ -582,29 +658,80 @@ namespace DayZero.Runtime
             return (x - p.x) * (x - p.x) + (z - p.z) * (z - p.z);
         }
 
-        /// <summary>Streams full-detail chunks in (one per frame at most) and drops the ones no longer wanted.</summary>
-        IEnumerator StreamLod0()
+        /// <summary>Per frame: upload a finished worker chunk, show / hide cached chunks, start the next build
+        /// (wanted first, then one ring ahead in the pan direction) and evict the least recently shown.</summary>
+        void StreamLod0()
         {
-            _streaming = true;
-            var want = WantedLod0();
-            var keep = new HashSet<int>(want);
-            // drop far ones (keep a little hysteresis: only drop when not wanted and we're over budget or zoomed out)
-            var drop = new List<int>();
-            foreach (var kv in _lod0) if (!keep.Contains(kv.Key) && (_lod0.Count > 9 || _dist > LOD0_MAX_DIST * 1.2f || DistTo(kv.Key, _focus) > (CH * 2.2f) * (CH * 2.2f))) drop.Add(kv.Key);
-            foreach (int c in drop)
+            if (_root == null || _buckets == null) return;
+            int frame = Time.frameCount;
+            bool uploaded = false;
+            if (_job != null && _job.IsCompleted)
             {
-                if (_lod0[c] != null) DestroyChunk(_lod0[c]);
-                _lod0.Remove(c);
-                if (c < _lod1.Length && _lod1[c] != null) _lod1[c].SetActive(true);
+                var job = _job; _job = null;
+                if (job.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
+                {
+                    if (_jobVer == _lod0Ver && !_lod0.ContainsKey(_jobC)) { AddLod0(_jobC, job.Result, true); _lod0[_jobC].SetActive(false); uploaded = true; }
+                }
+                else Debug.LogWarning("[MapView] LOD0 chunk build failed: " + job.Exception);
             }
-            foreach (int c in want)
+
+            // pan direction (smoothed), for prefetch
+            var mv = _focus - _prevFocus; _prevFocus = _focus; mv.y = 0f;
+            _panDir = Vector3.Lerp(_panDir, mv, 0.2f);
+
+            WantedLod0(_want, Vector3.zero, 0f, 9, LOD0_MAX_DIST);
+            WantedLod0(_keepRing, Vector3.zero, CH, 25, LOD0_MAX_DIST * 1.2f);   // hysteresis: one chunk ring further, a bit further out
+            // show wanted chunks; keep already-shown ones inside the ring while under the active budget
+            int active = 0;
+            for (int i = 0; i < _want.Count; i++) if (_lod0.ContainsKey(_want[i])) active++;
+            _lodTmp.Clear(); foreach (var kv in _lod0) _lodTmp.Add(kv.Key);
+            for (int i = 0; i < _lodTmp.Count; i++)
             {
-                if (_lod0.ContainsKey(c)) continue;
-                MakeLod0(c);
-                break;
+                int c = _lodTmp[i]; var go = _lod0[c];
+                if (go == null) continue;
+                bool on = _want.Contains(c);
+                if (!on && go.activeSelf && _keepRing.Contains(c) && active < LOD0_ACTIVE_MAX) { on = true; active++; }
+                if (on) _lod0Seen[c] = frame;
+                if (go.activeSelf != on)
+                {
+                    go.SetActive(on);
+                    if (c < _lod1.Length && _lod1[c] != null) _lod1[c].SetActive(!on);
+                }
             }
-            yield return null;
-            _streaming = false;
+
+            // next build
+            if (_job == null)
+            {
+                int next = -1;
+                for (int i = 0; i < _want.Count && next < 0; i++) if (!_lod0.ContainsKey(_want[i])) next = _want[i];
+                if (WorkerReady())
+                {
+                    if (next < 0 && _panDir.sqrMagnitude > 0.0004f)
+                    {
+                        WantedLod0(_pre, _panDir.normalized * CH, 0f, 9, LOD0_MAX_DIST);
+                        for (int i = 0; i < _pre.Count && next < 0; i++) if (!_lod0.ContainsKey(_pre[i])) next = _pre[i];
+                    }
+                    if (next >= 0)
+                    {
+                        var gen = _wgen; var lots = _buckets[next]; int cx = next % _ncx, cy = next / _ncx; float og = OvergrowthLevel();
+                        _jobC = next; _jobVer = _lod0Ver;
+                        _job = System.Threading.Tasks.Task.Run(() => { var ch = gen.BuildChunk(cx, cy, lots, 0); FxOvergrowth.Apply(ch.Mesh, og, true); return ch; });
+                    }
+                }
+                else if (next >= 0 && !uploaded && (_wgenFailed || _wgenTask != null)) MakeLod0(next);   // worker not up (yet): old synchronous path
+            }
+
+            // evict least recently shown hidden chunks over the count / vertex budget
+            for (int guard = 0; guard < 4; guard++)
+            {
+                long verts = 0; foreach (var kv in _lod0Verts) verts += kv.Value;
+                if (_lod0.Count <= LOD0_CACHE && verts <= LOD0_CACHE_VERTS) break;
+                int victim = -1, oldest = int.MaxValue;
+                foreach (var kv in _lod0)
+                    if (kv.Value != null && !kv.Value.activeSelf && _lod0Seen.TryGetValue(kv.Key, out int f) && f < oldest) { oldest = f; victim = kv.Key; }
+                if (victim < 0) break;
+                DestroyChunk(_lod0[victim]); _lod0.Remove(victim); _lod0Seen.Remove(victim); _lod0Verts.Remove(victim);
+            }
         }
 
         static void DestroyChunk(GameObject go)
