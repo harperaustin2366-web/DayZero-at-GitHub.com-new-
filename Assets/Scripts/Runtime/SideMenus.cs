@@ -66,6 +66,8 @@ namespace DayZero.Runtime
     {
         public Game G;
         public float W, H;
+        /// <summary>Union of the kit plates painted by Flush (for map-tap blocking).</summary>
+        public Rect Painted;
         public SideMenuState St;
         /// <summary>Height of text wrapped to a width: (text, font size, bold, width) -> height.</summary>
         public Func<string, int, bool, float, float> Measure;
@@ -266,6 +268,12 @@ namespace DayZero.Runtime
         /// <summary>Draw the display list with the UI kit and clear it (GameUI.DrawItems then has nothing left).</summary>
         public static void Flush(MenuCtx c)
         {
+            // bounds of every kit plate, so the host can block map taps under the sheet after the list is cleared
+            foreach (var it in c.Items)
+            {
+                if (it.Kind != MenuKind.Panel) continue;
+                c.Painted = c.Painted.width <= 0f ? it.R : Rect.MinMaxRect(Math.Min(c.Painted.xMin, it.R.xMin), Math.Min(c.Painted.yMin, it.R.yMin), Math.Max(c.Painted.xMax, it.R.xMax), Math.Max(c.Painted.yMax, it.R.yMax));
+            }
 #if !DZ_PREVIEW
             Paint(c.Items);
             c.Items.Clear();

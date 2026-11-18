@@ -117,9 +117,13 @@ namespace DayZero.Runtime
         void DrawDockedSheet(float w, float h, MapView map, Action<MenuCtx> layout)
         {
             var area = SheetArea(w, h, map);
-            var ctx = NewCtx(area.width + 200f, h, map);
-            layout(ctx);
+            // kit sheets lay out straight into the dock area and paint themselves (SideMenus.Flush)
+            var ctx = NewCtx(w, h, map);
+            SideMenus.DockArea = area;
+            try { layout(ctx); } finally { SideMenus.DockArea = null; }
+            if (ctx.Items.Count == 0) { if (ctx.Painted.width > 0f) Blk(ctx.Painted); return; }
             var b = InWorld.Bounds(ctx.Items);
+            if (b.width <= 0f && ctx.Painted.width > 0f) b = ctx.Painted;
             float dx = b.width > 0f ? Mathf.Round(area.x + area.width * 0.5f - (b.x + b.width * 0.5f)) : area.x;
             if (b.width > 0f) Blk(new Rect(b.x + dx, b.y, b.width, b.height));
             var m = GUI.matrix;

@@ -60,8 +60,18 @@ namespace DayZero.Runtime
         // ---------------- bottom sheets on the map ----------------
         /// <summary>A bottom sheet's rect: above the time controls, right of the camera buttons and left of the ACTIONS
         /// panel, so a sheet never covers either (v0.17: the old sheets ran under ACTIONS).</summary>
+        /// <summary>Set by GameUI.DrawDockedSheet while a sheet lays out: the dock's sheet area (left of ACTIONS,
+        /// above PLAY / speed). When set, every sheet docks into it.</summary>
+        public static Rect? DockArea;
+
         public static Rect SheetRect(float w, float h, float pw, float ph)
         {
+            if (DockArea.HasValue)
+            {
+                var a = DockArea.Value;
+                float dw = Math.Min(pw, a.width), dh = Math.Min(ph, a.height);
+                return new Rect((float)Math.Floor(a.x + (a.width - dw) * 0.5f + 0.5f), a.yMax - dh, dw, dh);
+            }
             float l = 150f, r = Math.Max(l + 420f, ActionsPanel(w).x - 12f);
             pw = Math.Min(pw, r - l);
             return new Rect(l + (r - l - pw) / 2f, h - 62f - ph - 10f, pw, ph);

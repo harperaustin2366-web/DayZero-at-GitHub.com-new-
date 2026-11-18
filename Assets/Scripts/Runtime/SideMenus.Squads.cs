@@ -296,7 +296,7 @@ namespace DayZero.Runtime
             return o;
         }
 
-        public static Rect TargetBarRect(float w, float h) { float pw = Math.Min(900f, w - 200f), ph = 176f; return new Rect(w / 2f - pw / 2f, h - 62f - ph - 10f, pw, ph); }
+        public static Rect TargetBarRect(float w, float h) => SheetRect(w, h, 900f, 176f);
 
         /// <summary>The bottom bar while a map target is being picked (main.gd toolbar: text, info, SEND, CANCEL).</summary>
         public static void TargetBar(MenuCtx c, TargetInfo info, string sendLabel, Action send, Action cancel)
@@ -359,7 +359,7 @@ namespace DayZero.Runtime
             c.EndScroll();
         }
 
-        public static Rect GroupSheetRect(float w, float h) { float pw = Math.Min(860f, w - 200f), ph = 240f; return new Rect(w / 2f - pw / 2f, h - 62f - ph - 10f, pw, ph); }
+        public static Rect GroupSheetRect(float w, float h) => SheetRect(w, h, 860f, 240f);
 
         /// <summary>main.gd _sheet_group: the SOS sheet for a survivor group tapped on the map.</summary>
         public static void GroupSheet(MenuCtx c, int gid, Action close)
