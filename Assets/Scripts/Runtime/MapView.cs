@@ -148,6 +148,7 @@ namespace DayZero.Runtime
             bool playing = b != null && b.State == Bootstrap.Screen2.Playing && b.Game?.S != null;
             if (_root != null) _root.SetActive(playing && Ready);
             if (_dyn != null) _dyn.SetActive(playing && Ready);
+            FxTerritory.Tick(transform, playing ? b.Game : null, _gen, _dist, playing && Ready);   // v0.18 territory tint
             if (!playing) return;
 
             string key = D.WorldSeed + ":" + D.Lots.Count + ":" + D.W + "x" + D.H;
@@ -168,7 +169,7 @@ namespace DayZero.Runtime
         }
 
         /// <summary>Force a full rebuild on the next frame (new game / load may reuse the same world seed).</summary>
-        public void Invalidate() { _builtKey = ""; _pickFocus = new Vector2(-1f, -1f); ClearSelection(); Game.YardProvider = null; CancelTool(); ClearBuilding(); }
+        public void Invalidate() { FxTerritory.Invalidate(); _builtKey = ""; _pickFocus = new Vector2(-1f, -1f); ClearSelection(); Game.YardProvider = null; CancelTool(); ClearBuilding(); }
 
         /// <summary>True while a new game waits for the player to pick the building for the camp.</summary>
         public bool Picking { get { var g = G; return g?.S != null && g.C != null && !g.C.Started && g.S.Phase == "pick"; } }

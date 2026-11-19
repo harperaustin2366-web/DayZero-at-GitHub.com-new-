@@ -937,6 +937,9 @@ namespace DayZero.Runtime
                 if (pick >= 0 && pick != cur) { sfx.Volume = Math.Round(pick / 10.0, 1); sfx.SaveSettings(); }
             }
             if (KBtn(S.Top(62f), "MORE SETTINGS", UiRole.Accent)) OpenSettings();   // graphics, film look, battery, vibration, UI size
+            var tc = UiLayout.Columns(S.Top(62f), 12f, 1f, -220f);   // v0.18 territory tint (FxTerritory); MERGE: move into the SETTINGS sheet
+            UiKit.FitLabel(tc[0], "TERRITORY COLORS", 20, TextAnchor.MiddleLeft, UiKit.Ink);
+            if (KBtn(tc[1], FxTerritory.Enabled ? "ON" : "OFF", FxTerritory.Enabled ? UiRole.Primary : UiRole.Neutral, FxTerritory.Enabled)) FxTerritory.Enabled = !FxTerritory.Enabled;
             UiKit.Divider(S.Top(8f));
             UiKit.Paragraph(S.Rest, "Drag to pan the map, pinch to zoom, twist with two fingers to rotate. Survivors work on their own: set jobs, answer events and control time.", 16);
         }
