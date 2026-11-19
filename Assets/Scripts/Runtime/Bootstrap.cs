@@ -120,12 +120,12 @@ namespace DayZero.Runtime
         // ---------------- commands from the UI ----------------
         /// <summary>New game: build the world and show the map with no camp yet ("pick" phase). The player taps a
         /// building (MapView) and confirms (GameUI -> ConfirmStart), which founds the colony there.</summary>
-        public void NewGame(int difficulty)
+        public void NewGame(int difficulty, int seed = -1)
         {
             try
             {
                 Pending.Clear(); Ended = false; Won = false; Paused = false; Speed = 1;
-                Game.NewRun(difficulty, -1, 1);
+                Game.NewRun(difficulty, seed >= 0 ? seed : SeedCode.RandomSeed(), 1);   // E13: fresh seeds fit a 6-char challenge code
                 CustomGame.ApplyNewRun(Game);   // E14: custom multipliers (null = normal game)
                 Game.Use(0);
                 Game.Running = false;

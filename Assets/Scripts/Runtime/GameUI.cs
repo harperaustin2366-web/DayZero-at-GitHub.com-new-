@@ -224,6 +224,7 @@ namespace DayZero.Runtime
         {
             if (DrawReportScreens(w, h)) return;   // GameUI.Reports.cs: SAVE GAMES opened from the title
             if (DrawAchCustomScreens(w, h)) return;   // GameUI.Achievements.cs / GameUI.CustomGame.cs (E12, E14)
+            if (DrawSeedEntry(w, h)) return;   // GameUI.SeedCode.cs: ENTER CODE keypad (E13)
             UiKit.FitLabel(new Rect(60, 44, w - 120, 58), "DAY ZERO: OUTBREAK", 46, TextAnchor.MiddleLeft, UiKit.Amber);
             GUI.DrawTexture(new Rect(60, 104, 420, 3), _accentTex);
             UiKit.FitLabel(new Rect(60, 110, w - 120, 32), "SURVIVE. BUILD. DEFEND. EXPAND.", 22, TextAnchor.MiddleLeft, OLIVE_INK);
@@ -239,6 +240,7 @@ namespace DayZero.Runtime
             DrawExpandedToggle(w, h);   // GameUI.Expansion.World.cs
             DrawTutorialToggle(w, h);   // Tutorial.cs (E11)
             DrawTitleExtras(w, h);      // GameUI.Achievements.cs: ACHIEVEMENTS, CUSTOM GAME (E12, E14)
+            DrawSeedCodeTitle(w, h);   // GameUI.SeedCode.cs (E13)
             UiKit.FitLabel(new Rect(60, h - 80, w - 120, 28),
                 "Starting a new game replaces the current save. You pick the building for your base on the map.", 16, TextAnchor.MiddleLeft, UiKit.InkDim, false);
         }
@@ -808,6 +810,7 @@ namespace DayZero.Runtime
         {
             var people = G.AlivePeople();
             var c = UiKit.Panel(r, string.Format("Survivors ({0})  -  drag the wheel to change a job", people.Count));
+            c = DrawAutoAssignBar(c);   // GameUI.SeedCode.cs (E18)
             var lst = UiKit.BeginList("ui_jobs", c, people.Count, 104f, 6f);
             for (int i = lst.First; i < lst.Last; i++) JobRow(lst.Row(i), i, people[i]);
             UiKit.EndList();
@@ -816,7 +819,8 @@ namespace DayZero.Runtime
         void JobRow(Rect row, int i, Person p)
         {
             UiKit.RowPlate(row, i);
-            var parts = UiLayout.Columns(UiLayout.Inset(row, 14f, 8f, 8f, 8f), 14f, 1f, -230f);
+            var parts = UiLayout.Columns(UiLayout.Inset(row, 14f, 8f, 8f, 8f), 14f, 1f, -112f, -230f);   // E18: LOCK column
+            DrawJobLock(parts[1], p);   // GameUI.SeedCode.cs
             var info = UiLayout.Rows(parts[0], 8f, 1.15f, 1f);
             var top = UiLayout.Columns(info[0], 14f, 1f, -210f);
             UiKit.FitLabel(top[0], p.Name, 24, TextAnchor.MiddleLeft, UiKit.Ink, true, 14);
@@ -837,8 +841,8 @@ namespace DayZero.Runtime
                 }
             // job wheel
             int cur = Array.IndexOf(Data.JOBS, p.Job);
-            if (cur < 0) { UiKit.Chip(UiLayout.Center(parts[1], parts[1].width, 44f), p.Job.ToUpperInvariant(), UiRole.Neutral, 18); return; }
-            int pick = UiWheel.Vertical("job_" + p.Id, parts[1], Data.JOBS, cur, 3, 20);
+            if (cur < 0) { UiKit.Chip(UiLayout.Center(parts[2], parts[2].width, 44f), p.Job.ToUpperInvariant(), UiRole.Neutral, 18); return; }
+            int pick = UiWheel.Vertical("job_" + p.Id, parts[2], Data.JOBS, cur, 3, 20);
             if (pick >= 0 && pick != cur) SetJob(p, Data.JOBS[pick]);
         }
 
@@ -951,6 +955,7 @@ namespace DayZero.Runtime
             if (KBtn(tc[1], FxTerritory.Enabled ? "ON" : "OFF", FxTerritory.Enabled ? UiRole.Primary : UiRole.Neutral, FxTerritory.Enabled)) FxTerritory.Enabled = !FxTerritory.Enabled;
             UiKit.Divider(S.Top(8f));
             UiKit.Paragraph(S.Rest, "Drag to pan the map, pinch to zoom, twist with two fingers to rotate. Survivors work on their own: set jobs, answer events and control time.", 16);
+            DrawSeedCodeStrip(r);   // GameUI.SeedCode.cs: challenge code (E13)
         }
 
         // ---------------- popups ----------------

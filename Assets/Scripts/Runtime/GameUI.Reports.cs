@@ -339,6 +339,7 @@ namespace DayZero.Runtime
             if (DrawReportScreens(w, h)) return true;   // MEMORIAL opened from the summary
             var ctx = NewCtx(w, h, MapView.Instance);
             ReportScreens.Summary(ctx, _b.Won, RepActions());
+            DrawSeedSummary(ctx);   // GameUI.SeedCode.cs: challenge code chip (E13)
             SideMenus.Flush(ctx);
             return true;
         }
