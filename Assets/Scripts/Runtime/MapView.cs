@@ -149,6 +149,7 @@ namespace DayZero.Runtime
             if (_root != null) _root.SetActive(playing && Ready);
             if (_dyn != null) _dyn.SetActive(playing && Ready);
             FxTerritory.Tick(transform, playing ? b.Game : null, _gen, _dist, playing && Ready);   // v0.18 territory tint
+            if (!playing || !Ready) FxFeel.Hide();   // v0.19 game feel (E8 / E10)
             if (!playing) return;
 
             string key = D.WorldSeed + ":" + D.Lots.Count + ":" + D.W + "x" + D.H;
@@ -160,6 +161,7 @@ namespace DayZero.Runtime
             TickLongPress();   // LongPressInfo.cs (E19)
             UpdateCamera();
             FxView.Apply(_cam, b.Game, _dist);   // v0.15 day/night tint, haze, film look (visual only)
+            FxFeel.Tick(this, _cam, b.Game, _gen, _focus, _dist, true);   // v0.19 shake, selection glow, order lines
             StreamLod0();   // v0.17.1: LOD0 built on a worker thread, cached (no per-frame coroutine)
             _dynT -= Time.unscaledDeltaTime;
             if (_dynT <= 0f) { _dynT = 0.75f; UpdateDynamic(); }
@@ -170,7 +172,7 @@ namespace DayZero.Runtime
         }
 
         /// <summary>Force a full rebuild on the next frame (new game / load may reuse the same world seed).</summary>
-        public void Invalidate() { FxTerritory.Invalidate(); _builtKey = ""; _pickFocus = new Vector2(-1f, -1f); ClearSelection(); Game.YardProvider = null; CancelTool(); ClearBuilding(); }
+        public void Invalidate() { FxTerritory.Invalidate(); FxFeel.Clear(); _builtKey = ""; _pickFocus = new Vector2(-1f, -1f); ClearSelection(); Game.YardProvider = null; CancelTool(); ClearBuilding(); }
 
         /// <summary>True while a new game waits for the player to pick the building for the camp.</summary>
         public bool Picking { get { var g = G; return g?.S != null && g.C != null && !g.C.Started && g.S.Phase == "pick"; } }
@@ -291,7 +293,7 @@ namespace DayZero.Runtime
 
         void UpdateCamera()
         {
-            float k = 1f - Mathf.Exp(-Time.unscaledDeltaTime * 10f);
+            float k = 1f - Mathf.Exp(-Time.unscaledDeltaTime * FxFeel.VisualTimeScale * 10f);   // v0.19: slow-mo beat (visual only)
             _dist = Mathf.Lerp(_dist, _distTarget, k);
             if (_animFocus)
             {
@@ -409,7 +411,7 @@ namespace DayZero.Runtime
                 _sfxGame = g;
             }
             bool running = !b.Paused && b.Pending.Count == 0 && !b.Ended && !Picking;
-            float dt = running ? Mathf.Min(Time.unscaledDeltaTime, 0.1f) : 0f;
+            float dt = running ? Mathf.Min(Time.unscaledDeltaTime, 0.1f) * FxFeel.VisualTimeScale : 0f;   // v0.19 slow-mo (animation only)
             var focus = new Vector2(_focus.x, -_focus.z);
             _crowd.Update(g, dt, focus, _dist);
             _crowd.Build(_cm, _cs, _cam.transform.position, _dist);

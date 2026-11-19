@@ -30,6 +30,8 @@ namespace DayZero.Runtime
         public static int Quality = HIGH;
         public static bool Vines = true, Weather = true, Crows = true, Fires = true, Shadows = true, Film = true;
         public static bool BatterySaver, Haptics = true;
+        /// <summary>v0.19 E8: camera shake and the short slow-motion beat on big hits (FxFeel).</summary>
+        public static bool ScreenShake = true;
         /// <summary>Applied UI scale (GameUI reads this). Change it with SetUiScale.</summary>
         public static float UiScale { get; private set; } = 1f;
         static float _pendingUi = -1f;
@@ -113,6 +115,7 @@ namespace DayZero.Runtime
                 Film = PlayerPrefs.GetInt(FxView.PREF_FILM, 1) != 0;
                 BatterySaver = PlayerPrefs.GetInt("set_battery", 0) != 0;
                 Haptics = PlayerPrefs.GetInt("set_haptics", 1) != 0;
+                ScreenShake = PlayerPrefs.GetInt("set_shake", 1) != 0;
                 UiScale = Mathf.Clamp(PlayerPrefs.GetFloat("set_uiscale", 1f), UI_MIN, UI_MAX);
             }
             catch (Exception e) { Debug.LogWarning("[GameSettings] load failed: " + e.Message); }
@@ -131,6 +134,7 @@ namespace DayZero.Runtime
                 PlayerPrefs.SetInt("set_shadows", Shadows ? 1 : 0);
                 PlayerPrefs.SetInt("set_battery", BatterySaver ? 1 : 0);
                 PlayerPrefs.SetInt("set_haptics", Haptics ? 1 : 0);
+                PlayerPrefs.SetInt("set_shake", ScreenShake ? 1 : 0);
                 PlayerPrefs.SetFloat("set_uiscale", UiScale);
                 PlayerPrefs.Save();
             }

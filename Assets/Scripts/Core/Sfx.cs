@@ -124,5 +124,12 @@ namespace DayZero.Core
         }
 
         public void Play(string name) => Play(name, new Vector2(-1, -1));
+
+        /// <summary>v0.19 UI cue (day-start sting): a non-positional one-shot at a fixed pitch, no cooldown, no RNG.</summary>
+        public void PlayTone(string name, float pitch, float volDb = 0f)
+        {
+            if (!Enabled || !_streams.Contains(name)) return;
+            _audio.PlayOneShot(name, volDb, pitch);
+        }
     }
 }

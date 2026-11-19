@@ -1,6 +1,6 @@
 // v0.18 (batch B1, phone feel): the SETTINGS sheet, opened from MENU > Settings > MORE SETTINGS. Built with the
 // v0.17 UI kit (UiKit panels / buttons / bar). Left card GRAPHICS: quality preset LOW / MEDIUM / HIGH and six
-// toggles; right card PHONE: battery saver, haptics, UI scale stepper (0.8x .. 1.4x) and BACK.
+// toggles; right card PHONE: battery saver, haptics, screen shake (v0.19), UI scale stepper (0.8x .. 1.4x) and BACK.
 // The layout is a pure plan (SettingsPlan.Make) so the offline preview lays out the very same rects; GameUI draws
 // the plan and runs the tapped action. State lives in GameSettings (GameSettings.cs).
 using System.Collections.Generic;
@@ -12,7 +12,7 @@ namespace DayZero.Runtime
 
     public enum SetAct
     {
-        None, QLow, QMedium, QHigh, Vines, Weather, Crows, Fires, Shadows, Film, Battery, Haptics, UiDown, UiUp, Back,
+        None, QLow, QMedium, QHigh, Vines, Weather, Crows, Fires, Shadows, Film, Battery, Haptics, Shake, UiDown, UiUp, Back,
     }
 
     public struct SetItem
@@ -77,6 +77,9 @@ namespace DayZero.Runtime
             var h = UiLayout.Columns(P.Top(ROW), GAP, 1f, -170f);
             Add(o, SetKind.Label, h[0], "VIBRATION");
             Add(o, SetKind.Button, h[1], GameSettings.Haptics ? "ON" : "OFF", GameSettings.Haptics ? UiRole.Primary : UiRole.Neutral, GameSettings.Haptics, SetAct.Haptics);
+            var sk = UiLayout.Columns(P.Top(ROW), GAP, 1f, -170f);   // v0.19 E8
+            Add(o, SetKind.Label, sk[0], "SCREEN SHAKE");
+            Add(o, SetKind.Button, sk[1], GameSettings.ScreenShake ? "ON" : "OFF", GameSettings.ScreenShake ? UiRole.Primary : UiRole.Neutral, GameSettings.ScreenShake, SetAct.Shake);
             var u = UiLayout.Columns(P.Top(ROW), GAP, -120f, -62f, 1f, -62f);
             float s = GameSettings.UiScaleShown;
             Add(o, SetKind.Label, u[0], "UI SIZE");
@@ -84,7 +87,7 @@ namespace DayZero.Runtime
             Add(o, SetKind.Bar, UiLayout.Inset(u[2], 0f, 8f, 0f, 8f), GameSettings.UiScaleText(s), frac: (s - GameSettings.UI_MIN) / (GameSettings.UI_MAX - GameSettings.UI_MIN));
             Add(o, SetKind.Button, u[3], "+", s < GameSettings.UI_MAX - 0.01f ? UiRole.Primary : UiRole.Disabled, false, SetAct.UiUp, 26);
             if (P.Rest.height >= 30f)
-                Add(o, SetKind.Para, P.Rest, "Battery saver caps the game at 30 fps and drops to 15 fps after 20 s without a touch while paused. Vibration: hits on survivors, the siren, broken fences, deaths.", size: 15);
+                Add(o, SetKind.Para, P.Rest, "Battery saver caps the game at 30 fps and drops to 15 fps after 20 s without a touch while paused. Vibration: hits on survivors, the siren, broken fences, deaths. Screen shake: also the slow-motion beat on a broken gate.", size: 15);
             Add(o, SetKind.Button, back, "BACK", UiRole.Accent, false, SetAct.Back, 22);
             return o;
         }
@@ -101,6 +104,7 @@ namespace DayZero.Runtime
                 case SetAct.Fires: GameSettings.Fires = !GameSettings.Fires; GameSettings.Changed(); break;
                 case SetAct.Shadows: GameSettings.Shadows = !GameSettings.Shadows; GameSettings.Changed(); break;
                 case SetAct.Film: GameSettings.SetFilm(!GameSettings.Film); break;
+                case SetAct.Shake: GameSettings.ScreenShake = !GameSettings.ScreenShake; GameSettings.Changed(); break;
                 case SetAct.Battery: GameSettings.BatterySaver = !GameSettings.BatterySaver; GameSettings.Changed(); break;
                 case SetAct.Haptics:
                     GameSettings.Haptics = !GameSettings.Haptics; GameSettings.Changed();

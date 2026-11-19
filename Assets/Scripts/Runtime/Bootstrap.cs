@@ -204,8 +204,10 @@ namespace DayZero.Runtime
         {
             try
             {
+                bool fx = FxFeel.BeforeOrder(Game, action);   // v0.19 E10 order route line (visual only)
                 string r = Game.DoAction(Math.Max(0, Game.CurCol), action, args);
                 Game.Use(Math.Max(0, Game.ViewCol));
+                FxFeel.AfterOrder(Game, action, args, r, fx);
                 return r ?? "";
             }
             catch (Exception e) { Debug.LogException(e); return "Error: " + e.Message; }

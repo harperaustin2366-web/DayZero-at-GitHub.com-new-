@@ -345,7 +345,7 @@ namespace DayZero.Runtime
             else if (_b.Pending.Count > 0) DrawDecision(w, h, _b.Pending[0]);
             else if (_menuOpen) DrawMenuOverlay(w, h);
             else if (SideOpen) DrawSideMenu(w, h);
-            else DrawMorningReport(w, h);   // GameUI.Reports.cs (E6)
+            else if (!DrawDaySting(w, h)) DrawMorningReport(w, h);   // v0.19 day sting first (GameUI.DaySting.cs), then the E6 report
             EndAnim();
         }
 
