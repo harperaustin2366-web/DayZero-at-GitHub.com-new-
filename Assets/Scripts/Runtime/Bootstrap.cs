@@ -155,13 +155,13 @@ namespace DayZero.Runtime
             catch (Exception e) { Fail("Could not found the camp.", e); }
         }
 
-        public void LoadSaved()
+        public void LoadSaved(string path = "")
         {
             try
             {
                 Pending.Clear(); Ended = false; Won = false; Paused = false;
                 Map?.Invalidate();   // v0.12.0a: drop the old world's yard geometry before the save is installed
-                if (!Game.LoadGame()) { Toast(Game.LastLoadError != "" ? Game.LastLoadError : "No save found."); return; }
+                if (!Game.LoadGame(path)) { Toast(Game.LastLoadError != "" ? Game.LastLoadError : "No save found."); return; }
                 Map?.Invalidate();   // camp yards come from the loaded bases (the chosen start site is a saved Base)
                 Game.Use(Math.Max(0, Game.ViewCol));
                 Game.Running = true;
@@ -234,6 +234,7 @@ namespace DayZero.Runtime
         void Update()
         {
             if (_toastT > 0f) { _toastT -= Time.unscaledDeltaTime; if (_toastT <= 0f) Toasts.Clear(); }
+            if (State == Screen2.Playing) RunStats.Tick(Game);   // E5-E15 (RunStats.cs): dawn report, memorial, dawn autosave
             if (!CanRun()) return;
             if (Paused || Pending.Count > 0) return;
             try
@@ -248,7 +249,7 @@ namespace DayZero.Runtime
 
         void SaveQuiet()
         {
-            try { if (Game?.S != null && Game.S.Phase != "pick") Game.SaveGame(); }
+            try { if (Game?.S != null && Game.S.Phase != "pick" && !(!Game.Mp && SaveSlots.SaveAuto(Game))) Game.SaveGame(); }
             catch (Exception e) { Debug.LogException(e); }
         }
 

@@ -246,6 +246,7 @@ namespace DayZero.Core
             FamilyOnDeath(p);
             if (ExpansionRules) PplOnDeath(p);   // Expansion: stress
             C.AddStat("dead", 1);
+            PersonDied?.Invoke(p, cause);
             if (logIt) AddLog(string.Format("{0} ({1}) {2}.", p.Name, p.Job, cause), "death");
             C.People.Remove(p);
             _peopleById.Remove(p.Id);
@@ -429,10 +430,15 @@ namespace DayZero.Core
             }
         }
 
+        /// <summary>UI hooks (E6 morning report / E7 memorial, Runtime/RunStats.cs): observers only, no sim effect.</summary>
+        public event Action<Person, string> PersonDied;
+        public event Action<Person, ODict<string, double>> LootDeposited;
+
         void Deposit(Person p)
         {
             var c = p.Carry;
             if (c.Count == 0) return;
+            LootDeposited?.Invoke(p, c);
             var parts = new List<string>();
             foreach (var kv in c)
             {

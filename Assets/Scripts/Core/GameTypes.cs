@@ -420,6 +420,8 @@ namespace DayZero.Core
         public List<Wreck> Wrecks = new List<Wreck>();
         public int VehN = 1, VehVer = 1;
         public int NextUid = 1;
+        // E5-E15 run log (Runtime/RunStats.cs: daily population / kills, memorial wall, morning report); UI only, missing = new
+        [JsonProperty("runlog", NullValueHandling = NullValueHandling.Ignore)] public Newtonsoft.Json.Linq.JObject RunLog;
         // zombies (only filled while saving / loading)
         public int[] Zc, Zn;
         public float[] Zp;

@@ -145,7 +145,7 @@ namespace DayZero.Runtime
         float _offX, _offY, _scale = 1f;
 
         /// <summary>True when a modal (menu, decision, game over) covers the map or we are not in a game.</summary>
-        public bool ModalOpen => _b.State != Bootstrap.Screen2.Playing || _menuOpen || SideOpen || _b.Pending.Count > 0 || _b.Ended;
+        public bool ModalOpen => _b.State != Bootstrap.Screen2.Playing || _menuOpen || SideOpen || _b.Pending.Count > 0 || _b.Ended || ReportsModal;
 
         /// <summary>Screen position (top-left origin, pixels) is over a HUD element.</summary>
         public bool BlocksPointer(Vector2 screenTopLeft)
@@ -221,6 +221,7 @@ namespace DayZero.Runtime
 
         void DrawTitle(float w, float h)
         {
+            if (DrawReportScreens(w, h)) return;   // GameUI.Reports.cs: SAVE GAMES opened from the title
             UiKit.FitLabel(new Rect(60, 44, w - 120, 58), "DAY ZERO: OUTBREAK", 46, TextAnchor.MiddleLeft, UiKit.Amber);
             GUI.DrawTexture(new Rect(60, 104, 420, 3), _accentTex);
             UiKit.FitLabel(new Rect(60, 110, w - 120, 32), "SURVIVE. BUILD. DEFEND. EXPAND.", 22, TextAnchor.MiddleLeft, OLIVE_INK);
@@ -229,6 +230,7 @@ namespace DayZero.Runtime
             UiKit.Panel(panel);
             bool has = _b.HasSave();
             if (KBtn(new Rect(60, 190, 420, 72), has ? "CONTINUE" : "CONTINUE (NO SAVE)", has ? UiRole.Accent : UiRole.Disabled, false, 26)) _b.LoadSaved();
+            if (KBtn(new Rect(496, 190, Mathf.Min(244f, panel.xMax - 512f), 72), "LOAD GAME", UiRole.Primary, false, 24)) OpenReportScreen("saves");
             UiKit.Header(new Rect(56, 276, panel.width - 32, 40), "New game", 20);
             for (int d = 0; d < Game.DIFF_NAMES.Length; d++)
                 if (KBtn(new Rect(60 + d * 220, 326, 200, 72), Game.DIFF_NAMES[d].ToUpperInvariant(), UiRole.Primary, false, 24)) _b.NewGame(d);
@@ -291,7 +293,7 @@ namespace DayZero.Runtime
             }
             // A sheet on top (side menu, menu overlay, decision, game over) gets the touches: IMGUI hands a press to
             // the first button drawn under it, so the HUD underneath must not see mouse events while one is up.
-            bool sheet = SideOpen || _menuOpen || _b.Pending.Count > 0 || _b.Ended || G.S.Phase == "lost";
+            bool sheet = SideOpen || _menuOpen || _b.Pending.Count > 0 || _b.Ended || G.S.Phase == "lost" || ReportsModal;
             var evType = Event.current.type;
             bool swallow = sheet && (evType == EventType.MouseDown || evType == EventType.MouseUp || evType == EventType.MouseDrag || evType == EventType.ScrollWheel);
             if (swallow) Event.current.type = EventType.Ignore;
@@ -336,6 +338,7 @@ namespace DayZero.Runtime
             else if (_b.Pending.Count > 0) DrawDecision(w, h, _b.Pending[0]);
             else if (_menuOpen) DrawMenuOverlay(w, h);
             else if (SideOpen) DrawSideMenu(w, h);
+            else DrawMorningReport(w, h);   // GameUI.Reports.cs (E6)
             EndAnim();
         }
 
@@ -660,6 +663,7 @@ namespace DayZero.Runtime
 
         void DrawMenuOverlay(float w, float h)
         {
+            if (DrawReportScreens(w, h)) return;   // GameUI.Reports.cs: SAVE GAMES / MEMORIAL
             GUI.DrawTexture(new Rect(0, 0, w, h), _dimTex);
             var f = MenuFrame.Make(w, h);
             UiKit.Panel(f.TabPlate);
@@ -914,6 +918,7 @@ namespace DayZero.Runtime
             if (KBtn(G2.Top(62f), "SAVE NOW", UiRole.Accent)) _b.SaveNow();
             if (KBtn(G2.Top(62f), "LOAD LAST SAVE")) _b.LoadSaved();
             if (KBtn(G2.Top(62f), "TITLE SCREEN", UiRole.Danger)) _b.ToTitle();
+            DrawReportMenuButtons(G2);   // GameUI.Reports.cs: SAVE GAMES, MEMORIAL
             G2.Top(2f);
             UiKit.Paragraph(G2.Rest, "The game autosaves every few minutes and when the app goes to the background.", 16);
 
@@ -984,6 +989,7 @@ namespace DayZero.Runtime
 
         void DrawGameOver(float w, float h)
         {
+            if (DrawRunSummary(w, h)) return;   // GameUI.Reports.cs (E15)
             float pw = Mathf.Min(760f, w - 60f);
             var p = new Rect((w - pw) / 2f, h / 2f - 150f, pw, 300f);
             GUI.DrawTexture(new Rect(0, 0, w, h), _sheetDimTex);
