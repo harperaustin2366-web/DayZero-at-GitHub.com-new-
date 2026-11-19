@@ -24,7 +24,7 @@ namespace DayZero.Runtime
     {
         public const int LOW = 0, MEDIUM = 1, HIGH = 2;
         public static readonly string[] QUALITY_NAMES = { "LOW", "MEDIUM", "HIGH" };
-        public const float UI_MIN = 0.8f, UI_MAX = 1.4f, UI_STEP = 0.1f;
+        public const float UI_MIN = 0.8f, UI_MAX = 1.3f, UI_STEP = 0.1f;
         public const float IDLE_SECONDS = 20f;
 
         public static int Quality = HIGH;
