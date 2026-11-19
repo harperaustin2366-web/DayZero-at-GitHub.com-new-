@@ -74,6 +74,8 @@ namespace DayZero.Core
             if (targets.Count == 0) return;
             var target = targets[Rng.RandiRange(0, targets.Count - 1)];
             int n = (int)Math.Min(90.0, 14.0 + 7.0 * daysSince);
+            double hmul = CustomRules.R(S);   // E14 custom game: post-Fall hordes follow the raid strength (1.0 = original)
+            if (hmul != 1.0) n = Math.Max(1, (int)Math.Round(n * hmul));
             var tc = ColonyAt(target.Col);
             string helped = "";
             foreach (var cid in tc?.Pacts ?? new List<string>())

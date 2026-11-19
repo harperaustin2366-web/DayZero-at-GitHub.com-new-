@@ -126,6 +126,7 @@ namespace DayZero.Runtime
             {
                 Pending.Clear(); Ended = false; Won = false; Paused = false; Speed = 1;
                 Game.NewRun(difficulty, -1, 1);
+                CustomGame.ApplyNewRun(Game);   // E14: custom multipliers (null = normal game)
                 Game.Use(0);
                 Game.Running = false;
                 Map?.Invalidate();
@@ -235,6 +236,7 @@ namespace DayZero.Runtime
         {
             if (_toastT > 0f) { _toastT -= Time.unscaledDeltaTime; if (_toastT <= 0f) Toasts.Clear(); }
             if (State == Screen2.Playing) RunStats.Tick(Game);   // E5-E15 (RunStats.cs): dawn report, memorial, dawn autosave
+            if (State == Screen2.Playing) Achievements.Tick(Game);   // E12 (Achievements.cs): unlock checks, read-only
             if (!CanRun()) return;
             if (Paused || Pending.Count > 0) return;
             try

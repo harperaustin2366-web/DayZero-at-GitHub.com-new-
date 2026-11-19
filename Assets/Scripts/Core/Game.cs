@@ -893,7 +893,9 @@ namespace DayZero.Core
         public double SecPerHour()
         {
             if (FastClock) return 2.0;
-            return IsNight() ? NIGHT_REAL_SEC / 8.0 : DAY_REAL_SEC / 16.0;
+            double sph = IsNight() ? NIGHT_REAL_SEC / 8.0 : DAY_REAL_SEC / 16.0;
+            double dl = CustomRules.D(S);   // E14 custom game: real seconds per game hour (1.0 = original)
+            return dl == 1.0 ? sph : sph * dl;
         }
 
         /// <summary>GDScript _process(delta). Call once per frame with real seconds.</summary>
@@ -936,7 +938,7 @@ namespace DayZero.Core
             RefreshRefs();
             _rtBudget = RT_PATH_BUDGET;
             S.T += dh;
-            if (S.Guts.Count > 0) StepGuts(dh * sph);
+            if (S.Guts.Count > 0) StepGuts(CustomRules.D(S) == 1.0 ? dh * sph : dh * sph / CustomRules.D(S));   // E14: gutting keeps its game-time length
             MoveZombies(dh); Dbg("MoveZombies");
             RebuildBuckets();
             _openHumans.Clear();

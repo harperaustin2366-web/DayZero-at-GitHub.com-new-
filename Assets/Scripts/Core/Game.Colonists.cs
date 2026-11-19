@@ -554,10 +554,12 @@ namespace DayZero.Core
             GearLoot(p, l);
             var tab = D.LotLootTable(l);
             double left = S.Loot[l];
+            double lmul = CustomRules.L(S);
             foreach (var kv in tab)
             {
                 double v = Rng.RandfRange(kv.Value[0], kv.Value[1]) * left * mult;
                 if (ExpansionRules) v *= ExpLootMul(l, kv.Key);   // Expansion: district danger, autumn harvest, rain
+                if (lmul != 1.0) v *= lmul;   // E14 custom game
                 if (v > 0.0) p.Carry[kv.Key] = p.Carry.Get(kv.Key, 0.0) + v;
             }
             MarkSearched(l, CurCol + 1);

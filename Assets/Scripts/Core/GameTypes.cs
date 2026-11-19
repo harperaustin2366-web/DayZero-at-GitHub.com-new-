@@ -422,10 +422,26 @@ namespace DayZero.Core
         public int NextUid = 1;
         // E5-E15 run log (Runtime/RunStats.cs: daily population / kills, memorial wall, morning report); UI only, missing = new
         [JsonProperty("runlog", NullValueHandling = NullValueHandling.Ignore)] public Newtonsoft.Json.Linq.JObject RunLog;
+        // E14 custom game multipliers (Runtime/CustomGame.cs); null = a normal game, every multiplier 1.0
+        [JsonProperty("custom", NullValueHandling = NullValueHandling.Ignore)] public CustomRules Custom;
         // zombies (only filled while saving / loading)
         public int[] Zc, Zn;
         public float[] Zp;
         public byte[] Zh;
+    }
+
+    /// <summary>E14 custom game: rule multipliers chosen on New Game (1.0 = original behaviour). Read at the few sim points
+    /// listed in PORT_NOTES.md; with a null GameState.Custom every helper returns exactly 1.0, so the sim stays bit-exact.</summary>
+    public sealed class CustomRules
+    {
+        public double Zombies = 1.0, Loot = 1.0, Raids = 1.0, DayLen = 1.0;
+        [JsonIgnore] public bool IsDefault => Zombies == 1.0 && Loot == 1.0 && Raids == 1.0 && DayLen == 1.0;
+        public CustomRules Clone() => (CustomRules)MemberwiseClone();
+        static double Ok(double v) => double.IsNaN(v) || v <= 0.0 ? 1.0 : v;
+        public static double Z(GameState s) => s?.Custom == null ? 1.0 : Ok(s.Custom.Zombies);
+        public static double L(GameState s) => s?.Custom == null ? 1.0 : Ok(s.Custom.Loot);
+        public static double R(GameState s) => s?.Custom == null ? 1.0 : Ok(s.Custom.Raids);
+        public static double D(GameState s) => s?.Custom == null ? 1.0 : Ok(s.Custom.DayLen);
     }
 
     /// <summary>Per-person daily routine state (game.gd _rt entries; runtime only).</summary>

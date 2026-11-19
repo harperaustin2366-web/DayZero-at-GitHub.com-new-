@@ -414,6 +414,7 @@ namespace DayZero.Core
         {
             var tab = D.LotLootTable(l);
             double left = S.Loot[l];
+            if (CustomRules.L(S) != 1.0) left *= CustomRules.L(S);   // E14 custom game
             foreach (var kv in tab) C.Res[kv.Key] = R(kv.Key) + (kv.Value[0] + kv.Value[1]) * 0.25 * left;
             MarkSearched(l, CurCol + 1);
         }

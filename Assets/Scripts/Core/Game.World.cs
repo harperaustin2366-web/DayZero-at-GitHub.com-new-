@@ -180,9 +180,11 @@ namespace DayZero.Core
             FlushDead();
             var counts = new int[SW * SH];
             foreach (int k in Zc) counts[SectOf(Tp(k))]++;
-            int budget = MaxZombies - Zc.Count;
+            double zmul = CustomRules.Z(S);   // E14 custom game (1.0 = original)
+            int budget = (zmul == 1.0 ? MaxZombies : (int)Math.Round(MaxZombies * zmul)) - Zc.Count;
             if (budget <= 0) return;
             double perSector = 4.2 * MaxZombies / 1100.0;
+            if (zmul != 1.0) perSector *= zmul;
             var order = Enumerable.Range(0, SW * SH).ToList();
             GRng.Shuffle(order);
             foreach (int i in order)

@@ -708,6 +708,8 @@ namespace DayZero.Core
                 if (cp != null && cp.Alive) { n *= 0.8; break; }
             }
             if (ExpansionRules) n *= ExpRaidMul();   // Expansion: summer x1.05, winter x0.85
+            double rmul = CustomRules.R(S);   // E14 custom game (1.0 = original)
+            if (rmul != 1.0) n *= rmul;
             return V.Clampi((int)Gd.Round(n), 3, RAID_CAP);
         }
 

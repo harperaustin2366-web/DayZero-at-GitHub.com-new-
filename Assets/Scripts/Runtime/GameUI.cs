@@ -184,6 +184,7 @@ namespace DayZero.Runtime
                 case Bootstrap.Screen2.Playing: DrawGame(w, h); break;
             }
             DrawToasts(w, h);
+            DrawAchToast(w, h);   // GameUI.Achievements.cs (E12)
             GUI.matrix = Matrix4x4.identity;
         }
 
@@ -222,6 +223,7 @@ namespace DayZero.Runtime
         void DrawTitle(float w, float h)
         {
             if (DrawReportScreens(w, h)) return;   // GameUI.Reports.cs: SAVE GAMES opened from the title
+            if (DrawAchCustomScreens(w, h)) return;   // GameUI.Achievements.cs / GameUI.CustomGame.cs (E12, E14)
             UiKit.FitLabel(new Rect(60, 44, w - 120, 58), "DAY ZERO: OUTBREAK", 46, TextAnchor.MiddleLeft, UiKit.Amber);
             GUI.DrawTexture(new Rect(60, 104, 420, 3), _accentTex);
             UiKit.FitLabel(new Rect(60, 110, w - 120, 32), "SURVIVE. BUILD. DEFEND. EXPAND.", 22, TextAnchor.MiddleLeft, OLIVE_INK);
@@ -236,6 +238,7 @@ namespace DayZero.Runtime
                 if (KBtn(new Rect(60 + d * 220, 326, 200, 72), Game.DIFF_NAMES[d].ToUpperInvariant(), UiRole.Primary, false, 24)) _b.NewGame(d);
             DrawExpandedToggle(w, h);   // GameUI.Expansion.World.cs
             DrawTutorialToggle(w, h);   // Tutorial.cs (E11)
+            DrawTitleExtras(w, h);      // GameUI.Achievements.cs: ACHIEVEMENTS, CUSTOM GAME (E12, E14)
             UiKit.FitLabel(new Rect(60, h - 80, w - 120, 28),
                 "Starting a new game replaces the current save. You pick the building for your base on the map.", 16, TextAnchor.MiddleLeft, UiKit.InkDim, false);
         }
@@ -668,6 +671,7 @@ namespace DayZero.Runtime
         void DrawMenuOverlay(float w, float h)
         {
             if (DrawReportScreens(w, h)) return;   // GameUI.Reports.cs: SAVE GAMES / MEMORIAL
+            if (DrawAchCustomScreens(w, h)) return;   // GameUI.Achievements.cs (E12)
             GUI.DrawTexture(new Rect(0, 0, w, h), _dimTex);
             var f = MenuFrame.Make(w, h);
             UiKit.Panel(f.TabPlate);
@@ -916,13 +920,14 @@ namespace DayZero.Runtime
         void DrawMenu(Rect r)
         {
             if (DrawSettingsSheet(r)) return;   // v0.18 SETTINGS sheet (GameUI.Settings.cs)
-            var cols = UiLayout.Columns(new Rect(r.x, r.y, r.width, Mathf.Min(r.height, 430f)), 10f, 1f, 1.25f);
+            var cols = UiLayout.Columns(new Rect(r.x, r.y, r.width, Mathf.Min(r.height, 500f)), 10f, 1f, 1.25f);
             var gc = UiKit.Panel(cols[0], "Game");
             var G2 = new UiLayout(gc, 12f);
             if (KBtn(G2.Top(62f), "SAVE NOW", UiRole.Accent)) _b.SaveNow();
             if (KBtn(G2.Top(62f), "LOAD LAST SAVE")) _b.LoadSaved();
             if (KBtn(G2.Top(62f), "TITLE SCREEN", UiRole.Danger)) _b.ToTitle();
             DrawReportMenuButtons(G2);   // GameUI.Reports.cs: SAVE GAMES, MEMORIAL
+            DrawAchMenuButton(G2);       // GameUI.Achievements.cs (E12)
             G2.Top(2f);
             UiKit.Paragraph(G2.Rest, "The game autosaves every few minutes and when the app goes to the background.", 16);
 
