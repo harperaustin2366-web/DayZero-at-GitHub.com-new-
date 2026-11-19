@@ -235,6 +235,7 @@ namespace DayZero.Runtime
             for (int d = 0; d < Game.DIFF_NAMES.Length; d++)
                 if (KBtn(new Rect(60 + d * 220, 326, 200, 72), Game.DIFF_NAMES[d].ToUpperInvariant(), UiRole.Primary, false, 24)) _b.NewGame(d);
             DrawExpandedToggle(w, h);   // GameUI.Expansion.World.cs
+            DrawTutorialToggle(w, h);   // Tutorial.cs (E11)
             UiKit.FitLabel(new Rect(60, h - 80, w - 120, 28),
                 "Starting a new game replaces the current save. You pick the building for your base on the map.", 16, TextAnchor.MiddleLeft, UiKit.InkDim, false);
         }
@@ -288,6 +289,7 @@ namespace DayZero.Runtime
                 if (KBtn(Blk(_hf.Menu), "MENU", UiRole.Neutral)) _menuOpen = true;
                 DrawCameraButtons(map);
                 if (map != null && map.Ready && !ModalOpen) DrawStartPick(w, h, map);
+                DrawB1Hud(w, h, map);   // GameUI.Alerts.cs (E11 tutorial, E16, E19)
                 if (_menuOpen) { BeginAnim(ref _modalAnim, 3, null, 0f, 18f); DrawMenuOverlay(w, h); EndAnim(); }
                 return;
             }
@@ -307,6 +309,7 @@ namespace DayZero.Runtime
             DrawRepairChip(w, ref by);
             DrawResearchNote(w, ref by, map);
             DrawWarHud(w, ref by, map);   // GameUI.Factions.cs
+            DrawTutorialBanner(w, ref by, map);   // Tutorial.cs (E11)
             BeginAnim(ref _sideAnim, _panel != Panel.None ? 1 + (int)_panel : _actionsOpen ? 1 : 0, null, 28f, 0f);
             bool sidePanel = DrawSidePanel(w, map);
             EndAnim();
@@ -327,6 +330,7 @@ namespace DayZero.Runtime
                 EndAnim();
             }
             DrawTimeControls(w, h);
+            DrawB1Hud(w, h, map);   // GameUI.Alerts.cs (E16 speed drop, E17 alerts, E19 long-press card)
             if (swallow) Event.current.type = evType;
 
             // modal sheets fade and slide in (v0.14.0a); a new decision or another side menu restarts the animation

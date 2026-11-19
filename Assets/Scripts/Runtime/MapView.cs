@@ -157,6 +157,7 @@ namespace DayZero.Runtime
 
             EnsureCamera();
             HandleInput(b);
+            TickLongPress();   // LongPressInfo.cs (E19)
             UpdateCamera();
             FxView.Apply(_cam, b.Game, _dist);   // v0.15 day/night tint, haze, film look (visual only)
             StreamLod0();   // v0.17.1: LOD0 built on a worker thread, cached (no per-frame coroutine)
