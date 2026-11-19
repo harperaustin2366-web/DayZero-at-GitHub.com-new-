@@ -16,7 +16,7 @@ namespace DayZero.Runtime
 {
     public sealed partial class GameUI
     {
-        const float VH = 720f;          // virtual height (Godot viewport 1280x720)
+        static float VH => 720f / GameSettings.UiScale;   // virtual height (Godot viewport 1280x720); v0.18 UI scale (GameSettings.cs)
         const float TAB_H = 52f;
 
         static readonly string[] RES_KEYS = { "food", "water", "meds", "ammo", "fuel" };
@@ -907,6 +907,7 @@ namespace DayZero.Runtime
         /// <summary>MENU: GAME card (save / load / title) and SETTINGS card (sound, volume wheel, film look, help).</summary>
         void DrawMenu(Rect r)
         {
+            if (DrawSettingsSheet(r)) return;   // v0.18 SETTINGS sheet (GameUI.Settings.cs)
             var cols = UiLayout.Columns(new Rect(r.x, r.y, r.width, Mathf.Min(r.height, 430f)), 10f, 1f, 1.25f);
             var gc = UiKit.Panel(cols[0], "Game");
             var G2 = new UiLayout(gc, 12f);
@@ -930,9 +931,7 @@ namespace DayZero.Runtime
                 int pick = UiWheel.Horizontal("ui_volume", v[1], VOL_ITEMS, cur, 5, 18);
                 if (pick >= 0 && pick != cur) { sfx.Volume = Math.Round(pick / 10.0, 1); sfx.SaveSettings(); }
             }
-            var fl = UiLayout.Columns(S.Top(62f), 12f, 1f, -220f);
-            UiKit.FitLabel(fl[0], "FILM LOOK", 20, TextAnchor.MiddleLeft, UiKit.Ink);
-            if (KBtn(fl[1], FxView.Film ? "ON" : "OFF", FxView.Film ? UiRole.Primary : UiRole.Neutral, FxView.Film)) FxView.SetFilmLook(!FxView.Film);
+            if (KBtn(S.Top(62f), "MORE SETTINGS", UiRole.Accent)) OpenSettings();   // graphics, film look, battery, vibration, UI size
             UiKit.Divider(S.Top(8f));
             UiKit.Paragraph(S.Rest, "Drag to pan the map, pinch to zoom, twist with two fingers to rotate. Survivors work on their own: set jobs, answer events and control time.", 16);
         }

@@ -529,7 +529,7 @@ namespace DayZero.Runtime
         {
             var go = new GameObject(name);
             go.transform.SetParent(_root.transform, false);
-            if (!overgrown) FxOvergrowth.Apply(ch.Mesh, OvergrowthLevel(), name.EndsWith("LOD0"));   // v0.16 spreading overgrowth (visual only)
+            if (!overgrown) FxOvergrowth.Apply(ch.Mesh, OvergrowthLevel(), name.EndsWith("LOD0") && GameSettings.Vines);   // v0.16 spreading overgrowth (visual only)
             if (ch.Mesh.Count > 0) MakeObject("Mesh", ToMesh(name, ch.Mesh), _objMat, go.transform);
             if (_shadowMat != null && ch.Shadow != null && ch.Shadow.Count > 0) MakeObject("Shadows", ToMesh(name + " shadows", ch.Shadow), _shadowMat, go.transform);
             return go;
@@ -570,7 +570,8 @@ namespace DayZero.Runtime
         // area + one chunk ring. The cache is invalidated wherever chunks were force-rebuilt before (new map,
         // camp founded -> SetCamps/ruins, overgrowth step). Output is bit-identical to a main-thread build
         // (checked by the preview harness: --chunkbench).
-        const int LOD0_CACHE = 24, LOD0_ACTIVE_MAX = 12;
+        const int LOD0_CACHE = 24;
+        static int LOD0_ACTIVE_MAX => GameSettings.Lod0Active;   // v0.18 graphics quality (12 HIGH, 8 LOW)
         const long LOD0_CACHE_VERTS = 3000000;
         readonly Dictionary<int, int> _lod0Seen = new Dictionary<int, int>();    // chunk -> frame last shown
         readonly Dictionary<int, int> _lod0Verts = new Dictionary<int, int>();
@@ -679,7 +680,7 @@ namespace DayZero.Runtime
             var mv = _focus - _prevFocus; _prevFocus = _focus; mv.y = 0f;
             _panDir = Vector3.Lerp(_panDir, mv, 0.2f);
 
-            WantedLod0(_want, Vector3.zero, 0f, 9, LOD0_MAX_DIST);
+            WantedLod0(_want, Vector3.zero, 0f, GameSettings.Lod0Want, LOD0_MAX_DIST);
             WantedLod0(_keepRing, Vector3.zero, CH, 25, LOD0_MAX_DIST * 1.2f);   // hysteresis: one chunk ring further, a bit further out
             // show wanted chunks; keep already-shown ones inside the ring while under the active budget
             int active = 0;
@@ -708,14 +709,14 @@ namespace DayZero.Runtime
                 {
                     if (next < 0 && _panDir.sqrMagnitude > 0.0004f)
                     {
-                        WantedLod0(_pre, _panDir.normalized * CH, 0f, 9, LOD0_MAX_DIST);
+                        WantedLod0(_pre, _panDir.normalized * CH, 0f, GameSettings.Lod0Want, LOD0_MAX_DIST);
                         for (int i = 0; i < _pre.Count && next < 0; i++) if (!_lod0.ContainsKey(_pre[i])) next = _pre[i];
                     }
                     if (next >= 0)
                     {
-                        var gen = _wgen; var lots = _buckets[next]; int cx = next % _ncx, cy = next / _ncx; float og = OvergrowthLevel();
+                        var gen = _wgen; var lots = _buckets[next]; int cx = next % _ncx, cy = next / _ncx; float og = OvergrowthLevel(); bool vn = GameSettings.Vines;
                         _jobC = next; _jobVer = _lod0Ver;
-                        _job = System.Threading.Tasks.Task.Run(() => { var ch = gen.BuildChunk(cx, cy, lots, 0); FxOvergrowth.Apply(ch.Mesh, og, true); return ch; });
+                        _job = System.Threading.Tasks.Task.Run(() => { var ch = gen.BuildChunk(cx, cy, lots, 0); FxOvergrowth.Apply(ch.Mesh, og, vn); return ch; });
                     }
                 }
                 else if (next >= 0 && !uploaded && (_wgenFailed || _wgenTask != null)) MakeLod0(next);   // worker not up (yet): old synchronous path
@@ -795,6 +796,7 @@ namespace DayZero.Runtime
             r.receiveShadows = false;
             r.lightProbeUsage = LightProbeUsage.Off;
             r.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            if (mat != null && mat == _shadowMat) r.enabled = GameSettings.Shadows;   // v0.18 settings
             return go;
         }
 

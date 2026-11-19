@@ -52,11 +52,12 @@ namespace DayZero.Runtime
 
             if (Time.frameCount - _filmCheckFrame > 30) { _filmCheckFrame = Time.frameCount; Film = PlayerPrefs.GetInt(PREF_FILM, 1) != 0; }
             Frame = Time.frameCount;
-            FxLights.Tick(cam, g, s.Lights);   // night light pools around fires / towers / lit lots
-            FxFires.Tick(cam, g, s.Lights);    // burning buildings + smoke columns (idea #7)
-            FxCrows.Tick(cam, g);              // crows that scatter from zombies + blowing paper (idea #11)
+            if (GameSettings.Shadows) FxLights.Tick(cam, g, s.Lights);   // night light pools around fires / towers / lit lots
+            if (GameSettings.Fires) FxFires.Tick(cam, g, s.Lights);    // burning buildings + smoke columns (idea #7)
+            if (GameSettings.Crows) FxCrows.Tick(cam, g);              // crows that scatter from zombies + blowing paper (idea #11)
             FxDamageReadout.Tick(cam, g);      // soot / sparks / flames / wrench on damaged own defences (idea #14)
             FxWeatherView.Tick(g); FxMuzzle.Tick(cam, g);   // rain / snow / lightning, gunfire glow + tracer streaks
+            if (!GameSettings.Weather) FxWeatherView.Frame = -10;   // v0.18 settings: weather particles off (sim weather still synced)
             FxColonyBanner.Tick(cam, g);      // colony name on the wall, roof flag, day tally board (idea #15)
             if (_ov == null)
             {
