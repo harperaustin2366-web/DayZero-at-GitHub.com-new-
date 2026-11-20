@@ -6,9 +6,14 @@
 //   * survivor groups waiting for rescue (S.Groups "wait"): a small green pin; tap opens their SOS sheet
 //   * wrecks: tap opens the wreck sheet (TOW TO GARAGE); a squad on a tow job shows its progress
 // The layer is parented to the static map root so it hides / goes away with it. Nothing here changes the sim.
+// v0.19.2: an SOS pin goes the moment its group stops waiting (rescued, lost, gone) and an open SOS sheet for it
+// closes; while a task force is on the way the pin turns blue (TEAM ON THE WAY), and with every bed taken it turns
+// grey (NO BEDS: a rescue would leave them behind). Looted buildings get a painted X on the roof (MapGen.Marks.cs),
+// one shared mesh rebuilt when the looted set changes (UpdateLootMarks).
 using System.Collections.Generic;
 using DayZero.Core;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace DayZero.Runtime
 {
@@ -20,7 +25,10 @@ namespace DayZero.Runtime
         {
             public MarkKind Kind; public int Id; public string Cid;
             public Vector3 World; public Color Col; public string Label, Sub; public float Frac;
+            public int St;   // Group: MapGen.SOS_OPEN / SOS_TEAM / SOS_NOBEDS
         }
+
+        public static readonly Color SOS_GREEN = new Color(0.36f, 0.8f, 0.34f), SOS_BLUE = new Color(0.36f, 0.6f, 0.86f), SOS_GREY = new Color(0.55f, 0.55f, 0.5f);
 
         GameObject _worldGo; Mesh _worldMesh, _worldShadowMesh; string _worldKey = ""; float _worldT;
         readonly List<WorldMark> _marks = new List<WorldMark>();
@@ -32,6 +40,8 @@ namespace DayZero.Runtime
         {
             var g = G;
             if (!Ready || _gen == null || _root == null || g?.S == null) return;
+            if (SelectedGroup >= 0 && MapGen.SosPin(g.GroupById(SelectedGroup), -1) == MapGen.SOS_NONE) SelectedGroup = -1;   // rescued / gone: sheet and ring go too
+            UpdateLootMarks(g);
             if (_worldGo == null) _worldKey = "";   // destroyed with the map root on a rebuild
             _worldT -= Time.unscaledDeltaTime;
             if (_worldT > 0f && _worldKey != "") return;
@@ -54,6 +64,40 @@ namespace DayZero.Runtime
             var ch = _gen.BuildWorldLayer(g, SelectedWreck);
             if (ch.Mesh.Count > 0) { _worldMesh = ToMesh("Colonies", ch.Mesh); MakeObject("Colonies", _worldMesh, _objMat, _worldGo.transform); }
             if (_shadowMat != null && ch.Shadow.Count > 0) { _worldShadowMesh = ToMesh("Colonies shadows", ch.Shadow); MakeObject("Colonies shadows", _worldShadowMesh, _shadowMat, _worldGo.transform); }
+        }
+
+        // ---------------- looted roofs: painted X (v0.19.2) ----------------
+        GameObject _lootGo; Mesh _lootMesh; readonly MeshData _lootMd = new MeshData(); int _lootKey; float _lootT;
+
+        static int LootWidthBucket(float dist) => dist < 35f ? 0 : dist < 70f ? 1 : dist < 120f ? 2 : 3;
+        static readonly float[] LOOT_W = { 1f, 1.45f, 2.1f, 2.9f };
+
+        /// <summary>Rebuilds the looted-roof X layer when the looted set (or the zoom bucket) changed; checked 3x a second,
+        /// allocation-free when nothing changed. One mesh, the map material, no shadows.</summary>
+        void UpdateLootMarks(Game g)
+        {
+            if (_lootGo == null) _lootKey = 0;   // destroyed with the map root on a rebuild
+            _lootT -= Time.unscaledDeltaTime;
+            if (_lootT > 0f && _lootGo != null) return;
+            _lootT = 0.33f;
+            int wb = LootWidthBucket(_dist);
+            int key = _gen.LootMarkKey(g, wb);
+            if (key == _lootKey && _lootGo != null) return;
+            _lootKey = key;
+            _gen.BuildLootMarks(g, _lootMd, LOOT_W[wb]);
+            if (_lootGo == null)
+            {
+                if (_lootMesh != null) Destroy(_lootMesh);
+                _lootMesh = new Mesh { name = "Looted roofs" };
+                _lootMesh.MarkDynamic();
+                _lootGo = MakeObject("Looted roofs", _lootMesh, _objMat, _root.transform);
+            }
+            _lootMesh.Clear();
+            if (_lootMd.V.Count > 65000) _lootMesh.indexFormat = IndexFormat.UInt32;
+            _lootMesh.SetVertices(_lootMd.V);
+            _lootMesh.SetColors(_lootMd.C);
+            _lootMesh.SetTriangles(_lootMd.T, 0);
+            _lootMesh.RecalculateBounds();
         }
 
         static string StanceWord(Game g, Camp c)
@@ -85,12 +129,18 @@ namespace DayZero.Runtime
                 if (g.C != null && g.C.Pacts.Contains(c.Id)) att = "Friendly";
                 _marks.Add(new WorldMark { Kind = MarkKind.Camp, Cid = c.Id, World = Geo.W(lc, top), Col = MapGen.StanceColor(att), Label = c.Name, Sub = StanceWord(g, c) + " - " + c.Pop + " people" });
             }
-            if (g.S.Groups != null)
+            if (g.S.Groups != null && g.S.Groups.Count > 0)
+            {
+                int beds = g.C != null ? g.BedsFree() : -1;
                 foreach (var gr in g.S.Groups)
                 {
-                    if (gr.St != "wait") continue;
-                    _marks.Add(new WorldMark { Kind = MarkKind.Group, Id = gr.Id, World = Geo.W(new Vector2(gr.Pos.x + 0.5f, gr.Pos.y + 0.5f), 0.95f), Col = new Color(0.36f, 0.8f, 0.34f), Label = gr.Label, Sub = gr.N + " to rescue" });
+                    int st = MapGen.SosPin(gr, beds);
+                    if (st == MapGen.SOS_NONE) continue;   // rescued / lost / gone: no pin anywhere
+                    _marks.Add(new WorldMark { Kind = MarkKind.Group, Id = gr.Id, St = st, World = Geo.W(new Vector2(gr.Pos.x + 0.5f, gr.Pos.y + 0.5f), 0.95f),
+                        Col = st == MapGen.SOS_TEAM ? SOS_BLUE : st == MapGen.SOS_NOBEDS ? SOS_GREY : SOS_GREEN, Label = gr.Label,
+                        Sub = st == MapGen.SOS_TEAM ? "TEAM ON THE WAY" : st == MapGen.SOS_NOBEDS ? gr.N + " waiting - NO BEDS" : gr.N + " to rescue" });
                 }
+            }
             if (g.S.Wrecks != null)
                 foreach (var w in g.S.Wrecks)
                 {

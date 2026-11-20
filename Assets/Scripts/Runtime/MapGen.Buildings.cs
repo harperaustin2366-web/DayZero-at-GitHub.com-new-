@@ -509,7 +509,22 @@ namespace DayZero.Runtime
                     g.Flat(info.Lot.Inset(0.05f).Quad(), PAVE_Y + 0.002f, Lerp(ASPH, ASPH_DARK, 0.4f)); return;
                 case Arch.Farm:
                     g.Flat(info.Lot.Inset(0.1f).Quad(), PAVE_Y, Hex("#5a4a36")); return;
-                case Arch.House: case Arch.Hut: case Arch.Barn: case Arch.Church:
+                case Arch.Church:
+                {
+                    // v0.19.2: the near nave + tower massing (was one big gable over the lot: the near roof, and the
+                    // looted-roof X on it, sat under it)
+                    if (R.Hu < R.Hv) R = new ORect(R.C, R.V, R.Hv, R.Hu);
+                    var nave = new ORect(R.At(R.Hu * 0.15f, 0f), R.U, R.Hu * 0.85f, R.Hv * 0.75f);
+                    g.Box(nave.Quad(), 0f, info.WallTop, info.Wall, info.Wall, 0.3f, false);
+                    g.Gable(nave, info.WallTop, info.WallTop + nave.Hv * 1.2f, info.Roof, info.Wall, 0.08f, 1);
+                    var tw = new ORect(R.At(-R.Hu + 0.38f, 0f), R.U, 0.36f, 0.36f);
+                    g.Box(tw.Quad(), 0f, 3.2f, info.Wall, info.Wall, 0.3f);
+                    g.Pyramid(tw.Inset(-0.04f).Quad(), 3.2f, tw.C, 4.6f, info.Roof);
+                    g.Shadow(nave.Quad(), info.WallTop + 0.5f, 0.34f);
+                    g.Shadow(tw.Quad(), 3.6f, 0.34f);
+                    return;
+                }
+                case Arch.House: case Arch.Hut: case Arch.Barn:
                 {
                     if (R.Hu < R.Hv) R = new ORect(R.C, R.V, R.Hv, R.Hu);
                     if (info.Dmg == 3) { LoShell(g, R, info.WallTop * 0.55f, Lerp(info.Wall, CHAR, 0.7f)); return; }
@@ -524,6 +539,25 @@ namespace DayZero.Runtime
                     if (info.A != Arch.Gas) Yard(g, l, info.Lot.Inset(0.06f), info.A == Arch.Industrial ? Hex("#615c50") : Hex("#6c675a"));
                     if (info.Dmg == 3) { LoShell(g, R, info.WallTop * 0.55f, info.Wall); return; }   // v0.19 audit: hollow like the near shell
                     float H = info.WallTop;
+                    // v0.19.2: gas station = shop + canopy, warehouse = shallow gable, like the near LOD (the looted-roof X
+                    // follows the near roof, so the far massing must not swallow it)
+                    if (info.A == Arch.Gas)
+                    {
+                        var shop = R.Sub(-1f, -0.2f, -1f, 0.2f); var can = R.Sub(0.0f, 1f, -0.9f, 0.9f);
+                        g.Box(shop.Quad(), 0f, 0.95f, Hex("#7a7468"), FLATROOF, 0.25f);
+                        g.Box(can.Quad(), 1.25f, 1.45f, Hex("#a8a49a"), Hex("#8a8678"));
+                        g.Shadow(can.Quad(), 1.45f, 0.3f);
+                        return;
+                    }
+                    if (info.A == Arch.Industrial && d.Lots[l].Kind != "supermarket")
+                    {
+                        if (R.Hu < R.Hv) R = new ORect(R.C, R.V, R.Hv, R.Hu);
+                        float ridge = H + R.Hv * 0.22f;
+                        g.Box(R.Quad(), 0f, H, info.Wall, info.Wall, 0.3f, false);
+                        g.Gable(R, H, ridge, Lerp(info.Roof, RUST, Hf(l, 20) * 0.4f), info.Wall, 0.06f, 1);
+                        g.Shadow(R.Quad(), (H + ridge) * 0.5f, 0.36f);
+                        return;
+                    }
                     g.Box(R.Quad(), 0f, H, info.Wall, info.Dmg == 3 ? INTERIOR : info.Roof, 0.3f);
                     g.Shadow(R.Quad(), H + 0.17f, 0.36f);
                     return;

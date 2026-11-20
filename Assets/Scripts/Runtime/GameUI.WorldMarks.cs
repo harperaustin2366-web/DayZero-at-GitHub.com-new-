@@ -1,7 +1,9 @@
 // v0.14.0a: floating map markers (MapView.World.cs gathers them, MapView taps them):
 //   * faction camps: a pin in the stance colour (hostile red, neutral amber, friendly green) with a flag, the
 //     camp name and its stance, readable zoomed all the way out
-//   * survivors waiting for rescue: a small green pin with a person, so the player can find them
+//   * survivors waiting for rescue: a small green pin with a person, so the player can find them (v0.19.2: gone the
+//     moment they are rescued / lost; blue "TEAM ON THE WAY" while a task force heads there; grey "NO BEDS" when every
+//     bed is taken)
 //   * wrecks: a jerrycan marker (own lost vehicles green), and a tow job's progress bar over the squad
 // Also keeps the camps / wrecks world layer current (MapView.UpdateWorldLayer).
 // v0.17: labels are planned first (PlanMarks, from DrawMapLabels, through the shared LabelPlacer): a camp name, SOS or
@@ -107,7 +109,7 @@ namespace DayZero.Runtime
                         case MapView.MarkKind.Group:
                         {
                             mp.UnderHud = _lp.UnderHud(new Rect(v.x - 17f, v.y - 34f, 34f, 34f));
-                            if (dist < 45f || map.SelectedGroup == m.Id) { mp.NameR = LabelRect(v.x, v.y + 1f, "SOS - " + m.Sub, 12, 16f); mp.Name = !mp.UnderHud && _lp.Place(mp.NameR); }
+                            if (dist < 45f || map.SelectedGroup == m.Id) { mp.NameR = LabelRect(v.x, v.y + 1f, SosText(m), 12, 16f); mp.Name = !mp.UnderHud && _lp.Place(mp.NameR); }
                             break;
                         }
                         case MapView.MarkKind.Tow:
@@ -127,6 +129,8 @@ namespace DayZero.Runtime
                     _markPlan.Add(mp);
                 }
         }
+
+        static string SosText(MapView.WorldMark m) => m.St == MapGen.SOS_OPEN ? "SOS - " + m.Sub : m.Sub;
 
         Rect LabelRect(float cx, float y, string t, int size, float h)
         {
@@ -164,12 +168,13 @@ namespace DayZero.Runtime
                         }
                         case MapView.MarkKind.Group:
                         {
-                            float s = (dist > 90f ? 22f : dist > 45f ? 28f : 34f) * (map.SelectedGroup == m.Id ? 1.25f : 1f);
+                            bool open = m.St == MapGen.SOS_OPEN, nobeds = m.St == MapGen.SOS_NOBEDS;
+                            float s = (dist > 90f ? 22f : dist > 45f ? 28f : 34f) * (map.SelectedGroup == m.Id ? 1.25f : 1f) * (nobeds ? 0.85f : 1f);
                             var r = new Rect(v.x - s / 2, v.y - s * 1.02f, s, s);
-                            var gc = m.Col; gc.a = pulse * GUI.color.a;
+                            var gc = m.Col; gc.a = (open ? pulse : nobeds ? 0.75f : 1f) * GUI.color.a;   // only an open SOS pulses
                             DrawTex(r, _pinTex, gc);
-                            DrawTex(new Rect(r.x + s * 0.24f, r.y + s * 0.08f, s * 0.52f, s * 0.52f), _personTex, new Color(1f, 1f, 1f, 0.95f * GUI.color.a));
-                            if (mp.Name) UiKit.FitLabel(mp.NameR, "SOS - " + m.Sub, 12, TextAnchor.MiddleCenter, new Color(0.62f, 0.95f, 0.55f, 0.95f), true, 10);
+                            DrawTex(new Rect(r.x + s * 0.24f, r.y + s * 0.08f, s * 0.52f, s * 0.52f), _personTex, new Color(1f, 1f, 1f, (nobeds ? 0.7f : 0.95f) * GUI.color.a));
+                            if (mp.Name) UiKit.FitLabel(mp.NameR, SosText(m), 12, TextAnchor.MiddleCenter, open ? new Color(0.62f, 0.95f, 0.55f, 0.95f) : nobeds ? new Color(0.78f, 0.77f, 0.7f, 0.9f) : new Color(0.62f, 0.8f, 1f, 0.95f), true, 10);
                             break;
                         }
                         case MapView.MarkKind.Tow:
