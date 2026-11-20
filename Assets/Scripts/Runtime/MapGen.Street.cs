@@ -48,6 +48,7 @@ namespace DayZero.Runtime
                     var jit = new Vector2(Hf(k, 902) - 0.5f, Hf(k, 903) - 0.5f) * (CELL * 0.6f);
                     var p = ctr + jit;
                     if (ClearedRect(new ORect(p, GU, 0.4f, 0.4f))) continue;
+                    if (InBuilding(p, 0.25f) || !DryAt(p, 0.3f) || ClsAt(p) == C_BRIDGE) continue;   // v0.19 audit: not in walls, on the bank edge or on a bridge
                     float an = Hf(k, 904) * 6.2832f; var dir = new Vector2(Mathf.Cos(an), Mathf.Sin(an));
                     float gy = GroundY(p);
                     int salt = (int)(k & 0x7fffffff);

@@ -24,6 +24,7 @@ namespace DayZero.Runtime
                     if (r > 0.4f) continue;
                     var p = new Vector2(x + 0.15f + Hf(x, y * 7 + 1) * 0.7f, y + 0.15f + Hf(x * 11 + 2, y) * 0.7f);
                     if (_clear.Count > 0 && Cleared(p)) continue;
+                    if (t == Data.T_BLD && InBuilding(p, 0.25f)) continue;   // v0.19 audit: not inside a neighbour's walls either
                     int salt = y * 4099 + x;
                     if (InCity(p.x, p.y))
                     {
@@ -48,8 +49,10 @@ namespace DayZero.Runtime
                             case Data.T_ROAD: case Data.T_AVE: case Data.T_BRIDGE: break;
                             default: tree = 0.05f; bush = 0.1f; break;
                         }
+                        int vt = g.M.V.Count;
                         if (r < tree) { if (lo) LoTree(g, p, salt); else Tree(g, p, salt, 0.85f + Hf(salt, 3) * 0.3f, false); }
                         else if (r < bush && !lo) Bush(g, p, salt);
+                        SinkToGround(g, vt, p);   // v0.19 audit: riverside trees stand on the bank slope
                     }
                     else
                     {
@@ -67,8 +70,10 @@ namespace DayZero.Runtime
                             int l = d.LotId[y * d.W + x];
                             if (l >= 0 && l < _info.Length && _info[l].Valid && _info[l].R.Contains(p, 0.25f)) continue;
                         }
+                        int vt = g.M.V.Count;
                         if (r < tree) { if (lo) LoTree(g, p, salt); else ForestTree(g, p, salt); }
                         else if (r < bush && !lo) Bush(g, p, salt);
+                        SinkToGround(g, vt, p);
                     }
                 }
         }
@@ -126,6 +131,7 @@ namespace DayZero.Runtime
             if (Hf(salt, 73) < 0.5f)
             {
                 Color c = Lerp(CONIFER, Hex("#24301e"), Hf(salt, 74) * 0.5f);
+                g.Beam(Geo.W(p, 0f), Geo.W(p, H * 0.2f), 0.045f, BARK);   // v0.19 audit: the skirt no longer hovers without a trunk
                 g.Cone(p, R * 0.8f, H * 0.15f, H * 0.68f, c, salt * 0.3f, 5);
                 g.Cone(p, R * 0.55f, H * 0.45f, H, Mul(c, 1.08f), salt * 0.3f + 0.6f, 5);
             }
@@ -269,6 +275,7 @@ namespace DayZero.Runtime
             }
             var c = CellC(i, j);
             if (_clear.Count > 0 && Cleared(c)) return;
+            if (InBuilding(c, 0.12f) || !DryAt(c, 0.3f)) return;   // v0.19 audit: sidewalks run under facades and along the bank
             long hs = (long)i * 6151 + j * 3079;
             if (rd == 0)
             {
@@ -290,7 +297,7 @@ namespace DayZero.Runtime
                 Vector2 dir = rd == 1 ? GU : GV;
                 PowerPole(g, c - toRoad * 0.15f, dir, (int)(hs & 0xffff));
                 int ai = rd == 1 ? i + 12 : i, aj = rd == 1 ? j : j + 12;
-                if (Cls(ai, aj) == C_SIDE && Hf(hs, 9) > 0.15f)
+                if (Cls(ai, aj) == C_SIDE && Hf(hs, 9) > 0.15f && !InBuilding(CellC(ai, aj), 0.12f) && DryAt(CellC(ai, aj), 0.3f))
                 {
                     var c2 = CellC(ai, aj) - toRoad * 0.15f;
                     var side = new Vector2(-dir.y, dir.x);

@@ -145,6 +145,62 @@ namespace DayZero.Runtime
             return _wet.Count == 0 ? r : new ORect(r.C, r.U, 0f, 0f);
         }
 
+        /// <summary>v0.19 map audit: p lies inside a drawn building footprint (grown by pad), checked against the lots of
+        /// the 3x3 tiles around it. Props, clutter, street furniture and trees use it to stay out of walls.</summary>
+        bool InBuilding(Vector2 p, float pad = 0.06f, int except = -1)
+        {
+            int tx = Mathf.FloorToInt(p.x), ty = Mathf.FloorToInt(p.y), last = -2;
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    int x = tx + dx, y = ty + dy;
+                    if (x < 0 || y < 0 || x >= d.W || y >= d.H) continue;
+                    int l = d.LotId[y * d.W + x];
+                    if (l < 0 || l == last || l == except || l >= _info.Length) continue;
+                    last = l;
+                    var i = _info[l];
+                    if (!i.Valid || i.Floors <= 0 || i.R.Hu < 0.05f) continue;
+                    if (i.R.Contains(p, pad)) return true;
+                }
+            return false;
+        }
+
+        /// <summary>Height of the LOD0 ground mesh at p (AddGround: banks dip toward the water; 0 elsewhere).</summary>
+        float GroundH(Vector2 p)
+        {
+            int x = Mathf.FloorToInt(p.x), y = Mathf.FloorToInt(p.y);
+            float fx = p.x - x, fy = p.y - y;
+            float VH(int vx, int vy)
+            {
+                int w = 0;
+                for (int k = 0; k < 4; k++) if (TileAt(vx - 1 + (k & 1), vy - 1 + (k >> 1)) == Data.T_WATER) w++;
+                return w == 0 ? 0f : -0.03f - 0.27f * (w / 4f);
+            }
+            float a = VH(x, y), b = VH(x + 1, y), c = VH(x + 1, y + 1), e = VH(x, y + 1);
+            if (a == 0f && b == 0f && c == 0f && e == 0f) return 0f;
+            // triangles (a,b,c) and (a,c,e) as AddGround splits the quad
+            return fx >= fy ? a + (b - a) * fx + (c - b) * fy : a + (c - e) * fx + (e - a) * fy;
+        }
+
+        /// <summary>Drops the vertices added since v0 by the ground height at p (trees / bushes on a sloping bank).</summary>
+        void SinkToGround(Geo g, int v0, Vector2 p)
+        {
+            float h = GroundH(p);
+            if (h == 0f) return;
+            for (int i = v0; i < g.M.V.Count; i++) { var v = g.M.V[i]; g.M.V[i] = new Vector3(v.x, v.y + h, v.z); }
+        }
+
+        /// <summary>v0.19 map audit: no water / pier tile within r of p (props stay off the river and its bank edge).</summary>
+        bool DryAt(Vector2 p, float r = 0.2f)
+        {
+            for (int k = 0; k < 5; k++)
+            {
+                var q = k == 0 ? p : p + new Vector2(k == 1 ? r : k == 2 ? -r : 0f, k == 3 ? r : k == 4 ? -r : 0f);
+                if (Wet(TileAt(Mathf.FloorToInt(q.x), Mathf.FloorToInt(q.y)))) return false;
+            }
+            return true;
+        }
+
         /// <summary>Last resort for small shoreline lots: the footprint scaled down about the centre of the lot's land tiles
         /// until it is dry (keeps a building where the sim has one).</summary>
         ORect ShrinkToLand(int l, ORect r, float m)

@@ -124,6 +124,7 @@ namespace DayZero.Runtime
                     }
                 }
             SnapRoads();
+            TrimWetRoads();
             // runs of road cells along u (rows) and v (columns)
             runU = new short[nu * nv]; posU = new short[nu * nv]; runV = new short[nu * nv]; posV = new short[nu * nv];
             for (int j = 0; j < nv; j++)
@@ -159,7 +160,7 @@ namespace DayZero.Runtime
                             var c = CellC(ii, jj);
                             if (!InCity(c.x, c.y)) continue;
                             int t = TileAtF(c.x, c.y);
-                            if (t == Data.T_WATER || t == Data.T_PIER) continue;
+                            if (t == Data.T_WATER || t == Data.T_PIER || !CellDry(c)) continue;   // v0.19 audit: no sidewalk slab over the water
                             cls[jj * nu + ii] = C_SIDE;
                         }
                 }
@@ -176,6 +177,36 @@ namespace DayZero.Runtime
                     for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) if (TileAt(tx + dx, ty + dy) == Data.T_PLAZA) n++;
                     if (n >= 6) cls[j * nu + i] = C_PLAZA;
                 }
+        }
+
+        /// <summary>v0.19 map audit: road cells that hang over the river bank (centre on land, a corner over water) are
+        /// dropped, except next to a bridge deck, so asphalt ends at the waterline instead of floating over it.</summary>
+        void TrimWetRoads()
+        {
+            var drop = new List<int>();
+            for (int j = 0; j < nv; j++)
+                for (int i = 0; i < nu; i++)
+                {
+                    if (cls[j * nu + i] != C_ROAD || CellDry(CellC(i, j))) continue;
+                    bool nearBridge = false;
+                    for (int dj = -3; dj <= 3 && !nearBridge; dj++)
+                        for (int di = -3; di <= 3; di++)
+                            if (Cls(i + di, j + dj) == C_BRIDGE) { nearBridge = true; break; }
+                    if (!nearBridge) drop.Add(j * nu + i);
+                }
+            foreach (int k in drop) cls[k] = C_NONE;
+        }
+
+        /// <summary>v0.19 map audit: all four corners of the 0.5-tile cell centred at c are on dry tiles.</summary>
+        bool CellDry(Vector2 c)
+        {
+            for (int k = 0; k < 4; k++)
+            {
+                var q = c + GU * ((k & 1) == 0 ? -0.24f : 0.24f) + GV * ((k >> 1) == 0 ? -0.24f : 0.24f);
+                int t = TileAtF(q.x, q.y);
+                if (t == Data.T_WATER || t == Data.T_PIER) return false;
+            }
+            return true;
         }
 
         /// <summary>Straighten road edges: every cross-section of a street (a short run of road cells
@@ -582,7 +613,7 @@ namespace DayZero.Runtime
                 else { a = CellP(i, j + 1); b = CellP(i + 1, j + 1); }
                 var outDir = Geo.OutDir(a, b, CellC(i, j));
                 if (Roadish(nc)) g.Wall(a, b, outDir, ROAD_Y, SW_Y, CURB);
-                else g.Wall(a, b, outDir, -0.01f, SW_Y, Mul(WALK2, 0.85f));
+                else g.Wall(a, b, outDir, Mathf.Min(-0.01f, Mathf.Min(GroundH(a), GroundH(b)) - 0.02f), SW_Y, Mul(WALK2, 0.85f));   // down the bank where the ground dips
             }
             StreetFurniture(g, i, j);
         }

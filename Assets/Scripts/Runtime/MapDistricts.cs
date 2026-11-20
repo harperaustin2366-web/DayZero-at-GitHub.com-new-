@@ -121,6 +121,7 @@ namespace DayZero.Runtime
                 if (x < 0 || y < 0 || x >= d.W || y >= d.H) continue;
                 int t = d.Tiles[y * d.W + x], ol = d.LotId[y * d.W + x];
                 if (t == Data.T_WATER || t == Data.T_VOID || (ol >= 0 && ol != l)) continue;
+                if (InBuilding(p, 0.3f) || !DryAt(p, 0.45f) || ClsAt(p) == C_BRIDGE) continue;   // v0.19 audit: props scale up 1.4-1.6x
                 bool near = false; foreach (var u in used) if ((u - p).sqrMagnitude < (mode == 1 ? 1.6f : 0.4f)) { near = true; break; }
                 if (near) continue;
                 used.Add(p);
