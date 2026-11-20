@@ -342,6 +342,7 @@ namespace DayZero.Core
         public int Lord = -1;
         public ODict<string, double> Owed = new ODict<string, double>();
         public int? DefeatedBy;
+        public LeaderMind Mind;   // EXPANDED: the leader's mind (LeaderBrain.cs); null in classic runs, skipped in saves when null
         public List<string> List(string which) => which == "needs" ? Needs : (which == "surplus" ? Surplus : new List<string>());
     }
 

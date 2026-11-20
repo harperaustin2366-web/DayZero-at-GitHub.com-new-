@@ -22,6 +22,7 @@ namespace DayZero.Runtime
     public sealed partial class SideMenuState
     {
         public int WPage, WRPage;        // WAR: army list page, battle report page
+        public string LeaderCamp = "";   // faction sheet showing the LEADER page for this camp id (EXPANDED)
     }
 
     public static partial class SideMenus
@@ -95,8 +96,12 @@ namespace DayZero.Runtime
             string att = g.CampAttitude(cp);
             bool hostile = g.FactionHostile(cp);
             bool pact = g.C.Pacts.Contains(cp.Id);
+            var mind = g.LeaderOf(cp);   // EXPANDED: the leader's mind (LeaderBrain.cs), null otherwise
+            if (mind != null && c.St.LeaderCamp == cid) { LeaderPage(c, cp, mind, tcol, close, pw); return; }
             lines.Add(new SheetLine { T = string.Format("{0}{1} · led by {2} · {3} people · strength {4} · {5}", att, pact ? " (pact)" : "", cp.Leader, cp.Pop, (int)cp.Str, Data.Instance.DistrictAt(cp.Pos).Name), Size = 15, Col = AttColor(att) });
-            if (!string.IsNullOrEmpty(cp.Desc)) lines.Add(new SheetLine { T = cp.Desc, Size = 14, Col = INK });
+            if (mind != null && !string.IsNullOrEmpty(mind.Plan))
+                lines.Add(new SheetLine { T = string.Format("{0} ({1}): \"{2}\"", cp.Leader, Lower(g.LeaderFeelingText(cp)), mind.Plan), Size = 15, Col = INK });
+            else if (!string.IsNullOrEmpty(cp.Desc)) lines.Add(new SheetLine { T = cp.Desc, Size = 14, Col = INK });
             double tr = cp.Truce.Get(g.CurCol.ToString(), -1.0);
             string rel = string.Format("Relations {0:+0;-0;+0}", (int)g.CampRel(cp));
             if (tr > g.S.T) rel += string.Format(" · paid off for {0:0}h more", tr - g.S.T);
@@ -116,6 +121,7 @@ namespace DayZero.Runtime
             r1.Add(new SheetBtn { T = "GIFT 15 FOOD", Style = "olive", On = true, Click = () => Res(c.Act("camp_gift", new object[] { cid })) });
             if (att == "Friendly")
                 r1.Add(new SheetBtn { T = string.Format("RECRUIT {0}", 2 + (int)g.Rx("recruit_n")), Style = "sel", On = true, Click = () => Res(c.Act("camp_recruit", new object[] { cid })) });
+            if (mind != null) r1.Add(new SheetBtn { T = "LEADER", Sub = "who they are", Style = "sel", On = true, Click = () => c.St.LeaderCamp = cid });
             rows.Add((null, r1));
             var r2 = new List<SheetBtn>();
             if (hostile) r2.Add(new SheetBtn { T = "PAY OFF", Sub = "25 food, 10 ammo", Style = "olive", On = true, Click = () => Res(c.Act("camp_tribute", new object[] { cid })) });
@@ -143,6 +149,29 @@ namespace DayZero.Runtime
                 rows.Add((string.Format("Attack (their power {0}):", (int)g.FactionPower(cp)), r3));
             }
             Sheet(c, cp.Name, tcol, lines, rows, close, pw);
+        }
+
+        /// <summary>EXPANDED: the LEADER page of a faction sheet. Who the leader is, what they are doing and why, how they
+        /// feel about you and what they remember. All text comes from Game.Leader* (LeaderBrain.cs); plain ASCII.</summary>
+        static void LeaderPage(MenuCtx c, Camp cp, LeaderMind m, Color tcol, Action close, float pw)
+        {
+            var g = c.G;
+            var lines = new List<SheetLine>();
+            lines.Add(new SheetLine { T = string.Format("LEADER: {0}  -  {1}", cp.Leader, g.LeaderTraitsText(cp)), Size = 17, Col = GOLD });
+            lines.Add(new SheetLine { T = string.Format("Right now ({0}): \"{1}\"", Lower(g.LeaderFeelingText(cp)), m.Plan), Size = 16, Col = INK });
+            string att = g.CampAttitude(cp);
+            lines.Add(new SheetLine { T = "Toward you: " + g.LeaderMoodToYou(cp, g.ViewCol), Size = 15, Col = AttColor(att) });
+            lines.Add(new SheetLine { T = "Before: " + g.LeaderBackstory(cp), Size = 14, Col = INK2 });
+            lines.Add(new SheetLine { T = g.LeaderValuesText(cp), Size = 14, Col = INK2 });
+            var mem = g.LeaderMemories(cp, 3);
+            if (mem.Count > 0) lines.Add(new SheetLine { T = "Remembers: " + string.Join("  ", mem.Select(x => "\"" + x + "\"")), Size = 14, Col = INK2 });
+            var allies = m.Allies.Select(a => g.CampById(a)).Where(a => a != null && a.Alive).Select(a => a.Name).ToList();
+            if (allies.Count > 0) lines.Add(new SheetLine { T = "Stands with: " + string.Join(", ", allies), Size = 14, Col = GREEN });
+            var rows = new List<(string, List<SheetBtn>)>
+            {
+                (null, new List<SheetBtn> { new SheetBtn { T = "BACK TO CAMP", Style = "sel", On = true, Click = () => c.St.LeaderCamp = "" } }),
+            };
+            Sheet(c, cp.Name, tcol, lines, rows, () => { c.St.LeaderCamp = ""; close?.Invoke(); }, pw);
         }
 
         // ---------------- WAR (main.gd _show_war / _war_army_section / _show_war_report) ----------------

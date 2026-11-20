@@ -296,6 +296,7 @@ namespace DayZero.Core
             C.Res["food"] = R("food") - 15.0;
             AddRel(c, 9.0 * (1.0 + Rx("rel_gain")));
             AddLog(string.Format("Sent 15 food to {0} as a gift.", c.Name), "info");
+            if (ExpansionRules) LeaderEvent(c, CurCol, "gift");   // Expansion: leader memory
             EmitChanged();
             return "";
         }
@@ -321,6 +322,7 @@ namespace DayZero.Core
                 arr.Add(p);
             }
             AddLog(string.Format("Two people from {0} are walking over to join you.", c.Name), "good");
+            if (ExpansionRules) LeaderEvent(c, CurCol, "recruit");   // Expansion: leader memory
             PlaceArrivals(arr, mb.Id);
             EmitChanged();
             return "";
@@ -337,6 +339,7 @@ namespace DayZero.Core
             C.Res["food"] = R("food") - 30.0;
             C.Pacts.Add(cid);
             AddLog(string.Format("Pact signed with {0}: they'll harass hordes heading for your camps and share supplies.", c.Name), "major");
+            if (ExpansionRules) LeaderEvent(c, CurCol, "pact");   // Expansion: leader memory
             EmitChanged();
             return "";
         }
@@ -347,12 +350,14 @@ namespace DayZero.Core
             {
                 if (!c.Alive) continue;
                 double tough = 1.0 - Math.Min(0.6, c.Str / 100.0);
+                if (ExpansionRules) tough *= LeaderGuard(c);   // Expansion: a leader who barred the doors keeps more people alive (same Rng draws)
                 if ((InfAt(c.Pos) > 0.85 && Rng.Randf() < 0.02 * tough) || (S.Phase == "fall" && Rng.Randf() < 0.01 * tough))
                 {
                     c.Alive = false;
                     C?.AddStat("dead", c.Pop);
                     AddLog(string.Format("{0} went silent. The dead took {1}.", c.Name, D.DistrictAt(c.Pos).Name), "loss");
                     for (int i = 0; i < Math.Min(c.Pop, 12); i++) SpawnZombie(Ti(c.Pos), 0);
+                    if (ExpansionRules) LeaderCampFell(c);   // Expansion: the other leaders take it in
                     _factionLotsDirty = true;
                 }
             }
@@ -424,11 +429,11 @@ namespace DayZero.Core
             FactionGrowClaim(c);
         }
 
-        void FactionGrowClaim(Camp c)
+        void FactionGrowClaim(Camp c, int extra = 0)   // extra > 0 only from LeaderBrain (EXPANDED)
         {
             int want = 2 + (int)(c.Pop / 9.0);
             var claim = c.Claim;
-            if (claim.Count >= Math.Min(want, 6)) return;
+            if (claim.Count >= Math.Min(want, 6) + extra) return;
             if (_factionLotsDirty) RefreshFactionLots();
             var c0 = D.LotCenter(c.Lot);
             int best = -1; double bd = 9.0;
@@ -490,6 +495,7 @@ namespace DayZero.Core
                 }
                 Use(ViewCol);
             }
+            if (ExpansionRules) { StepLeaders(); Use(ViewCol); }   // Expansion: rival leaders think (LeaderBrain.cs)
         }
 
         void FactionScavenge(Camp c)
@@ -555,6 +561,7 @@ namespace DayZero.Core
                     if (Rng.Randf() < win)
                     {
                         c.Str = Math.Max(3.0, c.Str - 1.0);
+                        if (ExpansionRules) LeaderEvent(c, CurCol, "ambush_lost");   // Expansion: leader memory
                         AddLog(string.Format("{0} fought off a {1} ambush near {2}.", p.Name, c.Name, D.DistrictAt(V.I(p.Pos)).Name), "info");
                     }
                     else
@@ -563,6 +570,7 @@ namespace DayZero.Core
                         if (p.Hp <= 0.0 || Rng.Randf() < 0.15f) KillPerson(p, string.Format("was shot by {0}", c.Name));
                         else
                         {
+                            if (ExpansionRules) LeaderEvent(c, CurCol, "ambush_won");   // Expansion: leader memory
                             AddLog(string.Format("{0} was hurt in a {1} ambush and is limping home.", p.Name, c.Name), "loss");
                             GoHome(p);
                         }
@@ -589,6 +597,7 @@ namespace DayZero.Core
             if (Defense(target) + Rx("raid_deter") > 18.0 + force)
             {
                 AddLog(string.Format("{0} sized up {1} and thought better of it.", c.Name, target.Name), "info");
+                if (ExpansionRules) LeaderEvent(c, CurCol, "raid_balked");   // Expansion: leader memory
                 return;
             }
             var lost = new ODict<string, double>();
@@ -616,6 +625,7 @@ namespace DayZero.Core
                 hit++;
             }
             AddLog(string.Format("{0} raided {1} and took {2}{3}.", c.Name, target.Name, FmtCost(lost), hit > 0 ? string.Format(" They tore at {0} fence sections.", hit) : ""), "loss");
+            if (ExpansionRules) LeaderEvent(c, CurCol, "raid_won");   // Expansion: leader memory
             PlaySfx("alarm", V.F(target.Pos));
         }
 
@@ -645,6 +655,7 @@ namespace DayZero.Core
                     aarr.Add(np);
                 }
                 AddLog(string.Format("{0} sent two fighters to help you hold the line.", c.Name), "good");
+                if (ExpansionRules) LeaderEvent(c, CurCol, "help_sent");   // Expansion: leader memory
                 PlaceArrivals(aarr, mb.Id);
             }
         }
@@ -661,6 +672,7 @@ namespace DayZero.Core
             C.Cd["parley_" + cid] = S.T + 48.0;
             AddRel(c, 18.0 * (1.0 + Rx("rel_gain")));
             AddLog(string.Format("Talks with {0} went well. Relations are now {1}.", c.Name, CampAttitude(c)), "good");
+            if (ExpansionRules) LeaderEvent(c, CurCol, "parley");   // Expansion: leader memory
             EmitChanged();
             return "";
         }
@@ -675,6 +687,7 @@ namespace DayZero.Core
             c.Stock["food"] = c.Stock.Get("food", 0.0) + 25.0;
             c.Truce[CurCol.ToString()] = S.T + 120.0;
             AddLog(string.Format("Paid {0} off. They'll leave you alone for 5 days.", c.Name), "info");
+            if (ExpansionRules) LeaderEvent(c, CurCol, "tribute");   // Expansion: leader memory
             EmitChanged();
             return "";
         }
