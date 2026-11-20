@@ -4,7 +4,7 @@
 //   top-left   stats card (survivors / beds / zombies / dead, time, phase, colony line)
 //   next to it season / weather chip + noise gauge (expanded rules only)
 //   top centre MENU         top right   ZOMBIES KILLED / RESCUED counters, resource chips under them
-//   left       HOME + - MAP DANGER column      bottom centre  PAUSE x1 +1h +6h segmented control
+//   left       HOME + - MAP DANGER column      bottom centre  PAUSE x1 +1h +6h segmented control (rules: TimeCtl)
 // Other HUD owners keep their own spots: banners start at BannerY (centre), right-side panels at y 108, bottom sheets
 // end above y = h - 72 (TimeBar starts at h - 70).
 using UnityEngine;
@@ -86,6 +86,50 @@ namespace DayZero.Runtime
             foreach (var c in Chips) into.Add(c);
             foreach (var c in Cam) into.Add(c);
             into.Add(TimeBar);
+        }
+    }
+
+    /// <summary>v0.19.2 time control rules (pure: GameUI and Bootstrap drive it, the offline preview replays it).
+    /// Pausing is only ever the player's PAUSE tap, and every way back is obvious:
+    /// * PLAY resumes at the current speed; the speed button and +1h / +6h also resume (a paused game answering x2 /
+    ///   x4 with nothing happening read as "the order is broken").
+    /// * A panel / sheet / tool that was opened while time ran gives the running state back when the last one closes,
+    ///   so a stray tap on PAUSE next to a sheet's bottom row never leaves the game silently stopped.
+    /// * A successful order that sends people out (task force, rescue, squads, tow, gut ...) resumes, so the team is
+    ///   seen leaving at once. Decisions (Pending) still hold the clock while their sheet is up, as before.</summary>
+    public sealed class TimeCtl
+    {
+        bool _was, _runBefore;
+
+        public static string PlayLabel(bool paused) => paused ? "PLAY" : "PAUSE";
+        public static int NextSpeed(int s) => s >= 4 ? 1 : s * 2;
+
+        /// <summary>Speed button: next speed, and running again if paused.</summary>
+        public static void TapSpeed(ref bool paused, ref int speed) { speed = NextSpeed(speed); paused = false; }
+
+        /// <summary>Orders that send people or crews out of camp: a successful one resumes a paused game.</summary>
+        public static bool IsDispatch(string action)
+        {
+            switch (action)
+            {
+                case "send_rescue": case "send_raid": case "heli_rescue":
+                case "send_squad": case "send_squad_scav": case "send_squad_map": case "squad_attack": case "recall_squad":
+                case "tow_wreck": case "siphon_wreck": case "gut":
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>Call once per frame with "is any panel, sheet or map tool up". When the last one closes and the
+        /// game was running when the first one opened, a pause that happened meanwhile is undone. True = resumed.</summary>
+        public bool Panels(bool up, ref bool paused)
+        {
+            bool resumed = false;
+            if (up && !_was) _runBefore = !paused;
+            if (!up && _was && _runBefore && paused) { paused = false; resumed = true; }
+            if (!up) _runBefore = false;
+            _was = up;
+            return resumed;
         }
     }
 

@@ -598,11 +598,27 @@ namespace DayZero.Runtime
         {
             var f = _hf;
             UiKit.Panel(Blk(f.TimeBar));
+            // v0.19.2 (HudFrame.cs TimeCtl): speed / skip resume; closing the panels opened while running resumes
+            if (Event.current.type == EventType.Layout) _tc.Panels(TimePanelsUp(MapView.Instance), ref _b.Paused);
             if (_b.Paused) DrawHalo(UiLayout.Inset(f.TimeSeg[0], 6f), new Color(1f, 0.72f, 0.30f), 2.6f);
-            if (KBtn(f.TimeSeg[0], _b.Paused ? "PLAY" : "PAUSE", _b.Paused ? UiRole.Accent : UiRole.Neutral)) _b.Paused = !_b.Paused;
-            if (KBtn(f.TimeSeg[1], "x" + _b.Speed, UiRole.Neutral, _b.Speed > 1)) _b.Speed = _b.Speed >= 4 ? 1 : _b.Speed * 2;
-            if (KBtn(f.TimeSeg[2], "+1h", UiRole.Neutral)) _b.Skip(1);
-            if (KBtn(f.TimeSeg[3], "+6h", UiRole.Neutral)) _b.Skip(6);
+            if (KBtn(f.TimeSeg[0], TimeCtl.PlayLabel(_b.Paused), _b.Paused ? UiRole.Accent : UiRole.Neutral))
+            {
+                _b.Paused = !_b.Paused;
+                if (_b.Paused) _b.Toast("Paused. Tap PLAY or a speed to go on.");
+            }
+            if (KBtn(f.TimeSeg[1], "x" + _b.Speed, UiRole.Neutral, _b.Speed > 1)) TimeCtl.TapSpeed(ref _b.Paused, ref _b.Speed);
+            if (KBtn(f.TimeSeg[2], "+1h", UiRole.Neutral)) { _b.Skip(1); _b.Paused = false; }
+            if (KBtn(f.TimeSeg[3], "+6h", UiRole.Neutral)) { _b.Skip(6); _b.Paused = false; }
+        }
+
+        readonly TimeCtl _tc = new TimeCtl();
+
+        /// <summary>Any panel, sheet, info card or map tool up (decisions excluded: they hold the clock themselves).</summary>
+        bool TimePanelsUp(MapView map)
+        {
+            if (SideOpen || _menuOpen || ReportsModal || TalkOpen || SupportOpen || ExileOpen || _panel != Panel.None || LongPressInfo.Showing) return true;
+            if (map == null || !map.Ready) return false;
+            return map.SelectedBase >= 0 || map.SelectedTrap >= 0 || map.OutpostMode || SheetKey(map) != 1;
         }
 
         /// <summary>Soft pulsing halo behind a control (v0.14.0a).</summary>

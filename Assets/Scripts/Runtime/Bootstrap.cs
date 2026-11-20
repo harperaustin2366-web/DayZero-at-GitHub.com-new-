@@ -208,6 +208,7 @@ namespace DayZero.Runtime
                 string r = Game.DoAction(Math.Max(0, Game.CurCol), action, args);
                 Game.Use(Math.Max(0, Game.ViewCol));
                 FxFeel.AfterOrder(Game, action, args, r, fx);
+                if (string.IsNullOrEmpty(r) && Paused && TimeCtl.IsDispatch(action)) Paused = false;   // v0.19.2: the team is seen leaving at once
                 return r ?? "";
             }
             catch (Exception e) { Debug.LogException(e); return "Error: " + e.Message; }
