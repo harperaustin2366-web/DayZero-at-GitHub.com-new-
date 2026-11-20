@@ -19,6 +19,7 @@ namespace DayZero.Runtime
         public Rect Stats, StatsIn;
         public Rect[] StatCell = new Rect[4];
         public Rect TimeRow, PhaseRow, ColonyRow;
+        public Rect SupportRow;           // v0.19 expanded rules: SUPPORT meter instead of the colony line (GameUI.Popularity.cs)
         public Rect World, SeasonRow, NoiseRow;
         public Rect Menu, Counters;
         public Rect[] CounterHalf = new Rect[2];
@@ -34,13 +35,13 @@ namespace DayZero.Runtime
             var f = new HudFrame();
             f.Stats = new Rect(M, M, 300f, 190f);
             f.StatsIn = UiLayout.Inset(f.Stats, 14f, 10f, 14f, 10f);
-            var rows = UiLayout.Rows(f.StatsIn, 4f, -38f, -38f, -32f, -24f, -22f);
+            var rows = expansion ? UiLayout.Rows(f.StatsIn, 4f, -36f, -36f, -30f, -22f, -30f) : UiLayout.Rows(f.StatsIn, 4f, -38f, -38f, -32f, -24f, -22f);
             for (int r = 0; r < 2; r++)
             {
                 var c = UiLayout.Columns(rows[r], 10f, 1f, 1f);
                 f.StatCell[r * 2] = c[0]; f.StatCell[r * 2 + 1] = c[1];
             }
-            f.TimeRow = rows[2]; f.PhaseRow = rows[3]; f.ColonyRow = rows[4];
+            f.TimeRow = rows[2]; f.PhaseRow = rows[3]; f.ColonyRow = rows[4]; f.SupportRow = rows[4];
 
             f.Menu = new Rect(w * 0.5f - 75f, M, 150f, 54f);
             float wx = f.Stats.xMax + GAP;

@@ -62,6 +62,7 @@ namespace DayZero.Runtime
                 case "raid": return "RAID";
                 case "died": return "DIED";
                 case "fire": return "FIRE";
+                case "support": return "SUPPORT";   // v0.19 GameUI.Popularity.cs
                 default: return "ALERT";
             }
         }

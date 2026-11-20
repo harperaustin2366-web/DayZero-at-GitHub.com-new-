@@ -145,7 +145,7 @@ namespace DayZero.Runtime
         float _offX, _offY, _scale = 1f;
 
         /// <summary>True when a modal (menu, decision, game over) covers the map or we are not in a game.</summary>
-        public bool ModalOpen => _b.State != Bootstrap.Screen2.Playing || _menuOpen || SideOpen || _b.Pending.Count > 0 || _b.Ended || ReportsModal || TalkOpen;
+        public bool ModalOpen => _b.State != Bootstrap.Screen2.Playing || _menuOpen || SideOpen || _b.Pending.Count > 0 || _b.Ended || ReportsModal || TalkOpen || SupportOpen || ExileOpen;
 
         /// <summary>Screen position (top-left origin, pixels) is over a HUD element.</summary>
         public bool BlocksPointer(Vector2 screenTopLeft)
@@ -300,7 +300,7 @@ namespace DayZero.Runtime
             }
             // A sheet on top (side menu, menu overlay, decision, game over) gets the touches: IMGUI hands a press to
             // the first button drawn under it, so the HUD underneath must not see mouse events while one is up.
-            bool sheet = SideOpen || _menuOpen || _b.Pending.Count > 0 || _b.Ended || G.S.Phase == "lost" || ReportsModal || TalkOpen;
+            bool sheet = SideOpen || _menuOpen || _b.Pending.Count > 0 || _b.Ended || G.S.Phase == "lost" || ReportsModal || TalkOpen || SupportOpen || ExileOpen;
             var evType = Event.current.type;
             bool swallow = sheet && (evType == EventType.MouseDown || evType == EventType.MouseUp || evType == EventType.MouseDrag || evType == EventType.ScrollWheel);
             if (swallow) Event.current.type = EventType.Ignore;
@@ -311,6 +311,7 @@ namespace DayZero.Runtime
             DrawCameraButtons(map);
             float by = _hf.BannerY;
             DrawAttackBanner(w, h, ref by);
+            DrawSupportBanner(w, ref by);   // v0.19 GameUI.Popularity.cs
             DrawRepairChip(w, ref by);
             DrawResearchNote(w, ref by, map);
             DrawWarHud(w, ref by, map);   // GameUI.Factions.cs
@@ -337,6 +338,7 @@ namespace DayZero.Runtime
             DrawTimeControls(w, h);
             DrawB1Hud(w, h, map);   // GameUI.Alerts.cs (E16 speed drop, E17 alerts, E19 long-press card)
             TalkTick();   // v0.19 GameUI.Talk.cs
+            SupportTick();   // v0.19 GameUI.Popularity.cs
             if (swallow) Event.current.type = evType;
 
             // modal sheets fade and slide in (v0.14.0a); a new decision or another side menu restarts the animation
@@ -346,9 +348,11 @@ namespace DayZero.Runtime
             if (over) DrawGameOver(w, h);
             else if (_b.Pending.Count > 0 && DrawWarDemand(w, h, _b.Pending[0])) { }   // GameUI.Factions.cs
             else if (_b.Pending.Count > 0) DrawDecision(w, h, _b.Pending[0]);
+            else if (ExileOpen) DrawExileScreen(w, h);   // v0.19 GameUI.Popularity.cs
             else if (_menuOpen) DrawMenuOverlay(w, h);
             else if (SideOpen) DrawSideMenu(w, h);
             else if (TalkOpen) DrawTalk(w, h);   // v0.19 GameUI.Talk.cs
+            else if (SupportOpen) DrawSupportSheet(w, h);   // v0.19 GameUI.Popularity.cs
             else if (!DrawDaySting(w, h)) DrawMorningReport(w, h);   // v0.19 day sting first (GameUI.DaySting.cs), then the E6 report
             EndAnim();
         }
@@ -455,7 +459,8 @@ namespace DayZero.Runtime
             var pr = f.PhaseRow;
             if (alert) DrawAlertPulse(new Rect(pr.xMax - 22f, pr.y + 1f, 22f, 22f), ri.On);
             UiKit.FitLabel(new Rect(pr.x, pr.y, pr.width - (alert ? 28f : 0f), pr.height), PhaseText(), 17, TextAnchor.MiddleLeft, alert ? RED_INK : AMBER, true, 11);
-            UiKit.FitLabel(f.ColonyRow, string.Format("{0}  -  {1} survivors  -  {2} kills", c.Name, alive.Count, c.Stat("kills")), 15, TextAnchor.MiddleLeft, OLIVE_INK, false, 11);
+            if (Game.ExpansionRules) DrawSupportRow();   // v0.19 GameUI.Popularity.cs
+            else UiKit.FitLabel(f.ColonyRow, string.Format("{0}  -  {1} survivors  -  {2} kills", c.Name, alive.Count, c.Stat("kills")), 15, TextAnchor.MiddleLeft, OLIVE_INK, false, 11);
         }
 
         void StatTile(Rect r, string label, string value, Color vc)

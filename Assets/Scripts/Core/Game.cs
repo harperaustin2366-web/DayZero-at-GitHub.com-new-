@@ -1052,6 +1052,7 @@ namespace DayZero.Core
             RegrowLoot(); Dbg("RegrowLoot");
             StepPhase(); Dbg("StepPhase");
             StepDefenseGlobal(); Dbg("StepDefenseGlobal");
+            if (ExpansionRules) { StepSupport(); Dbg("StepSupport"); }   // v0.19 leader popularity / camp vote / exile (Popularity.cs)
             Use(ViewCol);
             if (_flowDirty && (S.Phase == "fall" || RaidOnAny())) BuildFlow();
             HourTicked?.Invoke();

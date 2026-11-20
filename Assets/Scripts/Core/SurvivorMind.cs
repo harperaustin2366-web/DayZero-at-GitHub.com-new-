@@ -168,10 +168,26 @@ namespace DayZero.Core
         static int MyCol(Game g) { int i = g.S.Cols.IndexOf(g.C); return i < 0 ? g.CurCol : i; }
 
         /// <summary>Recent events of your colony (newest first), within `hours`.</summary>
+        // v0.19 popularity: the same few windows are read for every survivor in the same hour; parse the log once per
+        // (state, time, colony, log tail, window). Callers only read the list.
+        static GameState _recS; static double _recT = -1; static int _recCol = -2, _recN = -1;
+        static readonly Dictionary<double, List<Ev>> _recCache = new Dictionary<double, List<Ev>>();
+
         public static List<Ev> Recent(Game g, double hours = 72.0)
         {
+            if (g?.S?.Log == null || g.C == null) return new List<Ev>();
+            int lastN = g.S.Log.Count > 0 ? g.S.Log[g.S.Log.Count - 1].N : 0;
+            int myc = MyCol(g);
+            if (!ReferenceEquals(_recS, g.S) || _recT != g.S.T || _recCol != myc || _recN != lastN) { _recCache.Clear(); _recS = g.S; _recT = g.S.T; _recCol = myc; _recN = lastN; }
+            if (_recCache.TryGetValue(hours, out var hit)) return hit;
+            var res = RecentScan(g, hours);
+            _recCache[hours] = res;
+            return res;
+        }
+
+        static List<Ev> RecentScan(Game g, double hours)
+        {
             var list = new List<Ev>();
-            if (g?.S?.Log == null || g.C == null) return list;
             int col = MyCol(g);
             for (int i = g.S.Log.Count - 1; i >= 0; i--)
             {

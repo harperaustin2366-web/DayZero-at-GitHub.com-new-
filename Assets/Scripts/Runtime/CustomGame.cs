@@ -55,7 +55,7 @@ namespace DayZero.Runtime
         {
             if (r == null || r.IsDefault) return "";
             int P(double v) => (int)Math.Round(v * 100.0);
-            return string.Format(CultureInfo.InvariantCulture, "Z{0}L{1}R{2}D{3}", P(r.Zombies), P(r.Loot), P(r.Raids), P(r.DayLen));
+            return string.Format(CultureInfo.InvariantCulture, "Z{0}L{1}R{2}D{3}", P(r.Zombies), P(r.Loot), P(r.Raids), P(r.DayLen)) + (r.NoExile ? "X0" : "");
         }
 
         /// <summary>Parse a Code() string (case-insensitive, any order, missing parts = 100). Empty = normal game.</summary>
@@ -72,7 +72,8 @@ namespace DayZero.Runtime
                 while (j < s.Length && char.IsDigit(s[j])) j++;
                 if (j == i || !int.TryParse(s.Substring(i, j - i), NumberStyles.Integer, CultureInfo.InvariantCulture, out int pc)) return false;
                 double v = Math.Max(10, Math.Min(500, pc)) / 100.0;
-                if (k == 'Z') r.Zombies = v; else if (k == 'L') r.Loot = v; else if (k == 'R') r.Raids = v; else if (k == 'D') r.DayLen = v; else return false;
+                if (k == 'X') r.NoExile = pc == 0;   // v0.19 EXILE option: X0 = off
+                else if (k == 'Z') r.Zombies = v; else if (k == 'L') r.Loot = v; else if (k == 'R') r.Raids = v; else if (k == 'D') r.DayLen = v; else return false;
                 i = j;
             }
             return true;
@@ -89,6 +90,7 @@ namespace DayZero.Runtime
             if (r.Loot != 1.0) p.Add("loot " + Mul(r.Loot));
             if (r.Raids != 1.0) p.Add("raids " + Mul(r.Raids));
             if (r.DayLen != 1.0) p.Add("day length " + Mul(r.DayLen));
+            if (r.NoExile) p.Add("no exile");
             return "Custom: " + string.Join(", ", p);
         }
 
@@ -134,11 +136,28 @@ namespace DayZero.Runtime
                 c.Btn(db[i], Game.DIFF_NAMES[i].ToUpperInvariant(), st.Difficulty == i ? UiRole.Accent : UiRole.Primary, () => st.Difficulty = di, true, st.Difficulty == i, 22);
             }
             L.Top(2f);
-            var rows = UiLayout.Rows(L.Rest, 8f, 1f, 1f, 1f, 1f);
+            var rows = UiLayout.Rows(L.Rest, 8f, 1f, 1f, 1f, 1f, 1f);
             Stepper(c, rows[0], 0, "Zombie count", d.Zombies, ZombieNote(d.Zombies), ZOMBIE_STEPS, v => Draft.Zombies = v);
             Stepper(c, rows[1], 1, "Loot amount", d.Loot, LootNote(d.Loot), LOOT_STEPS, v => Draft.Loot = v);
             Stepper(c, rows[2], 2, "Raid strength", d.Raids, RaidNote(d.Raids), RAID_STEPS, v => Draft.Raids = v);
             Stepper(c, rows[3], 3, "Day length", d.DayLen, DayNote(d.DayLen), DAY_STEPS, v => Draft.DayLen = v);
+            ExileRow(c, rows[4], 4, !d.NoExile);
+        }
+
+        /// <summary>v0.19 EXILE on / off (expanded rules: a camp that turns on you can vote you out; Core/Popularity.cs).</summary>
+        static void ExileRow(MenuCtx c, Rect row, int idx, bool on)
+        {
+            c.Plate(row, idx, !on);
+            var R = new UiLayout(UiLayout.Inset(row, 16f, 6f, 10f, 6f), 12f);
+            float bh = Math.Min(76f, R.Rest.height);
+            Rect B(Rect r, float w) => UiLayout.Center(r, w, bh);
+            var off = B(R.Right(110f), 110f);
+            var onB = B(R.Right(110f), 110f);
+            c.Btn(onB, "ON", on ? UiRole.Accent : UiRole.Primary, () => Draft.NoExile = false, true, on, 24);
+            c.Btn(off, "OFF", !on ? UiRole.Accent : UiRole.Primary, () => Draft.NoExile = true, true, !on, 24);
+            var tx = UiLayout.Rows(R.Rest, 2f, 1.15f, 0.85f);
+            c.Fit(tx[0], "Exile", 23, INK, true);
+            c.Fit(tx[1], on ? "Expanded rules: lose your people's support and they can vote you out" : "Your people never vote you out", 17, INK2, false);
         }
 
         static void Stepper(MenuCtx c, Rect row, int idx, string name, double v, string note, double[] steps, Action<double> set)

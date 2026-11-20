@@ -289,6 +289,8 @@ namespace DayZero.Core
         public bool Away;           // set by the network layer when the player is offline
         // Expansion: people (night watch shifts, AUTO talk, breach / death bookkeeping); null in classic runs
         public PeopleCfg Ppl;
+        // v0.19 leader popularity (Core/Popularity.cs): support, mutiny clock, camp vote, last exile; null in classic runs
+        public LeaderStanding Lead;
         // end Expansion: people
         public int Stat(string k) => Stats.Get(k, 0);
         public void AddStat(string k, int v) => Stats[k] = Stats.Get(k, 0) + v;
@@ -438,7 +440,8 @@ namespace DayZero.Core
     public sealed class CustomRules
     {
         public double Zombies = 1.0, Loot = 1.0, Raids = 1.0, DayLen = 1.0;
-        [JsonIgnore] public bool IsDefault => Zombies == 1.0 && Loot == 1.0 && Raids == 1.0 && DayLen == 1.0;
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public bool NoExile;   // v0.19: EXILE option off (expanded rules: no camp vote / exile)
+        [JsonIgnore] public bool IsDefault => Zombies == 1.0 && Loot == 1.0 && Raids == 1.0 && DayLen == 1.0 && !NoExile;
         public CustomRules Clone() => (CustomRules)MemberwiseClone();
         static double Ok(double v) => double.IsNaN(v) || v <= 0.0 ? 1.0 : v;
         public static double Z(GameState s) => s?.Custom == null ? 1.0 : Ok(s.Custom.Zombies);
