@@ -33,7 +33,9 @@ namespace DayZero.Core
             double agri = 1.0 + Rx("food_mult");
             double wm = 1.0 + Rx("water_mult");
             if (ExpansionRules) { agri *= ExpCropMul(); wm *= ExpWaterMul(); }   // Expansion: seasons + rain
-            r["water"] += (b.Main ? 5.0 : 2.5) * wm + Rx("water_flat");
+            double wy = ExpansionRules ? WaterYieldMul : 1.0, fy = ExpansionRules ? FoodYieldMul : 1.0;   // Expansion: gathering balance
+            if (ExpansionRules) { agri *= fy; wm *= wy; }
+            r["water"] += (b.Main ? 5.0 : 2.5) * wm + Rx("water_flat") * wy;
             r["water"] += 5.0 * b.U("water") * wm;
             r["food"] += 5.0 * b.U("garden") * agri;
             r["meds"] += Rx("meds_flat");
@@ -42,9 +44,9 @@ namespace DayZero.Core
             {
                 case "hospital": r["meds"] += 1.0; break;
                 case "police": r["ammo"] += 1.5; break;
-                case "high_school": r["food"] += 2.0; break;
+                case "high_school": r["food"] += 2.0 * fy; break;
                 case "warehouse": r["materials"] += 2.0; break;
-                case "farmhouse": r["food"] += 6.0 * agri; r["water"] += 2.0; break;
+                case "farmhouse": r["food"] += 6.0 * agri; r["water"] += 2.0 * wy; break;
             }
             ConvBalance(b, r, agri, wm);
             var here = AtBase(b.Id);
@@ -62,7 +64,7 @@ namespace DayZero.Core
                         r["food"] += f;
                         break;
                     case "Civilian":
-                        r["water"] += 1.6 * wm; r["food"] += 0.6; r["materials"] += 1.0;
+                        r["water"] += 1.6 * (ExpansionRules ? wm / wy * WaterJobYieldMul : wm); r["food"] += 0.6 * fy; r["materials"] += 1.0;
                         break;
                     case "Engineer":
                         r["materials"] += (1.5 + (b.U("workshop") > 0 ? 2.0 : 0.0)) * (1.0 + Rx("salvage_mult")) * (ExpansionRules ? 1.0 + Tx(p, "engineer_mult") : 1.0);   // Expansion: Tinkerer
@@ -558,7 +560,7 @@ namespace DayZero.Core
             foreach (var kv in tab)
             {
                 double v = Rng.RandfRange(kv.Value[0], kv.Value[1]) * left * mult;
-                if (ExpansionRules) v *= ExpLootMul(l, kv.Key);   // Expansion: district danger, autumn harvest, rain
+                if (ExpansionRules) v *= ExpLootMul(l, kv.Key) * YieldMul(kv.Key);   // Expansion: district danger, autumn harvest, rain; gathering balance
                 if (lmul != 1.0) v *= lmul;   // E14 custom game
                 if (v > 0.0) p.Carry[kv.Key] = p.Carry.Get(kv.Key, 0.0) + v;
             }

@@ -30,6 +30,36 @@ namespace DayZero.Core
         public static bool PhaseARules = false;
         /// <summary>SYSTEMS_30 expansion rules (traits, stress, fatigue...). Off = classic v0.10.8a.</summary>
         public static bool ExpansionRules;
+        /// <summary>Expansion gathering balance (v0.19, Austin: gathering too fast, mainly water, and food). Applied only
+        /// when ExpansionRules is on, at the yield sites; consumption is unchanged. Water and food: every income source
+        /// (base camp, collectors, farmhouse, cisterns, farms, gardens, farmers, civilians, kitchen, scavenged loot).
+        /// Everything else: scavenging / loot only.</summary>
+        public const double WaterYieldMul = 0.70;   // -30%
+        /// <summary>The Civilian water job is cut less (0.80): at 0.70 one water worker hauls less than one person drinks in
+        /// summer (1.6 x 0.7 x 0.8 = 0.9/day), so a big camp could never balance its water and slid into thirst (survival test).</summary>
+        public const double WaterJobYieldMul = 0.80;   // -20%
+        public const double FoodYieldMul = 0.80;    // -20%
+        public const double OtherYieldMul = 0.92;   // -8%, scavenging / loot only
+        /// <summary>Yield multiplier for one resource key under the current rules (1.0 with Expansion off).</summary>
+        public static double YieldMul(string res)
+        {
+            if (!ExpansionRules) return 1.0;
+            return res == "water" ? WaterYieldMul : res == "food" ? FoodYieldMul : OtherYieldMul;
+        }
+        static readonly System.Text.RegularExpressions.Regex _rateRx = new System.Text.RegularExpressions.Regex(@"\+(\d+(?:\.\d+)?) (food|water)/day");
+        /// <summary>UI: rewrites "+N food/day" / "+N water/day" in a description to the Expansion-adjusted rate.</summary>
+        public static string RateText(string desc)
+        {
+            if (!ExpansionRules || string.IsNullOrEmpty(desc)) return desc;
+            return _rateRx.Replace(desc, m => "+" + YieldTxt(double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), m.Groups[2].Value) + " " + m.Groups[2].Value + "/day");
+        }
+        /// <summary>Rate text helper for UI descriptions: the classic number, scaled when Expansion is on.</summary>
+        public static string YieldTxt(double v, string res)
+        {
+            double m = YieldMul(res);
+            if (m == 1.0) return v.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+            return (v * m).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+        }
 
         public const int WALL_MAX_LEN = 24;            // tiles per placed run
         public static readonly int[] WALL_PATH = { 0, 2, 3 };   // wood palisade -> scrap metal -> concrete

@@ -434,7 +434,7 @@ namespace DayZero.Runtime
                 }
                 if (need.Count > 0) meta += " · needs " + string.Join(", ", need);
                 if (g.ResearchProg(rid) >= 0.0 && stt != "active") meta += string.Format(" · paid, {0:0}h done", g.ResearchProg(rid));
-                float dh = c.H_((string)r["desc"], 15, false, tw), mh = c.H_(meta, 14, false, tw);
+                float dh = c.H_(Game.RateText((string)r["desc"]), 15, false, tw), mh = c.H_(meta, 14, false, tw);
                 rows.Add((rid, stt, meta, need.Count > 0, dh, mh));
                 hs.Add(Math.Max(80f, PAD + 28f + dh + 4f + mh + PAD));
             }
@@ -458,7 +458,7 @@ namespace DayZero.Runtime
                 Color nc2 = q.state == "done" ? GREEN : q.state == "active" ? AMBER : q.state == "available" ? INK : INK2;
                 float tx = card.x + 18f, ty = card.y + PAD - 2f;
                 c.Fit(new Rect(tx, ty, tw, 28f), string.Format("T{0}  {1}", (int)(double)r["tier"], (string)r["name"]), 20, nc2, true); ty += 30f;
-                c.Para(new Rect(tx, ty, tw, q.dh), (string)r["desc"], 15, q.state != "locked" ? INK : INK2); ty += q.dh + 4f;
+                c.Para(new Rect(tx, ty, tw, q.dh), Game.RateText((string)r["desc"]), 15, q.state != "locked" ? INK : INK2); ty += q.dh + 4f;
                 c.Para(new Rect(tx, ty, tw, q.mh), q.meta, 14, q.need ? RED : INK2);
                 var br = new Rect(card.xMax - BTN_W - 12f, card.y + (card.height - BTN_H) / 2f, BTN_W, BTN_H);
                 var chip = new Rect(br.x, card.y + (card.height - 36f) / 2f, BTN_W, 36f);

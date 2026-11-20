@@ -846,7 +846,8 @@ namespace DayZero.Core
             return s;
         }
 
-        public static string SiteBonusText(string site)
+        public static string SiteBonusText(string site) => RateText(SiteBonusText0(site));
+        static string SiteBonusText0(string site)
         {
             switch (site)
             {

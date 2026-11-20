@@ -322,7 +322,7 @@ namespace DayZero.Core
             r["materials"] += 1.5 * ConvN("workshop", bid, ci);
             r["fuel"] += 0.8 * ConvN("garage", bid, ci);
             int nk = ConvN("kitchen", bid, ci);
-            if (nk > 0 && _balUp.Has("food")) r["food"] += Math.Min(0.24, 0.12 * nk) * _balUp["food"];
+            if (nk > 0 && _balUp.Has("food")) r["food"] += Math.Min(0.24, 0.12 * nk) * _balUp["food"] * YieldMul("food");
             int na = ConvN("armory", bid, ci);
             if (na > 0 && R("metal") > 3.0)
             {
@@ -415,7 +415,7 @@ namespace DayZero.Core
             var tab = D.LotLootTable(l);
             double left = S.Loot[l];
             if (CustomRules.L(S) != 1.0) left *= CustomRules.L(S);   // E14 custom game
-            foreach (var kv in tab) C.Res[kv.Key] = R(kv.Key) + (kv.Value[0] + kv.Value[1]) * 0.25 * left;
+            foreach (var kv in tab) C.Res[kv.Key] = R(kv.Key) + (kv.Value[0] + kv.Value[1]) * 0.25 * left * YieldMul(kv.Key);   // YieldMul: Expansion gathering balance (1.0 classic)
             MarkSearched(l, CurCol + 1);
         }
 

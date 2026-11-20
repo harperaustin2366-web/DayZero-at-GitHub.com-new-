@@ -158,7 +158,7 @@ namespace DayZero.Runtime
             foreach (var kv in Data.UPGRADES)
             {
                 if (kv.Key == "radio" && !b.Main) continue;
-                string desc = kv.Value.Desc ?? "";
+                string desc = Game.RateText(kv.Value.Desc ?? "");
                 var cst0 = g.UpgradeCost(b, kv.Key);
                 if (cst0.Count > 0) desc += (desc != "" ? "\n" : "") + "Cost: " + Game.FmtCost(cst0);
                 float dh = c.H_(desc, 15, false, lw);
@@ -191,7 +191,7 @@ namespace DayZero.Runtime
                 float tx = 18f, ty = y + 10f;
                 c.Fit(new Rect(tx, ty, lw, 28f), string.Format("{0}  (level {1}/{2}){3}", u.Name, lv, u.Max, (u.Slot ?? true) ? "" : "  · no slot needed"), 20, lv > 0 ? GREEN : INK, true);
                 var cost = g.UpgradeCost(b, uid);
-                string desc = (u.Desc ?? "") + (cost.Count > 0 ? ((u.Desc ?? "") != "" ? "\n" : "") + "Cost: " + Game.FmtCost(cost) : "");
+                string desc = Game.RateText(u.Desc ?? "") + (cost.Count > 0 ? ((u.Desc ?? "") != "" ? "\n" : "") + "Cost: " + Game.FmtCost(cost) : "");
                 if (rows[i].dh > 0f) c.Para(new Rect(tx, ty + 30f, lw, rows[i].dh), desc, 15, INK2);
                 string blk = g.UpgradeBlock(b, uid);
                 float mainH = rows[i].h - rows[i].ah;

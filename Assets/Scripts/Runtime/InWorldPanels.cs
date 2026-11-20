@@ -214,7 +214,7 @@ namespace DayZero.Runtime
                     prog = (float)g.ConvProgress(l);
                     progT = string.Format("SETTING UP  {0}%  -  READY IN {1:0.0} H", (int)(prog * 100), Math.Max(0.0, cv.Ready - g.S.T));
                 }
-                else status = cd.Name + ": " + cd.Desc;
+                else status = cd.Name + ": " + Game.RateText(cd.Desc);
             }
             else if (canConv) status = type + " - scavenged, inside the safe zone. Pick a use:";
             else { status = type + " - " + err; warn = true; }
