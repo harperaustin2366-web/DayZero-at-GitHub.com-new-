@@ -53,7 +53,9 @@ namespace DayZero.Runtime
             foreach (var b in g.C.Bases)
             {
                 if (b.Done < 1.0) continue;
+                int t0 = geo.M.T.Count, s0 = geo.S != null ? geo.S.T.Count : 0;
                 gen.CampGrowth(geo, b, PeopleAt(g, b.Id));
+                gen.ClipWetPublic(geo, t0, s0);   // v0.19 audit: nothing stands in the river
             }
         }
     }

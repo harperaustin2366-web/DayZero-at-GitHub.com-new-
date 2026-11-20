@@ -203,8 +203,7 @@ namespace DayZero.Runtime
             for (int k = 0; k < 4; k++)
             {
                 var q = c + GU * ((k & 1) == 0 ? -0.24f : 0.24f) + GV * ((k >> 1) == 0 ? -0.24f : 0.24f);
-                int t = TileAtF(q.x, q.y);
-                if (t == Data.T_WATER || t == Data.T_PIER) return false;
+                if (Wet(TileAtF(q.x, q.y))) return false;
             }
             return true;
         }
@@ -431,7 +430,10 @@ namespace DayZero.Runtime
                 {
                     if (!NearWater(x, y)) { x++; continue; }
                     int xe = x + 1;
-                    while (xe < x1 && xe - x < 16 && NearWater(xe, y)) xe++;
+                    // v0.19 audit: merge only across tiles whose corner colour / depth (alpha) is the same, otherwise the
+                    // shore foam and depth smear along a 16-tile quad and read as streaks / dots on the river
+                    var ta = WaterV(x, y); var tb = WaterV(x, y + 1);
+                    while (xe < x1 && xe - x < 16 && NearWater(xe, y) && Same(WaterV(xe, y), ta) && Same(WaterV(xe, y + 1), tb)) xe++;
                     int i = m.V.Count;
                     m.V.Add(new Vector3(x, WATER_Y, -y)); m.V.Add(new Vector3(xe, WATER_Y, -y));
                     m.V.Add(new Vector3(xe, WATER_Y, -(y + 1))); m.V.Add(new Vector3(x, WATER_Y, -(y + 1)));
@@ -443,6 +445,7 @@ namespace DayZero.Runtime
         }
 
         static readonly Color FOAM = Hex("#8c9688");
+        static bool Same(Color32 a, Color32 b) => Math.Abs(a.r - b.r) + Math.Abs(a.g - b.g) + Math.Abs(a.b - b.b) <= 3 && a.a == b.a;
 
         Color32 WaterV(int x, int y)
         {

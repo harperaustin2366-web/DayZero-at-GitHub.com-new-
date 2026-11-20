@@ -79,7 +79,7 @@ namespace DayZero.Runtime
         // The baked city has lots the river was carved through (a parking lot with tiles on both banks) and lots whose
         // oriented rectangle reaches over the bank. Visual footprints (yard, building) use the lot's largest connected
         // tile group and are clipped back from water / pier tiles with a bank margin. Deterministic, visual only.
-        static bool Wet(int t) => t == Data.T_WATER || t == Data.T_PIER;
+        static bool Wet(int t) => t == Data.T_WATER || t == Data.T_PIER || t == Data.T_BRIDGE;   // bridge tiles: river under a raised deck
 
         /// <summary>Water / pier tiles overlapping r grown by m (separating axes: the rect's and the tile grid's).</summary>
         void WetTilesNear(ORect r, float m, List<Vector2Int> o)
@@ -173,7 +173,7 @@ namespace DayZero.Runtime
             float VH(int vx, int vy)
             {
                 int w = 0;
-                for (int k = 0; k < 4; k++) if (TileAt(vx - 1 + (k & 1), vy - 1 + (k >> 1)) == Data.T_WATER) w++;
+                for (int k = 0; k < 4; k++) if (WetT(TileAt(vx - 1 + (k & 1), vy - 1 + (k >> 1)))) w++;
                 return w == 0 ? 0f : -0.03f - 0.27f * (w / 4f);
             }
             float a = VH(x, y), b = VH(x + 1, y), c = VH(x + 1, y + 1), e = VH(x, y + 1);
@@ -190,7 +190,7 @@ namespace DayZero.Runtime
             for (int i = v0; i < g.M.V.Count; i++) { var v = g.M.V[i]; g.M.V[i] = new Vector3(v.x, v.y + h, v.z); }
         }
 
-        /// <summary>v0.19 map audit: no water / pier tile within r of p (props stay off the river and its bank edge).</summary>
+        /// <summary>v0.19 map audit: no water / pier / bridge tile within r of p (props stay off the river and its bank edge).</summary>
         bool DryAt(Vector2 p, float r = 0.2f)
         {
             for (int k = 0; k < 5; k++)
@@ -199,6 +199,44 @@ namespace DayZero.Runtime
                 if (Wet(TileAt(Mathf.FloorToInt(q.x), Mathf.FloorToInt(q.y)))) return false;
             }
             return true;
+        }
+
+        /// <summary>v0.19 map audit: drops the triangles added since (t0, s0) whose centre lies over the river (water or the
+        /// water under a bridge deck). Camp yards, palisades, faction compounds and the starter wall the sim lays out
+        /// around a camp beside the river: the sim keeps its yard, only the drawing stops at the waterline.</summary>
+        internal void ClipWetPublic(Geo g, int t0, int s0) => ClipWet(g, t0, s0);
+        void ClipWet(Geo g, int t0, int s0)
+        {
+            Clip(g.M, t0); if (g.S != null) Clip(g.S, s0);
+            void Clip(MeshData m, int from)
+            {
+                int w = from;
+                for (int t = from; t + 2 < m.T.Count; t += 3)
+                {
+                    var a = m.V[m.T[t]]; var b = m.V[m.T[t + 1]]; var c = m.V[m.T[t + 2]];
+                    float cx = (a.x + b.x + c.x) / 3f, cy = -(a.z + b.z + c.z) / 3f;
+                    if (WetT(TileAtF(cx, cy))) continue;
+                    m.T[w] = m.T[t]; m.T[w + 1] = m.T[t + 1]; m.T[w + 2] = m.T[t + 2]; w += 3;
+                }
+                if (w < m.T.Count) m.T.RemoveRange(w, m.T.Count - w);
+            }
+        }
+
+        /// <summary>v0.19 map audit: a dry spot for a camp fire (layouts beside the river): p itself, else the first of
+        /// eight turns of (p - pivot) around pivot at the same or shorter reach that is clear of water.</summary>
+        Vector2 DrySpot(Vector2 p, Vector2 pivot, float r = 0.55f)
+        {
+            if (DryAt(p, r)) return p;
+            var dv = p - pivot;
+            for (int k = 1; k <= 8; k++)
+            {
+                float a = (k % 2 == 1 ? 1f : -1f) * ((k + 1) / 2) * 0.785f;
+                float ca = Mathf.Cos(a), sa = Mathf.Sin(a);
+                var q = pivot + new Vector2(dv.x * ca - dv.y * sa, dv.x * sa + dv.y * ca);
+                if (DryAt(q, r)) return q;
+            }
+            for (float k = 0.75f; k >= 0.25f; k -= 0.25f) { var q = pivot + dv * k; if (DryAt(q, r * 0.6f)) return q; }
+            return p;
         }
 
         /// <summary>Last resort for small shoreline lots: the footprint scaled down about the centre of the lot's land tiles

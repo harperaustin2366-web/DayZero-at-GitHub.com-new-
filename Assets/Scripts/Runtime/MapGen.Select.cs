@@ -26,7 +26,7 @@ namespace DayZero.Runtime
             var V = -CampFront(); var U = new Vector2(V.y, -V.x);
             o.Yard = new ORect(c, U, half, half);
             o.HasBld = bld.HasValue; if (bld.HasValue) o.Bld = bld.Value;
-            o.Fire = CampFireAt(c, half, U, V, bld);
+            o.Fire = DrySpot(CampFireAt(c, half, U, V, bld), c);   // v0.19 audit: never in the river (visual / crowd only)
             o.Tower = c + U * (half - 0.5f) + V * (half - 0.5f);
             o.Gate = c - V * half;
             o.Main = b.Main;
@@ -50,12 +50,12 @@ namespace DayZero.Runtime
                 o.Yard = new ORect(r.C, r.U, r.Hu + 0.9f, r.Hv + 0.9f);
                 var outv = door - r.C; if (outv.sqrMagnitude < 1e-4f) outv = GU;
                 outv = outv.normalized;
-                o.Fire = door + outv * 0.9f + new Vector2(-outv.y, outv.x) * 0.6f;
+                o.Fire = DrySpot(door + outv * 0.9f + new Vector2(-outv.y, outv.x) * 0.6f, door);   // v0.19 audit: not in the river
             }
             else
             {
                 o.Yard = new ORect(door, GU, 2.0f, 2.0f);
-                o.Fire = door + GU * 0.5f;
+                o.Fire = DrySpot(door + GU * 0.5f, door);
             }
             o.Gate = door; o.Tower = door; o.TowerTop = 0f; o.Main = b.Main;
             return true;

@@ -63,7 +63,7 @@ namespace DayZero.Runtime
             // fire: just inside the gate, clear of the building
             var fire = o.Gate - outv * 1.0f + along * 0.5f;
             if (hasB && inf.R.Contains(fire, 0.35f)) fire = o.Gate - outv * 0.55f + along * 0.9f;
-            o.Fire = fire;
+            o.Fire = DrySpot(fire, ctr);   // v0.19 audit: not in the river
             // hut spots: a ring inside the palisade, clear of the building, the gate lane and the fire
             o.Huts = new List<Vector2>();
             int salt = c.Lot * 13 + 7;
@@ -93,8 +93,10 @@ namespace DayZero.Runtime
             {
                 if (!FactionLayoutOf(c, out var lay)) continue;
                 Color fc = Game.FactionColor(c);
-                if (!c.Alive) { FactionRuin(g, c, lay); continue; }
+                int t0 = g.M.T.Count, s0 = g.S.T.Count;
+                if (!c.Alive) { FactionRuin(g, c, lay); ClipWet(g, t0, s0); continue; }
                 FactionCamp(g, c, lay, fc);
+                ClipWet(g, t0, s0);   // v0.19 audit: compound yard / palisade / huts stop at the waterline
                 if (c.Claim != null)
                     foreach (int l in c.Claim)
                         if (l != c.Lot && l >= 0 && l < _info.Length && _info[l].Valid) ClaimPennant(g, l, fc);

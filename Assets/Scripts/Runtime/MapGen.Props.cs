@@ -438,6 +438,7 @@ namespace DayZero.Runtime
             foreach (var kv in lit) if (!conv.ContainsKey(kv.Key)) Marker(g, kv.Key, kv.Value == me ? Hex("#d8a840") : Hex("#b04a3a"));
             var walled = new HashSet<int>();
             if (game.S.Walls != null) foreach (var w in game.S.Walls) if (w.Starter) walled.Add(w.Bid);
+            int t0 = g.M.T.Count, s0 = g.S.T.Count;
             foreach (var b in game.AllBases())
             {
                 bool mine = b.Col == me;
@@ -447,6 +448,7 @@ namespace DayZero.Runtime
                 Camp(g, c, half, b.Id, b.Main, bld, mine, walled.Contains(b.Id));
             }
             DrawWalls(g, game);
+            ClipWet(g, t0, s0);   // v0.19 audit: yards / palisades / starter walls stop at the waterline (visual only)
             DrawTowersTraps(g, game);
             return new Chunk { Mesh = g.M, Shadow = g.S };
         }
@@ -511,7 +513,7 @@ namespace DayZero.Runtime
             var V = -CampFront(); var U = new Vector2(V.y, -V.x);
             var yard = new ORect(c, U, half, half);
             // fire position: centre of the yard, or between the building front and the gate
-            var fire = CampFireAt(c, half, U, V, bld);   // shared with Layout() (MapGen.Select.cs)
+            var fire = DrySpot(CampFireAt(c, half, U, V, bld), c);   // shared with Layout() (MapGen.Select.cs)
             // yard ground: packed dirt with a warm pool around the fire
             const int N = 10;
             float y = 0.049f;

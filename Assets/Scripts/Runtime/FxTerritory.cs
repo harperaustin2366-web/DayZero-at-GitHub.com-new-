@@ -175,7 +175,7 @@ namespace DayZero.Runtime
                             int k = y * W + x;
                             if (_own[k] != 0 || _own2[k] != 0) continue;
                             int t = tl[k];
-                            if (t != Data.T_BLD && t != Data.T_WATER && !S.Fences.Has(k) && !S.Towers.Has(k) && !S.Gates.Has(k)) continue;
+                            if (t != Data.T_BLD && !S.Fences.Has(k) && !S.Towers.Has(k) && !S.Gates.Has(k)) continue;   // v0.19 audit: not into the river
                             bool touch = false;
                             for (int dy = -1; dy <= 1 && !touch; dy++)
                                 for (int dx = -1; dx <= 1; dx++)
@@ -208,6 +208,7 @@ namespace DayZero.Runtime
                                 int k = y * W + x;
                                 if (_own2[k] != 0) continue;
                                 if (!(lotOk && d.LotId[k] == c.Lot) && !grown.Contains(new Vector2(x + 0.5f, y + 0.5f))) continue;
+                                if (Wet(d.Tiles[k])) continue;   // v0.19 audit: the compound tint stops at the waterline
                                 _own2[k] = o;
                                 bx0 = Math.Min(bx0, x); by0 = Math.Min(by0, y); bx1 = Math.Max(bx1, x); by1 = Math.Max(by1, y);
                             }
@@ -260,6 +261,13 @@ namespace DayZero.Runtime
 
         }
 
+        static bool Wet(int t) => t == Data.T_WATER || t == Data.T_BRIDGE;
+        static bool WetAt(Vector2 p)
+        {
+            var d = Data.Instance; int x = Mathf.FloorToInt(p.x), y = Mathf.FloorToInt(p.y);
+            return d != null && x >= 0 && y >= 0 && x < d.W && y < d.H && Wet(d.Tiles[y * d.W + x]);
+        }
+
         static void DashedCircle(MeshData m, Vector2 c, float r, float w, Color32 col)
         {
             if (r <= 0.5f) return;
@@ -268,6 +276,7 @@ namespace DayZero.Runtime
             {
                 float a0 = k * Mathf.PI * 2f / n, a1 = (k + 1) * Mathf.PI * 2f / n;
                 var u0 = new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)); var u1 = new Vector2(Mathf.Cos(a1), Mathf.Sin(a1));
+                if (WetAt(c + u0 * r) || WetAt(c + u1 * r) || WetAt(c + (u0 + u1) * (0.5f * r))) continue;   // v0.19 audit: the ring stops at the river
                 Quad(m, c + u0 * (r - w * 0.5f), c + u1 * (r - w * 0.5f), c + u1 * (r + w * 0.5f), c + u0 * (r + w * 0.5f), col);
             }
         }
