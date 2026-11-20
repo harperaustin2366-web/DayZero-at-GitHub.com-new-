@@ -42,10 +42,10 @@ namespace DayZero.Runtime
         {
             o = default;
             var door = new Vector2(b.Pos.x + 0.5f, b.Pos.y + 0.5f);
-            bool inBld = b.Lot >= 0 && b.Lot < _info.Length && _info[b.Lot].Valid && _info[b.Lot].Floors > 0;
+            bool inBld = b.Lot >= 0 && b.Lot < _info.Length && _info[b.Lot].Valid && _info[b.Lot].SimBld;
             if (inBld)
             {
-                var r = _info[b.Lot].R;
+                var r = _info[b.Lot].R0;   // sim-facing: unclipped footprint (MapGen.Buildings.cs LandLotRect)
                 o.HasBld = true; o.Bld = r;
                 o.Yard = new ORect(r.C, r.U, r.Hu + 0.9f, r.Hv + 0.9f);
                 var outv = door - r.C; if (outv.sqrMagnitude < 1e-4f) outv = GU;

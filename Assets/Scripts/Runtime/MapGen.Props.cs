@@ -401,15 +401,16 @@ namespace DayZero.Runtime
 
         void CampRect(Base b, out Vector2 c, out float half, out ORect? bld)
         {
-            bool inBld = b.Lot >= 0 && b.Lot < _info.Length && _info[b.Lot].Valid && _info[b.Lot].Floors > 0;
+            // sim-facing (YardFor -> starter palisade): the unclipped footprint R0, never the land-clipped visual one
+            bool inBld = b.Lot >= 0 && b.Lot < _info.Length && _info[b.Lot].Valid && _info[b.Lot].SimBld;
             bld = null;
             if (inBld)
             {
                 var inf = _info[b.Lot];
-                bld = inf.R;
-                half = Mathf.Max(inf.R.Hu, inf.R.Hv) + (b.Main ? 1.5f : 0.9f);
+                bld = inf.R0;
+                half = Mathf.Max(inf.R0.Hu, inf.R0.Hv) + (b.Main ? 1.5f : 0.9f);
                 // shift the yard toward the default camera so the fire and gate face the viewer
-                c = inf.R.C + CampFront() * (b.Main ? 0.9f : 0.5f);
+                c = inf.R0.C + CampFront() * (b.Main ? 0.9f : 0.5f);
             }
             else { c = new Vector2(b.Pos.x + 0.5f, b.Pos.y + 0.5f); half = b.Main ? 3.0f : 2.0f; }
         }

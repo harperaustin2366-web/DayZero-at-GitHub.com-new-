@@ -15,7 +15,10 @@ namespace DayZero.Runtime
         struct LotInfo
         {
             public Arch A;
-            public ORect Lot, R;          // whole lot (tile coverage) and building footprint
+            public ORect Lot, R;          // whole lot (tile coverage) and building footprint (visual: clipped to land)
+            public ORect R0;              // building footprint from the unclipped lot rect (sim-facing camp layout)
+            public bool SimBld;           // Floors > 0 before clipping (sim-facing: camp in a building)
+            public bool Bank;             // clipped against water: drawn with a foundation skirt down the bank
             public int Floors, Dmg;
             public float FloorH, WallTop, Top;
             public Color Wall, Roof;
@@ -40,21 +43,30 @@ namespace DayZero.Runtime
 
         string DistrictKind(Lot L) => d.Districts.Count > 0 ? d.Districts[Mathf.Clamp(L.District, 0, d.Districts.Count - 1)].Kind ?? "" : "";
 
-        /// <summary>Oriented rectangle covering the lot's tiles (axes = lot angle).</summary>
-        ORect LotRect(int l)
+        /// <summary>Oriented rectangle covering the lot's tiles (axes = lot angle). This is the footprint the sim-facing
+        /// queries keep (Layout / YardFor: the starter palisade), so it must not change.</summary>
+        ORect LotRect(int l) => RectOfTiles(l, LotTiles(l));
+
+        List<Vector2Int> LotTiles(int l)
         {
-            var L = d.Lots[l];
+            var L = d.Lots[l]; var o = new List<Vector2Int>();
+            for (int y = L.Y; y < L.Y + L.H; y++)
+                for (int x = L.X; x < L.X + L.W; x++)
+                    if (x >= 0 && y >= 0 && x < d.W && y < d.H && d.LotId[y * d.W + x] == l) o.Add(new Vector2Int(x, y));
+            return o;
+        }
+
+        ORect RectOfTiles(int l, List<Vector2Int> tiles)
+        {
             double th = d.LotAngle(l) * Math.PI / 180.0;
             float cu = (float)Math.Cos(th), su = (float)Math.Sin(th);
             float a0 = 1e9f, a1 = -1e9f, b0 = 1e9f, b1 = -1e9f;
-            for (int y = L.Y; y < L.Y + L.H; y++)
-                for (int x = L.X; x < L.X + L.W; x++)
-                {
-                    if (x < 0 || y < 0 || x >= d.W || y >= d.H || d.LotId[y * d.W + x] != l) continue;
-                    float px = x + 0.5f, py = y + 0.5f;
-                    float u = px * cu + py * su, v = -px * su + py * cu;
-                    a0 = Mathf.Min(a0, u); a1 = Mathf.Max(a1, u); b0 = Mathf.Min(b0, v); b1 = Mathf.Max(b1, v);
-                }
+            foreach (var t in tiles)
+            {
+                float px = t.x + 0.5f, py = t.y + 0.5f;
+                float u = px * cu + py * su, v = -px * su + py * cu;
+                a0 = Mathf.Min(a0, u); a1 = Mathf.Max(a1, u); b0 = Mathf.Min(b0, v); b1 = Mathf.Max(b1, v);
+            }
             if (a0 > a1) return new ORect(Vector2.zero, Vector2.right, 0f, 0f);
             const float pad = 0.42f;
             a0 -= pad; a1 += pad; b0 -= pad; b1 += pad;
@@ -62,6 +74,144 @@ namespace DayZero.Runtime
             var c = U * ((a0 + a1) * 0.5f) + V * ((b0 + b1) * 0.5f);
             return new ORect(c, U, (a1 - a0) * 0.5f, (b1 - b0) * 0.5f);
         }
+
+        // ---------------- v0.19 map audit: lots stay on land ----------------
+        // The baked city has lots the river was carved through (a parking lot with tiles on both banks) and lots whose
+        // oriented rectangle reaches over the bank. Visual footprints (yard, building) use the lot's largest connected
+        // tile group and are clipped back from water / pier tiles with a bank margin. Deterministic, visual only.
+        static bool Wet(int t) => t == Data.T_WATER || t == Data.T_PIER;
+
+        /// <summary>Water / pier tiles overlapping r grown by m (separating axes: the rect's and the tile grid's).</summary>
+        void WetTilesNear(ORect r, float m, List<Vector2Int> o)
+        {
+            o.Clear();
+            float ex = Mathf.Abs(r.U.x) * r.Hu + Mathf.Abs(r.V.x) * r.Hv + m, ey = Mathf.Abs(r.U.y) * r.Hu + Mathf.Abs(r.V.y) * r.Hv + m;
+            for (int y = Mathf.FloorToInt(r.C.y - ey); y <= Mathf.FloorToInt(r.C.y + ey); y++)
+                for (int x = Mathf.FloorToInt(r.C.x - ex); x <= Mathf.FloorToInt(r.C.x + ex); x++)
+                {
+                    if (!Wet(TileAt(x, y))) continue;
+                    float u0 = 1e9f, u1 = -1e9f, w0 = 1e9f, w1 = -1e9f;
+                    for (int k = 0; k < 4; k++)
+                    {
+                        var q = new Vector2(x + (k & 1), y + (k >> 1)) - r.C;
+                        float u = Vector2.Dot(q, r.U), w = Vector2.Dot(q, r.V);
+                        u0 = Mathf.Min(u0, u); u1 = Mathf.Max(u1, u); w0 = Mathf.Min(w0, w); w1 = Mathf.Max(w1, w);
+                    }
+                    if (u1 <= -r.Hu - m || u0 >= r.Hu + m || w1 <= -r.Hv - m || w0 >= r.Hv + m) continue;
+                    o.Add(new Vector2Int(x, y));
+                }
+        }
+
+        readonly List<Vector2Int> _wet = new List<Vector2Int>(32);
+
+        /// <summary>Shrinks r side by side until no water / pier tile is within m of it: each step cuts the one side
+        /// (against the wet tiles on that side of the centre) that keeps the most area.</summary>
+        ORect ClipToLand(ORect r, float m)
+        {
+            for (int it = 0; it < 8; it++)
+            {
+                WetTilesNear(r, m, _wet);
+                if (_wet.Count == 0) return r;
+                float bestA = -1f; float na0 = 0, na1 = 0, nb0 = 0, nb1 = 0;
+                for (int side = 0; side < 4; side++)
+                {
+                    float a0 = -r.Hu, a1 = r.Hu, b0 = -r.Hv, b1 = r.Hv; bool any = false;
+                    foreach (var t in _wet)
+                    {
+                        float u0 = 1e9f, u1 = -1e9f, w0 = 1e9f, w1 = -1e9f;
+                        for (int k = 0; k < 4; k++)
+                        {
+                            var q = new Vector2(t.x + (k & 1), t.y + (k >> 1)) - r.C;
+                            float u = Vector2.Dot(q, r.U), w = Vector2.Dot(q, r.V);
+                            u0 = Mathf.Min(u0, u); u1 = Mathf.Max(u1, u); w0 = Mathf.Min(w0, w); w1 = Mathf.Max(w1, w);
+                        }
+                        float cu = (u0 + u1) * 0.5f, cw = (w0 + w1) * 0.5f;
+                        switch (side)
+                        {
+                            case 0: if (cu > 0f) { a1 = Mathf.Min(a1, u0 - m); any = true; } break;
+                            case 1: if (cu <= 0f) { a0 = Mathf.Max(a0, u1 + m); any = true; } break;
+                            case 2: if (cw > 0f) { b1 = Mathf.Min(b1, w0 - m); any = true; } break;
+                            default: if (cw <= 0f) { b0 = Mathf.Max(b0, w1 + m); any = true; } break;
+                        }
+                    }
+                    if (!any) continue;
+                    float area = Mathf.Max(0f, a1 - a0) * Mathf.Max(0f, b1 - b0);
+                    if (area > bestA) { bestA = area; na0 = a0; na1 = a1; nb0 = b0; nb1 = b1; }
+                }
+                if (bestA <= 0f || na1 - na0 < 0.1f || nb1 - nb0 < 0.1f) return new ORect(r.C, r.U, 0f, 0f);
+                r = new ORect(r.C + r.U * ((na0 + na1) * 0.5f) + r.V * ((nb0 + nb1) * 0.5f), r.U, (na1 - na0) * 0.5f, (nb1 - nb0) * 0.5f);
+            }
+            WetTilesNear(r, m, _wet);
+            return _wet.Count == 0 ? r : new ORect(r.C, r.U, 0f, 0f);
+        }
+
+        /// <summary>Last resort for small shoreline lots: the footprint scaled down about the centre of the lot's land tiles
+        /// until it is dry (keeps a building where the sim has one).</summary>
+        ORect ShrinkToLand(int l, ORect r, float m)
+        {
+            Vector2 c = Vector2.zero; int n = 0;
+            foreach (var t in LotTiles(l)) if (!Wet(TileAt(t.x, t.y))) { c += new Vector2(t.x + 0.5f, t.y + 0.5f); n++; }
+            if (n == 0) return new ORect(r.C, r.U, 0f, 0f);
+            c /= n;
+            for (float k = 0.9f; k >= 0.35f; k -= 0.05f)
+            {
+                var q = new ORect(c, r.U, Mathf.Max(0.22f, r.Hu * k), Mathf.Max(0.22f, r.Hv * k));
+                WetTilesNear(q, m, _wet);
+                if (_wet.Count == 0) return q;
+            }
+            return new ORect(r.C, r.U, 0f, 0f);
+        }
+
+        /// <summary>Visual lot rectangle: the sim rectangle when it is dry, else the largest connected tile group of the
+        /// lot (a river carved through it) clipped to land with a bank margin.</summary>
+        ORect LandLotRect(int l, ORect sim, out bool clipped)
+        {
+            clipped = false;
+            if (sim.Hu <= 0.05f) return sim;
+            WetTilesNear(sim, LOT_BANK, _wet);
+            if (_wet.Count == 0) return sim;
+            clipped = true;
+            var tiles = LotTiles(l);
+            // largest 8-connected group of land tiles
+            var set = new HashSet<Vector2Int>();
+            foreach (var t in tiles) if (!Wet(TileAt(t.x, t.y))) set.Add(t);
+            List<Vector2Int> best = null; var seen = new HashSet<Vector2Int>(); var q = new Queue<Vector2Int>();
+            foreach (var t0 in tiles)
+            {
+                if (!set.Contains(t0) || seen.Contains(t0)) continue;
+                var grp = new List<Vector2Int>(); seen.Add(t0); q.Enqueue(t0);
+                while (q.Count > 0)
+                {
+                    var t = q.Dequeue(); grp.Add(t);
+                    for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++)
+                        {
+                            var n = new Vector2Int(t.x + dx, t.y + dy);
+                            if (set.Contains(n) && seen.Add(n)) q.Enqueue(n);
+                        }
+                }
+                if (best == null || grp.Count > best.Count) best = grp;
+            }
+            if (best == null) return new ORect(sim.C, sim.U, 0f, 0f);
+            return ClipToLand(RectOfTiles(l, best), LOT_BANK);
+        }
+
+        /// <summary>Building footprint inside lot rect lr per archetype (the insets PlanLot uses).</summary>
+        static ORect Foot(Arch a, ORect lr)
+        {
+            switch (a)
+            {
+                case Arch.House: return lr.Inset(Mathf.Min(0.42f, lr.Short * 0.28f));
+                case Arch.Hut: return lr.Inset(Mathf.Min(0.35f, lr.Short * 0.3f));
+                case Arch.Barn: case Arch.Church: return lr.Inset(0.2f);
+                case Arch.Apartment: return lr.Inset(0.14f);
+                case Arch.Office: return lr.Inset(0.12f);
+                case Arch.Industrial: case Arch.Civic: case Arch.Gas: return lr.Inset(0.15f);
+                case Arch.Parking: case Arch.Farm: return lr;
+                default: return lr.Inset(0.1f);
+            }
+        }
+
+        const float LOT_BANK = 0.02f, BLD_BANK = 0.15f;   // clearance from water / pier tiles: lot surfaces, building walls
 
         static Arch ArchOf(string k)
         {
@@ -85,8 +235,10 @@ namespace DayZero.Runtime
         LotInfo PlanLot(int l)
         {
             var L = d.Lots[l];
-            var info = new LotInfo { A = ArchOf(L.Kind), Lot = LotRect(l) };
-            if (info.Lot.Hu <= 0.05f) return info;
+            var simLot = LotRect(l);
+            var info = new LotInfo { A = ArchOf(L.Kind), Lot = LandLotRect(l, simLot, out bool clipped) };
+            info.Bank = clipped;
+            if (info.Lot.Hu <= 0.05f || info.Lot.Hv <= 0.05f) return info;
             info.Valid = true;
             float r = Hf(l, 1), r2 = Hf(l, 2);
             bool landmark = !string.IsNullOrEmpty(L.Landmark);
@@ -168,6 +320,19 @@ namespace DayZero.Runtime
                     break;
             }
             if (info.A == Arch.Parking || info.A == Arch.Farm) info.Dmg = 0;
+            // sim-facing footprint (camp layout / starter palisade) from the unclipped lot rect, visual one clipped to land
+            info.R0 = clipped ? Foot(info.A, simLot) : info.R;
+            info.SimBld = info.Floors > 0;
+            if (clipped && info.A != Arch.Parking && info.A != Arch.Farm)
+            {
+                var full = info.R;
+                info.R = ClipToLand(full, BLD_BANK);
+                if (info.R.Hu < 0.2f || info.R.Hv < 0.2f) info.R = ClipToLand(full, 0.03f);   // small shoreline lots: hug the bank
+                if (info.R.Hu < 0.2f || info.R.Hv < 0.2f) info.R = ShrinkToLand(l, full, 0.03f);   // corner of the rect in the water: smaller block on the land tiles
+                if (info.R.Hu < 0.2f || info.R.Hv < 0.2f) { info.R = new ORect(info.R.C, info.R.U, 0f, 0f); info.Floors = 0; info.WallTop = 0f; info.Dmg = 0; }
+                else if (info.A == Arch.Apartment) { info.Floors = Math.Min(info.Floors, Math.Max(2, Mathf.RoundToInt(info.R.Short * 2f / FLOOR * 1.4f))); info.WallTop = info.Floors * FLOOR + 0.12f; }
+                else if (info.A == Arch.Office) { info.Floors = Math.Min(info.Floors, Math.Max(3, Mathf.RoundToInt(info.R.Short * 2f / (3.6f * MT) * 2.2f))); info.WallTop = info.Floors * info.FloorH + 0.1f; }
+            }
             info.Wall = Geo.Desat(info.Wall, 0.04f);
             info.Front = FrontFace(info.R, new Vector2(L.DoorX + 0.5f, L.DoorY + 0.5f));
             info.Top = info.WallTop;
@@ -206,6 +371,8 @@ namespace DayZero.Runtime
             var info = _info[l];
             if (!info.Valid) return;
             if (!_campLots.Contains(l) && ClearedRect(info.R)) return;   // cleared for a camp yard
+            if (info.Bank) BankSkirt(g, info);
+            if (info.R.Hu < 0.05f) { if (info.A != Arch.Parking && info.A != Arch.Farm) Yard(g, l, info.Lot.Inset(0.06f), Hex("#6c675a")); return; }   // clipped away by the river: bare lot
             if (RuinLot(g, l, info)) return;                               // collapsed building (MapGen.Ruins.cs)
             if (lo) { LoLot(g, l, info); return; }
             switch (info.A)
@@ -224,6 +391,15 @@ namespace DayZero.Runtime
                 case Arch.Industrial: Industrial(g, l, info); break;
                 default: Block(g, l, info); break;
             }
+        }
+
+        /// <summary>Lots clipped against the river sit on the bank, where the ground slopes down to the water: a dark
+        /// foundation skirt under the building and the yard edge so nothing floats above the slope.</summary>
+        void BankSkirt(Geo g, LotInfo info)
+        {
+            var c = Lerp(BANK, Hex("#5a554a"), 0.5f);
+            if (info.R.Hu >= 0.05f && info.Floors > 0) g.Box(info.R.Quad(), -0.32f, 0.004f, Mul(c, 0.85f), c, 0f, false);
+            if (info.A != Arch.House && info.A != Arch.Hut && info.A != Arch.Barn) g.Box(info.Lot.Inset(0.06f).Quad(), -0.32f, PAVE_Y, c, c, 0f, false);
         }
 
         /// <summary>Far LOD: massing only (walls with baked shading, flat or gable roof), plus its shadow.</summary>
