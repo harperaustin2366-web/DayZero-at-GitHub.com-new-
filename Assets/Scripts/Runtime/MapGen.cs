@@ -49,6 +49,7 @@ namespace DayZero.Runtime
             LotH = new float[d.Lots.Count];
             _info = new LotInfo[d.Lots.Count];
             BuildGrid();
+            PlanBridges();   // MapGen.Bridges.cs
             for (int l = 0; l < d.Lots.Count; l++) _info[l] = PlanLot(l);
         }
 
@@ -298,6 +299,7 @@ namespace DayZero.Runtime
             AddWater(g, x0, y0, x1, y1); Stat("water");
             AddCityOverlay(g, x0, y0, x1, y1); Stat("roads+props");
             AddWildRoads(g, x0, y0, x1, y1); Stat("wildroads");
+            AddBridges(g, cx, cy); Stat("bridges");   // MapGen.Bridges.cs: raised decks, piers, railings
             foreach (int l in lots) AddLot(g, l);
             Stat("lots");
             DistrictPass(g, x0, y0, x1, y1, lots); Stat("districts");   // MapDistricts.cs: district palettes + props
@@ -356,7 +358,7 @@ namespace DayZero.Runtime
                         int tx = x - 1 + (k & 1), ty = y - 1 + (k >> 1);
                         int t = TileAt(tx, ty);
                         if (t == -1) { t = TileAt(Mathf.Clamp(tx, 0, d.W - 1), Mathf.Clamp(ty, 0, d.H - 1)); }
-                        if (t == Data.T_WATER) { water++; continue; }
+                        if (WetT(t)) { water++; continue; }   // bridges: river under the deck (MapGen.Bridges.cs)
                         var c = TileBase(t, x, y);
                         wr += c.r; wg += c.g; wb += c.b; n++;
                     }
@@ -367,7 +369,7 @@ namespace DayZero.Runtime
                     if (water == 0)
                     {
                         int near = 0;
-                        for (int k = 0; k < 4; k++) { int tx = x - 2 + (k & 1) * 3, ty = y - 2 + (k >> 1) * 3; if (TileAt(tx, ty) == Data.T_WATER) near++; }
+                        for (int k = 0; k < 4; k++) { int tx = x - 2 + (k & 1) * 3, ty = y - 2 + (k >> 1) * 3; if (WetT(TileAt(tx, ty))) near++; }
                         if (near > 0) col = Mul(Lerp(col, BANK, 0.3f * near), 1f - 0.03f * near);   // damp, darker bank ring
                     }
                     else col = Mul(Lerp(Lerp(col, BANK, 0.85f), BANK_DEEP, f), 0.9f);              // wet mud at the waterline
@@ -414,7 +416,7 @@ namespace DayZero.Runtime
         Color32 WaterV(int x, int y)
         {
             int n = 0;
-            for (int dy = -3; dy <= 3; dy += 3) for (int dx = -3; dx <= 3; dx += 3) if (TileAt(x + dx, y + dy) == Data.T_WATER) n++;
+            for (int dy = -3; dy <= 3; dy += 3) for (int dx = -3; dx <= 3; dx += 3) if (WetT(TileAt(x + dx, y + dy))) n++;
             float depth = Mathf.Clamp01((n - 2) / 6f);
             Color c = WaterCol(x, y);
             c = Lerp(c, FOAM, (1f - Mathf.Clamp01(depth / 0.2f)) * 0.3f);   // static pale shore strip (fallback / preview)
@@ -423,14 +425,14 @@ namespace DayZero.Runtime
 
         bool NearWater(int x, int y)
         {
-            for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) if (TileAt(x + dx, y + dy) == Data.T_WATER) return true;
+            for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) if (WetT(TileAt(x + dx, y + dy))) return true;
             return false;
         }
 
         Color WaterCol(int x, int y)
         {
             int n = 0;
-            for (int dy = -3; dy <= 3; dy += 3) for (int dx = -3; dx <= 3; dx += 3) if (TileAt(x + dx, y + dy) == Data.T_WATER) n++;
+            for (int dy = -3; dy <= 3; dy += 3) for (int dx = -3; dx <= 3; dx += 3) if (WetT(TileAt(x + dx, y + dy))) n++;
             Color c = Lerp(Hex("#5a6a5e"), WATER, Mathf.Clamp01(n / 5f));
             c = Lerp(c, WATER_DEEP, Mathf.Clamp01((n - 6) / 3f) * 0.8f);
             float k = Noise(x, y, 13f, 77);
@@ -499,6 +501,7 @@ namespace DayZero.Runtime
                         if (dir == 3) { acr0 = acr1 = 0f; w = 0f; }
                         else { acr0 = (posV[k] / (float)runV[k]) * 2f - 1f; acr1 = ((posV[k] + 1) / (float)runV[k]) * 2f - 1f; }
                         float y = c == C_BRIDGE ? 0.06f : ROAD_Y;
+                        if (c == C_BRIDGE && DeckDrawn) { i = e; continue; }   // the raised deck replaces it (MapGen.Bridges.cs)
                         g.Flat(a, b, cc, dd, y, AsphaltCol(a, acr0, w), AsphaltCol(b, acr0, w), AsphaltCol(cc, acr1, w), AsphaltCol(dd, acr1, w));
                     }
                     else if (c == C_SIDE)
@@ -528,6 +531,7 @@ namespace DayZero.Runtime
                     float w = runU[k] * CELL;
                     float acr0 = (posU[k] / (float)runU[k]) * 2f - 1f, acr1 = ((posU[k] + 1) / (float)runU[k]) * 2f - 1f;
                     float y = c == C_BRIDGE ? 0.06f : ROAD_Y;
+                    if (c == C_BRIDGE && DeckDrawn) { j = e; continue; }
                     g.Flat(a, b, cc, dd, y, AsphaltCol(a, acr0, w), AsphaltCol(b, acr1, w), AsphaltCol(cc, acr1, w), AsphaltCol(dd, acr0, w));
                     j = e;
                 }
@@ -542,7 +546,7 @@ namespace DayZero.Runtime
                     var ctr = CellC(i, j);
                     if (!InRect(ctr, x0, y0, x1, y1)) continue;
                     if (c == C_SIDE) SidewalkCell(g, i, j);
-                    else if (Roadish(c)) RoadCell(g, i, j, c);
+                    else if (c == C_ROAD || (c == C_BRIDGE && !DeckDrawn)) RoadCell(g, i, j, c);
                 }
         }
 
@@ -731,7 +735,7 @@ namespace DayZero.Runtime
                 for (int x = x0; x < x1; x++)
                 {
                     int t = d.Tiles[y * d.W + x];
-                    if (!IsRoadT(t) || InCity(x + 0.5f, y + 0.5f)) continue;
+                    if (!IsRoadT(t) || InCity(x + 0.5f, y + 0.5f) || (t == Data.T_BRIDGE && DeckDrawn)) continue;
                     Color c = Lerp(ASPH, DIRT, 0.35f + Noise(x, y, 5f, 3) * 0.3f);
                     g.Flat(new Vector2(x, y), new Vector2(x + 1, y), new Vector2(x + 1, y + 1), new Vector2(x, y + 1), ROAD_Y, c, c, c, c);
                 }

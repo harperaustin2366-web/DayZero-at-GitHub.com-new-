@@ -104,7 +104,7 @@ namespace DayZero.Runtime
                 {
                     var wp = new Vector2(w.Pos.x + 0.5f, w.Pos.y + 0.5f);
                     float a = (w.Id % 7) * 0.9f + (w.Id % 3) * 0.3f;   // view3d.gd wreck_xf
-                    Vehicle(g, wp, new Vector2(Mathf.Cos(a), Mathf.Sin(a)), w.Type, w.Id * 97 + 11, VehLook.Wreck, ROAD_Y);
+                    Vehicle(g, wp, new Vector2(Mathf.Cos(a), Mathf.Sin(a)), w.Type, w.Id * 97 + 11, VehLook.Wreck, ROAD_Y + DeckLift(wp));
                     if (w.Id == selWreck) Ring(g, wp, VehicleSize(w.Type).x + 0.35f, Hex("#e0a030"));
                 }
             return new Chunk { Mesh = g.M, Shadow = g.S };

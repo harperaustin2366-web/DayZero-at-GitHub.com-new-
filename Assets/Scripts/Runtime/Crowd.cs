@@ -735,7 +735,7 @@ namespace DayZero.Runtime
             {
                 bool useFull = a.Manual || (camDist <= FullDist && full < MaxFull && a.Dist2 < fullR * fullR);
                 if (!useFull && (camDist > LowDist || low >= MaxLow || a.Low == null)) continue;
-                var root = M34.Scaled(M34.TRS(Geo.W(a.Pos, GROUND_Y + a.Height - SinkOf(a)), 0f, a.Yaw), MT);
+                var root = M34.Scaled(M34.TRS(Geo.W(a.Pos, GROUND_Y + a.Height + Lift(a.Pos) - SinkOf(a)), 0f, a.Yaw), MT);
                 if (useFull)
                 {
                     full++;
@@ -761,9 +761,9 @@ namespace DayZero.Runtime
                 foreach (var v in _vehs.Values)
                 {
                     bool puller = v.Type != "none";
-                    if (puller) MapGen.Vehicle(vg, v.Pos, v.Dir, v.Type, v.Salt, v.Wreck ? MapGen.VehLook.Towed : MapGen.VehLook.Driving, 0.02f);
+                    if (puller) MapGen.Vehicle(vg, v.Pos, v.Dir, v.Type, v.Salt, v.Wreck ? MapGen.VehLook.Towed : MapGen.VehLook.Driving, 0.02f + Lift(v.Pos));
                     if (!v.HasTow) continue;
-                    MapGen.Vehicle(vg, v.TowPos, v.TowDir, v.TowType, v.TowSalt, MapGen.VehLook.Towed, 0.02f);
+                    MapGen.Vehicle(vg, v.TowPos, v.TowDir, v.TowType, v.TowSalt, MapGen.VehLook.Towed, 0.02f + Lift(v.TowPos));
                     // tow line: from the rear of the puller to the nose of the wreck
                     var a0 = puller ? v.Pos - v.Dir * MapGen.VehicleSize(v.Type).x : v.Pos; var a1 = v.TowPos + v.TowDir * MapGen.VehicleSize(v.TowType).x;
                     vg.Beam(Geo.W(a0, 0.16f), Geo.W(a1, 0.16f), 0.012f, Geo.Hex("#2a2a26"));
@@ -773,6 +773,7 @@ namespace DayZero.Runtime
         }
         readonly List<Agent> _draw = new List<Agent>(512);
 
+        float Lift(Vector2 p) => _gen != null ? _gen.DeckLift(p) : 0f;   // standing on a raised bridge deck (MapGen.Bridges.cs)
         static float SinkOf(Agent a) => a.DeadT > 5.5f ? (a.DeadT - 5.5f) * 0.12f : 0f;
 
         static void Emit(MeshData m, CharPart part, M34 x)
