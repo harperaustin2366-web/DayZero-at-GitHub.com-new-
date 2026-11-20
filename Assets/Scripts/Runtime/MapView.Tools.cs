@@ -158,21 +158,13 @@ namespace DayZero.Runtime
                 {
                     kind = MapGen.GhostKind.Gate;
                     // v0.14.0a: the reach grows with the camera distance so a gate can be dropped on a fence when zoomed out
-                    float reach = Mathf.Max(1.6f, _dist * 0.045f); int ri = Mathf.CeilToInt(reach);
-                    int best = -1; float bd = reach;
-                    for (int dy = -ri; dy <= ri; dy++)
-                        for (int dx = -ri; dx <= ri; dx++)
-                        {
-                            var q = new Vector2Int(tile.x + dx, tile.y + dy);
-                            if (!D.InMap(q)) continue;
-                            int k = q.y * D.W + q.x;
-                            if (!g.S.Fences.ContainsKey(k)) continue;
-                            float dd = (new Vector2(q.x + 0.5f, q.y + 0.5f) - GhostAt).magnitude;
-                            if (dd < bd) { bd = dd; best = k; }
-                        }
+                    float reach = Mathf.Max(1.6f, _dist * 0.045f);
+                    // v0.19.2: snap to the nearest fence tile that can really take a gate (straight stretch, flush, walk-through);
+                    // when none can, show why the nearest one can't (Game.FenceRules.cs)
+                    int best = g.SnapGate(GhostAt, Mathf.Max(reach, 2.5f), out string why);
                     _toolKey = best;
                     if (best >= 0) { a = new Vector2(best % D.W + 0.5f, best / D.W + 0.5f); tiles.Add(best); }
-                    ToolErr = best < 0 ? "Tap a wall to put a gate in it." : g.CanGate(best);
+                    ToolErr = best < 0 ? why : g.CanGate(best);
                     if (ToolErr == "" && !g.CanAfford(Data.GATE_COST)) ToolErr = "Need " + Game.FmtCost(Data.GATE_COST) + ".";
                     ToolOk = ToolErr == ""; state.Add(ToolOk ? 0 : 2);
                     ToolCost = Game.FmtCost(Data.GATE_COST);

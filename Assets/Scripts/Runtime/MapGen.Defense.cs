@@ -101,18 +101,58 @@ namespace DayZero.Runtime
         // now nothing drew them. Corner-post fences are drawn as straight runs from post to post along the curb, each
         // element looking up the sim tile under it (hp, gate, breach). Loose tiles are joined to their fenced neighbours.
         readonly HashSet<int> _fenceDrawn = new HashSet<int>();
+        readonly HashSet<int> _wallDrawn = new HashSet<int>();
+        readonly HashSet<int> _edgeSet = new HashSet<int>();
+        readonly List<Vector2> _gateAt = new List<Vector2>();
+        int[] _smpK = new int[64]; byte[] _smpS = new byte[64];
+
+        /// <summary>v0.19.2: the fence tile a point on a section's line stands on. The sim fences the tiles the line was
+        /// sampled through (Data.RgEdgeTiles), so where the line steps diagonally it clips the corner of a tile that is not
+        /// fenced; the piece there belongs to the fenced tile of this section that is closest (within a quarter tile),
+        /// otherwise the drawn fence had a hole at every diagonal step (the sim never had one: movement is 4-way).</summary>
+        int FenceTileOn(Vector2 p, GameState S)
+        {
+            int tx = Mathf.FloorToInt(p.x), ty = Mathf.FloorToInt(p.y);
+            if (tx < 0 || ty < 0 || tx >= d.W || ty >= d.H) return -1;
+            int k0 = ty * d.W + tx;
+            if (S.Fences.ContainsKey(k0) || S.Breaches.ContainsKey(k0)) return k0;
+            int best = -1; float bd = 0.25f;
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    if (dx == 0 && dy == 0) continue;
+                    int x = tx + dx, y = ty + dy;
+                    if (x < 0 || y < 0 || x >= d.W || y >= d.H) continue;
+                    int k = y * d.W + x;
+                    if (!_edgeSet.Contains(k) || (!S.Fences.ContainsKey(k) && !S.Breaches.ContainsKey(k))) continue;
+                    float ox = Mathf.Max(0f, Mathf.Max(x - p.x, p.x - (x + 1))), oy = Mathf.Max(0f, Mathf.Max(y - p.y, p.y - (y + 1)));
+                    float dd = Mathf.Sqrt(ox * ox + oy * oy);
+                    if (dd < bd) { bd = dd; best = k; }
+                }
+            return best;
+        }
+
+        /// <summary>Solid ground a fence may butt into: a building / lot tile (the sim blocks it) not yet inside the drawn walls.</summary>
+        bool ButtGround(Vector2 p)
+        {
+            int tx = Mathf.FloorToInt(p.x), ty = Mathf.FloorToInt(p.y);
+            if (tx < 0 || ty < 0 || tx >= d.W || ty >= d.H) return false;
+            int t = d.Tiles[ty * d.W + tx];
+            if (t != Data.T_BLD) return false;
+            return !InBuilding(p, 0.02f);
+        }
 
         void DrawFenceLines(Geo g, Game game)
         {
             var S = game.S;
             if (S == null || (S.Fences.Count == 0 && S.Breaches.Count == 0)) return;
-            _fenceDrawn.Clear();
+            _fenceDrawn.Clear(); _wallDrawn.Clear(); _gateAt.Clear();
             if (S.Walls != null)
                 foreach (var r in S.Walls)
                 {
                     float len = (r.B - r.A).magnitude; if (len < 0.2f) continue;
                     var dir = (r.B - r.A) / len;
-                    for (float t = 0f; t <= len; t += 0.25f) { var p = r.A + dir * t; var tl = new Vector2Int(Mathf.FloorToInt(p.x), Mathf.FloorToInt(p.y)); if (d.InMap(tl)) _fenceDrawn.Add(tl.y * d.W + tl.x); }
+                    for (float t = 0f; t <= len; t += 0.25f) { var p = r.A + dir * t; var tl = new Vector2Int(Mathf.FloorToInt(p.x), Mathf.FloorToInt(p.y)); if (d.InMap(tl)) { _fenceDrawn.Add(tl.y * d.W + tl.x); _wallDrawn.Add(tl.y * d.W + tl.x); } }
                 }
             var gates = new HashSet<int>();
             var corners = new HashSet<int>();
@@ -128,7 +168,77 @@ namespace DayZero.Runtime
                 float step = WallStep(tierSeg);
                 int n = Mathf.Max(1, Mathf.RoundToInt(len / step));
                 float st = len / n;
+                _edgeSet.Clear(); foreach (int k in game.EdgeTiles(e)) _edgeSet.Add(k);
+                if (_smpK.Length < n) { _smpK = new int[n * 2]; _smpS = new byte[n * 2]; }
+                // 1. classify every element slot: 1 fence, 2 gate tile, 3 breach, 4 solid ground to butt into, 0 nothing.
+                // v0.19.2: no slot is skipped because another section already drew "its" tile (that left a gap of up to a
+                // tile at every corner post and T-junction); only the camp palisade's own tiles are left to it.
                 bool any = false;
+                for (int i = 0; i < n; i++)
+                {
+                    var p = a + dir * ((i + 0.5f) * st);
+                    int k = FenceTileOn(p, S);
+                    byte sv = 0;
+                    if (k >= 0 && _wallDrawn.Contains(k)) { k = -1; sv = 5; }
+                    if (k >= 0)
+                    {
+                        if (S.Fences.ContainsKey(k)) { sv = S.Gates.ContainsKey(k) ? (byte)2 : (byte)1; any = true; }
+                        else sv = 3;
+                    }
+                    else if (sv == 0 && ButtGround(p)) sv = 4;
+                    _smpK[i] = k; _smpS[i] = sv;
+                }
+                if (!any) continue;
+                // 2. gates: one leaf per gate tile, centred on the stretch of line inside that tile so the posts sit flush
+                // with the fence on both sides; slots under the leaf draw nothing, slots of the gate tile outside it are fence
+                int g0 = _gateAt.Count;
+                for (int i = 0; i < n; i++)
+                {
+                    if (_smpS[i] != 2) continue;
+                    int k = _smpK[i];
+                    int j = i; while (j + 1 < n && _smpK[j + 1] == k) j++;
+                    float tc = ((i + j + 1) * 0.5f) * st;
+                    tc = Mathf.Clamp(tc, Mathf.Min(0.45f, len * 0.5f), Mathf.Max(len - 0.45f, len * 0.5f));
+                    var gp = a + dir * tc;
+                    bool dup = false;
+                    foreach (var q in _gateAt) if ((q - gp).sqrMagnitude < 0.36f) { dup = true; break; }
+                    if (gates.Add(k) && !dup)
+                    {
+                        var f = S.Fences[k];
+                        GateLeaf(g, gp, dir, nrm, f.Tier, (float)(f.Hp / Math.Max(1.0, game.FenceTileMax(k))));
+                        GateMark(g, gp, nrm);
+                        _gateAt.Add(gp);
+                    }
+                    i = j;
+                }
+                // gates drawn by another section across the same tile also clear this line
+                bool UnderGate(float t)
+                {
+                    var p = a + dir * t;
+                    foreach (var q in _gateAt)
+                    {
+                        var o = p - q;
+                        float along = Mathf.Abs(Vector2.Dot(o, dir)), off = Mathf.Abs(Vector2.Dot(o, nrm));
+                        if (off < 0.3f && along < 0.45f + st * 0.35f) return true;
+                    }
+                    return false;
+                }
+                // 3. solid slots next to a standing run carry the fence on until it meets the drawn wall (a run that ends at
+                // a building butts into it: the lot tile is solid for the sim, but the walls stand back from the tile edge)
+                const float BUTT_MAX = 1.6f;
+                for (int pass = 0; pass < 2; pass++)
+                    for (int i0 = 0; i0 < n; i0++)
+                    {
+                        int i = pass == 0 ? i0 : n - 1 - i0, nb = pass == 0 ? i - 1 : i + 1;
+                        if (_smpS[i] != 4 || nb < 0 || nb >= n) continue;
+                        byte ns = _smpS[nb];
+                        if (ns != 1 && ns != 6) continue;
+                        // distance walked into the solid stretch
+                        int src = nb; while (src >= 0 && src < n && _smpS[src] == 6) src += pass == 0 ? -1 : 1;
+                        if (Mathf.Abs(i - src) * st > BUTT_MAX) continue;
+                        _smpS[i] = 6; _smpK[i] = _smpK[nb];
+                    }
+                // 4. draw: fence pieces, rubble, binding rails along every standing stretch
                 float run0 = -1f;
                 for (int i = 0; i <= n; i++)
                 {
@@ -137,53 +247,60 @@ namespace DayZero.Runtime
                     {
                         float t = (i + 0.5f) * st;
                         var p = a + dir * t;
-                        var tile = new Vector2Int(Mathf.FloorToInt(p.x), Mathf.FloorToInt(p.y));
-                        if (d.InMap(tile))
+                        byte sv = _smpS[i]; int k = _smpK[i];
+                        int salt = e * 977 + i;
+                        if ((sv == 1 || sv == 2 || sv == 6) && k >= 0 && S.Fences.TryGetValue(k, out var f) && !UnderGate(t))
                         {
-                            int k = tile.y * d.W + tile.x;
-                            if (!_fenceDrawn.Contains(k) || gates.Contains(k))
-                            {
-                                int salt = e * 977 + i;
-                                if (S.Fences.TryGetValue(k, out var f))
-                                {
-                                    any = true;
-                                    float frac = (float)(f.Hp / Math.Max(1.0, game.FenceTileMax(k)));
-                                    if (S.Gates.ContainsKey(k))
-                                    {
-                                        if (gates.Add(k))
-                                        {
-                                            // one gate per tile, centred where the line crosses the tile
-                                            var tc = new Vector2(tile.x + 0.5f, tile.y + 0.5f);
-                                            var gp = a + dir * Mathf.Clamp(Vector2.Dot(tc - a, dir), 0f, len);
-                                            GateLeaf(g, gp, dir, nrm, f.Tier, frac);
-                                            GateMark(g, gp, nrm);
-                                        }
-                                    }
-                                    else { WallPiece(g, p, dir, nrm, st, f.Tier, frac, salt); standing = true; }
-                                }
-                                else if (S.Breaches.TryGetValue(k, out var br)) { if ((i & 1) == 0) Rubble(g, p, dir, nrm, br.Tier, salt); }
-                            }
+                            float frac = (float)(f.Hp / Math.Max(1.0, game.FenceTileMax(k)));
+                            WallPiece(g, p, dir, nrm, st, f.Tier, frac, salt); standing = true;
                         }
+                        else if (sv == 3 && S.Breaches.TryGetValue(k, out var br)) { if ((i & 1) == 0) Rubble(g, p, dir, nrm, br.Tier, salt); }
                     }
-                    // binding rails (wood) / top wire (others) along each standing stretch
                     if (standing && run0 < 0f) run0 = i * st;
                     if (!standing && run0 >= 0f) { FenceRail(g, a + dir * run0, a + dir * (i * st), nrm, tierSeg); run0 = -1f; }
                 }
-                if (!any) continue;
-                for (int i = 0; i <= n; i++)
+                // 5. a run that stops short of a building: carry it on past its end post up to the wall
+                for (int end = 0; end < 2; end++)
                 {
+                    int nd = end == 0 ? d.RgEa[e] : d.RgEb[e];
+                    int last = end == 0 ? 0 : n - 1;
+                    if (_smpS[last] != 1 && _smpS[last] != 6) continue;
+                    int fenced = 0; foreach (int e2 in d.RgAdj[nd]) if (S.Fsegs.ContainsKey(e2)) fenced++;
+                    if (fenced > 1) continue;
+                    var od = end == 0 ? -dir : dir; var on = new Vector2(-od.y, od.x);
+                    var np = d.RgPos(nd);
+                    int kk = _smpK[last];
+                    if (kk < 0 || !S.Fences.TryGetValue(kk, out var ff)) continue;
+                    float fr = (float)(ff.Hp / Math.Max(1.0, game.FenceTileMax(kk)));
+                    float t1 = 0f;
+                    for (float t = st * 0.5f; t < BUTT_MAX; t += st)
+                    {
+                        var p = np + od * t;
+                        if (!ButtGround(p)) break;
+                        WallPiece(g, p, od, on, st, ff.Tier, fr, e * 977 + 500 + (int)(t / st) + end * 50);
+                        t1 = t + st * 0.5f;
+                    }
+                    if (t1 > 0f) FenceRail(g, np, np + od * t1, on, tierSeg);
+                }
+                for (int i = 0; i < n; i++)
+                {
+                    if (_smpK[i] >= 0) _fenceDrawn.Add(_smpK[i]);
                     var p = a + dir * ((i + 0.5f) * st);
                     var tl = new Vector2Int(Mathf.FloorToInt(p.x), Mathf.FloorToInt(p.y));
                     if (d.InMap(tl)) _fenceDrawn.Add(tl.y * d.W + tl.x);
                 }
+                foreach (int k in _edgeSet) if (S.Fences.ContainsKey(k)) _fenceDrawn.Add(k);
                 // stout corner posts where sections meet
                 foreach (int nd in new[] { d.RgEa[e], d.RgEb[e] })
                 {
                     if (!corners.Add(nd)) continue;
                     var cp = d.RgPos(nd);
                     var ct = new Vector2Int(Mathf.FloorToInt(cp.x), Mathf.FloorToInt(cp.y));
-                    if (!d.InMap(ct) || !S.Fences.ContainsKey(ct.y * d.W + ct.x)) continue;
-                    CornerPost(g, cp, tierSeg);
+                    if (!d.InMap(ct)) continue;
+                    int ck = ct.y * d.W + ct.x;
+                    if (!S.Fences.ContainsKey(ck) && FenceTileOn(cp, S) < 0) continue;
+                    bool nearGate = false; foreach (var q in _gateAt) if ((q - cp).sqrMagnitude < 0.3f) nearGate = true;
+                    if (!nearGate) CornerPost(g, cp, tierSeg);
                 }
             }
             // loose fence tiles (build_fence): link each tile to its fenced neighbours
@@ -211,8 +328,8 @@ namespace DayZero.Runtime
                         if (links == 0) firstDir = dir;
                         links++;
                         if (gate || S.Gates.ContainsKey(q)) continue;
-                        // half link from this tile toward the neighbour (the neighbour draws the other half)
-                        float half = new Vector2(dx, dy).magnitude * 0.5f;
+                        // half link from this tile toward the neighbour (the neighbour draws the other half; all the way to a drawn section)
+                        float half = new Vector2(dx, dy).magnitude * (_fenceDrawn.Contains(q) ? 1f : 0.5f);   // v0.19.2: a section's line draws no half toward a loose tile
                         float stp = WallStep(f.Tier);
                         int n = Mathf.Max(1, Mathf.RoundToInt(half / stp));
                         float st = half / n;

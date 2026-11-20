@@ -33,6 +33,9 @@ namespace DayZero.Runtime
         static readonly Dictionary<int, RectInt> _ownBox = new Dictionary<int, RectInt>();
         static readonly Vector2[] _poly = new Vector2[8];
         static readonly List<int> _colKeys = new List<int>();
+        static byte[] _seen = new byte[0];
+        static readonly Dictionary<int, int> _line = new Dictionary<int, int>();
+        static readonly List<int> _q = new List<int>();
 
         /// <summary>Marching-squares case of the cell whose corners are the centres of tiles (x,y) (x+1,y) (x+1,y+1) (x,y+1).</summary>
         static int Cell(int o, int x, int y, int W, int H)
@@ -113,7 +116,7 @@ namespace DayZero.Runtime
                 int h = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(g);
                 h = h * 31 + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(g.S);
                 h = h * 31 + (gen == null ? 0 : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(gen));
-                h = h * 31 + g.EnclGen; h = h * 31 + g.CurCol; h = h * 31 + g.ViewCol; h = h * 31 + (far ? 1 : 0);
+                h = h * 31 + g.EnclGen; h = h * 31 + g.ClaimGen; h = h * 31 + g.CurCol; h = h * 31 + g.ViewCol; h = h * 31 + (far ? 1 : 0);
                 var cols = g.S.Cols;
                 for (int ci = 0; ci < cols.Count; ci++)
                 {
@@ -132,6 +135,7 @@ namespace DayZero.Runtime
                 {
                     var c = camps[i];
                     h = h * 31 + (c.Alive ? 1 : 0); h = h * 31 + c.Lot; h = h * 31 + (c.Color ?? "").GetHashCode();
+                    if (c.Claim != null) for (int j = 0; j < c.Claim.Count; j++) h = h * 31 + c.Claim[j];   // v0.19.2: claimed lots
                 }
                 return h;
             }
@@ -150,14 +154,18 @@ namespace DayZero.Runtime
             if (_own.Length != N) { _own = new int[N]; _own2 = new int[N]; }
             Array.Clear(_own, 0, N);
             _ownCol.Clear(); _ownBox.Clear();
+            // v0.19.2: one owner per colony, covering its camp enclosures AND every pocket its own fence closes (Game.TerritoryOwnerAt:
+            // RebuildEnclosures + RebuildClaims, both rebuilt only when the fences change). Extending the fence line outward
+            // closes a new pocket against the old line, which now joins the territory; the old line between them is grown
+            // over below, so the two read as one area. Tearing the fence down drops the pocket again.
             for (int k = 0; k < N; k++)
             {
-                var b = g.EnclBaseAt(k);
-                if (b == null) continue;
-                int o = b.Id + 1, x = k % W, y = k / W;
+                int ci = g.TerritoryOwnerAt(k);
+                if (ci < 0) continue;
+                int o = ci + 1, x = k % W, y = k / W;
                 _own[k] = o;
                 if (_ownBox.TryGetValue(o, out var bx)) _ownBox[o] = new RectInt(Math.Min(bx.x, x), Math.Min(bx.y, y), Math.Max((bx.x + bx.width), x + 1) - Math.Min(bx.x, x), Math.Max((bx.y + bx.height), y + 1) - Math.Min(bx.y, y));
-                else { _ownBox[o] = new RectInt(x, y, 1, 1); _ownCol[o] = ColonyColor(g, b.Col); }
+                else { _ownBox[o] = new RectInt(x, y, 1, 1); _ownCol[o] = ColonyColor(g, ci); }
             }
             {
                 // grow each region by one tile into the barrier it stops at (fence / gate / tower / building wall / water),
@@ -177,15 +185,76 @@ namespace DayZero.Runtime
                             int t = tl[k];
                             if (t != Data.T_BLD && !S.Fences.Has(k) && !S.Towers.Has(k) && !S.Gates.Has(k)) continue;   // v0.19 audit: not into the river
                             bool touch = false;
+                            bool wallT = t != Data.T_BLD;   // v0.19.2: a building only when it touches side-on, not across a diagonal step of the fence
                             for (int dy = -1; dy <= 1 && !touch; dy++)
                                 for (int dx = -1; dx <= 1; dx++)
                                 {
+                                    if (!wallT && dx != 0 && dy != 0) continue;
                                     int nx = x + dx, ny = y + dy;
                                     if (nx < 0 || ny < 0 || nx >= W || ny >= H || _own[ny * W + nx] != o) continue;
                                     touch = true; break;
                                 }
                             if (touch) _own2[k] = o;
                         }
+                }
+                // v0.19.2: the whole area inside the fence takes the colour, buildings and yards included (the sim's flood only
+                // holds open ground, so the lots inside a fenced block were left as uncoloured holes): flood each colony's box
+                // from its border around its own tiles; whatever dry tile the flood can't reach is inside the fence line
+                // a section's line is the wall even where it crosses a lot (no fence tile there: the building blocks)
+                _line.Clear();
+                foreach (var kv in S.Fsegs)
+                    if (kv.Key >= 0 && kv.Key < d.RgEdges())
+                        foreach (int k in g.EdgeTiles(kv.Key)) _line[k] = kv.Value.Col;
+                foreach (int o in _colKeys)
+                {
+                    var bx = _ownBox[o];
+                    // the colony's own fence line bounds the area too (a fenced block's far side can lie past its open ground)
+                    int fx0 = bx.x, fy0 = bx.y, fx1 = bx.x + bx.width - 1, fy1 = bx.y + bx.height - 1;
+                    foreach (var kv in S.Fences)
+                    {
+                        if (kv.Value.Col != o - 1) continue;
+                        int x = kv.Key % W, y = kv.Key / W;
+                        if (x < bx.x - 40 || x > fx1 + 40 || y < bx.y - 40 || y > fy1 + 40) continue;   // a far-off fence of the same colony
+                        fx0 = Math.Min(fx0, x); fy0 = Math.Min(fy0, y); fx1 = Math.Max(fx1, x); fy1 = Math.Max(fy1, y);
+                    }
+                    bx = new RectInt(fx0, fy0, fx1 - fx0 + 1, fy1 - fy0 + 1);
+                    int xa = Math.Max(0, bx.x - 2), xb = Math.Min(W - 1, bx.x + bx.width + 1), ya = Math.Max(0, bx.y - 2), yb = Math.Min(H - 1, bx.y + bx.height + 1);
+                    int bw = xb - xa + 1, bh = yb - ya + 1;
+                    if (bw < 3 || bh < 3) continue;
+                    if (_seen.Length < bw * bh) _seen = new byte[bw * bh * 2];
+                    Array.Clear(_seen, 0, bw * bh);
+                    _q.Clear();
+                    for (int y = 0; y < bh; y++)
+                        for (int x = 0; x < bw; x++)
+                        {
+                            if (x != 0 && y != 0 && x != bw - 1 && y != bh - 1) continue;
+                            int k = (ya + y) * W + xa + x;
+                            if (_own2[k] == o || OwnWall(S, k, o - 1)) continue;
+                            _seen[y * bw + x] = 1; _q.Add(y * bw + x);
+                        }
+                    for (int h = 0; h < _q.Count; h++)
+                    {
+                        int li = _q[h], x = li % bw, y = li / bw;
+                        for (int q = 0; q < 4; q++)
+                        {
+                            int nx = x + (q == 0 ? 1 : q == 1 ? -1 : 0), ny = y + (q == 2 ? 1 : q == 3 ? -1 : 0);
+                            if (nx < 0 || ny < 0 || nx >= bw || ny >= bh) continue;
+                            int nl = ny * bw + nx;
+                            int nk = (ya + ny) * W + xa + nx;
+                            if (_seen[nl] != 0 || _own2[nk] == o || OwnWall(S, nk, o - 1)) continue;
+                            _seen[nl] = 1; _q.Add(nl);
+                        }
+                    }
+                    int ox0 = int.MaxValue, oy0 = int.MaxValue, ox1 = -1, oy1 = -1;
+                    for (int y = 1; y < bh - 1; y++)
+                        for (int x = 1; x < bw - 1; x++)
+                        {
+                            int k = (ya + y) * W + xa + x;
+                            if (_seen[y * bw + x] == 0 && _own2[k] == 0 && !Wet(tl[k])) _own2[k] = o;
+                            if (_own2[k] != o) continue;
+                            ox0 = Math.Min(ox0, xa + x); oy0 = Math.Min(oy0, ya + y); ox1 = Math.Max(ox1, xa + x); oy1 = Math.Max(oy1, ya + y);
+                        }
+                    if (ox1 >= 0) _ownBox[o] = new RectInt(ox0, oy0, ox1 - ox0 + 1, oy1 - oy0 + 1);
                 }
                 // faction compounds (always walled, MapGen.FactionLayoutOf): their lot plus the palisade yard, grown half a
                 // tile so the edge runs just outside the palisade (the building fills most of a compound)
@@ -211,6 +280,34 @@ namespace DayZero.Runtime
                                 if (Wet(d.Tiles[k])) continue;   // v0.19 audit: the compound tint stops at the waterline
                                 _own2[k] = o;
                                 bx0 = Math.Min(bx0, x); by0 = Math.Min(by0, y); bx1 = Math.Max(bx1, x); by1 = Math.Max(by1, y);
+                            }
+                        // v0.19.2: the buildings the camp has taken over since (LeaderBrain "expand", Game.FactionGrowClaim: the
+                        // pennant lots) are its territory too, so an expanding faction's colour grows with it
+                        if (c.Claim != null && d.LotId.Length == N)
+                            foreach (int l in c.Claim)
+                            {
+                                if (l == c.Lot || l < 0 || l >= d.Lots.Count) continue;
+                                var L = d.Lots[l];
+                                for (int y = Math.Max(0, L.Y - 1); y <= Math.Min(H - 1, L.Y + L.H); y++)
+                                    for (int x = Math.Max(0, L.X - 1); x <= Math.Min(W - 1, L.X + L.W); x++)
+                                    {
+                                        int k = y * W + x;
+                                        if (_own2[k] != 0 || Wet(d.Tiles[k])) continue;
+                                        bool inLot = d.LotId[k] == l;
+                                        // the lot itself, plus a one-tile apron of open ground around it (the edge then runs along the curb)
+                                        if (!inLot)
+                                        {
+                                            bool touch = false;
+                                            for (int q = 0; q < 4 && !touch; q++)
+                                            {
+                                                int nx = x + (q == 0 ? 1 : q == 1 ? -1 : 0), ny = y + (q == 2 ? 1 : q == 3 ? -1 : 0);
+                                                if (nx >= 0 && ny >= 0 && nx < W && ny < H && d.LotId[ny * W + nx] == l) touch = true;
+                                            }
+                                            if (!touch || d.Tiles[k] == Data.T_BLD) continue;
+                                        }
+                                        _own2[k] = o;
+                                        bx0 = Math.Min(bx0, x); by0 = Math.Min(by0, y); bx1 = Math.Max(bx1, x); by1 = Math.Max(by1, y);
+                                    }
                             }
                         if (bx1 < 0) continue;
                         _ownBox[o] = new RectInt(bx0, by0, bx1 - bx0 + 1, by1 - by0 + 1);
@@ -256,10 +353,26 @@ namespace DayZero.Runtime
             }
             // faction compounds sit wedged between houses, so their tinted yard hides behind roofs from most angles: a dashed
             // ring in the faction colour around each live camp (outpost zone radius) marks them at a glance
+            // v0.19.2: the ring widens to take in the buildings the camp has claimed since, so an expanding faction is seen growing
             foreach (var c in g.S.Camps)
-                if (c.Alive && c.Lot >= 0) DashedCircle(m, new Vector2(c.Pos.x + 0.5f, c.Pos.y + 0.5f), FACTION_RING_R, far ? 0.45f : 0.16f, C32(Game.FactionColor(c), DASH_A + 0.12f));
+            {
+                if (!c.Alive || c.Lot < 0) continue;
+                var cc = new Vector2(c.Pos.x + 0.5f, c.Pos.y + 0.5f);
+                float rr = FACTION_RING_R;
+                if (c.Claim != null)
+                    foreach (int l in c.Claim)
+                        if (l != c.Lot && l >= 0 && l < d.Lots.Count)
+                        {
+                            var L = d.Lots[l];
+                            rr = Mathf.Max(rr, (new Vector2(L.X + L.W * 0.5f, L.Y + L.H * 0.5f) - cc).magnitude + Mathf.Max(L.W, L.H) * 0.5f + 1.5f);
+                        }
+                DashedCircle(m, cc, Mathf.Min(rr, 22f), far ? 0.45f : 0.16f, C32(Game.FactionColor(c), DASH_A + 0.12f));
+            }
 
         }
+
+        static bool OwnWall(GameState S, int k, int ci) =>
+            (S.Fences.TryGetValue(k, out var f) && f.Col == ci) || (S.Towers.TryGetValue(k, out var t) && t.Col == ci) || (_line.TryGetValue(k, out int lc) && lc == ci);
 
         static bool Wet(int t) => t == Data.T_WATER || t == Data.T_BRIDGE;
         static bool WetAt(Vector2 p)

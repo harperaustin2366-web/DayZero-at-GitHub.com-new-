@@ -594,9 +594,15 @@ namespace DayZero.Runtime
             else
             {
                 string ge = g.CanGate(k);
-                bool on = ge == "" && g.CanAfford(Data.GATE_COST);
-                if (Button2(p, cols[0], ge == "" ? "MAKE IT A GATE" : "GATE: " + ge, ge == "" ? Game.FmtCost(Data.GATE_COST) : null, on ? UiRole.Primary : UiRole.Disabled) && on)
-                { var e = H.Do("place_gate", k); H.Toast(e == "" ? "Gate built." : e); H.Dirty?.Invoke(); }
+                // v0.19.2: a tile that can't take a gate (corner, end of the run, diagonal step) snaps to the nearest one along
+                // the fence that can (Game.SnapGate); when none can, the button says why
+                int gk = k;
+                if (ge != "") { int sk = g.SnapGate(new Vector2(pos.x + 0.5f, pos.y + 0.5f), 2.5f, out _); if (sk >= 0) gk = sk; }
+                bool snapped = gk != k;
+                bool on = (ge == "" || snapped) && g.CanAfford(Data.GATE_COST);
+                string gl = ge == "" ? "MAKE IT A GATE" : snapped ? "GATE NEXT TO IT" : "GATE: " + ge;
+                if (Button2(p, cols[0], gl, ge == "" || snapped ? Game.FmtCost(Data.GATE_COST) : null, on ? UiRole.Primary : UiRole.Disabled) && on)
+                { var e = H.Do("place_gate", gk); H.Toast(e == "" ? (snapped ? "Gate built on the nearest straight stretch (" + ge.TrimEnd('.') + " here)." : "Gate built.") : e); H.Dirty?.Invoke(); }
             }
             if (se >= 0)
             {

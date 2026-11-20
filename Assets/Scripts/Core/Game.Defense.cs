@@ -225,11 +225,14 @@ namespace DayZero.Core
 
         public List<int> EdgeTiles(int e)
         {
+            if (_edgeCacheExp != ExpansionRules) { _edgeCache.Clear(); _edgeCacheExp = ExpansionRules; }
             if (_edgeCache.TryGetValue(e, out var t)) return t;
             t = D.RgEdgeTiles(e);
+            if (ExpansionRules) t = FillDiagonalSteps(e, t);   // v0.19.2 (Game.FenceRules.cs)
             _edgeCache[e] = t;
             return t;
         }
+        bool _edgeCacheExp;
 
         public int SegAtTile(int k)
         {
@@ -1202,6 +1205,7 @@ namespace DayZero.Core
             }
             if (sig == _claimSig && _claim.Length == W * H) return;
             _claimSig = sig;
+            ClaimGen++;
             if (_claim.Length != W * H) _claim = new byte[W * H];
             Array.Clear(_claim, 0, _claim.Length);
             _claimTiles.Clear(); _claimLots.Clear();
@@ -1360,6 +1364,7 @@ namespace DayZero.Core
             var b = LineBase(k);
             if (b == null) return "Too far from your camps.";
             if (GatesNear(b) >= 4) return "Four gates per camp at most.";
+            if (ExpansionRules) return GateSpotError(k);   // v0.19.2: straight stretch, flush, walk-through (Game.FenceRules.cs)
             return "";
         }
 
