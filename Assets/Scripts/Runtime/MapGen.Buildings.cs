@@ -427,6 +427,9 @@ namespace DayZero.Runtime
                 else if (info.A == Arch.Apartment) { info.Floors = Math.Min(info.Floors, Math.Max(2, Mathf.RoundToInt(info.R.Short * 2f / FLOOR * 1.4f))); info.WallTop = info.Floors * FLOOR + 0.12f; }
                 else if (info.A == Arch.Office) { info.Floors = Math.Min(info.Floors, Math.Max(3, Mathf.RoundToInt(info.R.Short * 2f / (3.6f * MT) * 2.2f))); info.WallTop = info.Floors * info.FloorH + 0.1f; }
             }
+            // v0.19 audit: neighbouring blocks overlap a little where the rotated lots meet; equal floor counts gave coplanar
+            // roofs that z-fought. A 0-18 mm step per lot keeps adjacent roofs apart (invisible at map scale).
+            if (info.Floors > 0) info.WallTop += (l % 7) * 0.003f;
             info.Wall = Geo.Desat(info.Wall, 0.04f);
             info.Front = FrontFace(info.R, new Vector2(L.DoorX + 0.5f, L.DoorY + 0.5f));
             info.Top = info.WallTop;
@@ -509,7 +512,7 @@ namespace DayZero.Runtime
                 case Arch.House: case Arch.Hut: case Arch.Barn: case Arch.Church:
                 {
                     if (R.Hu < R.Hv) R = new ORect(R.C, R.V, R.Hv, R.Hu);
-                    if (info.Dmg == 3) { g.Box(R.Quad(), 0f, info.WallTop * 0.5f, Lerp(info.Wall, CHAR, 0.7f), INTERIOR, 0.2f); return; }
+                    if (info.Dmg == 3) { LoShell(g, R, info.WallTop * 0.55f, Lerp(info.Wall, CHAR, 0.7f)); return; }
                     g.Box(R.Quad(), 0f, info.WallTop, info.Wall, info.Wall, 0.22f, false);
                     float ridge = info.A == Arch.Church ? info.WallTop + R.Hv * 1.2f : info.Top;
                     g.Gable(R, info.WallTop, ridge, info.Roof, info.Wall, 0.1f, 1);
@@ -519,12 +522,30 @@ namespace DayZero.Runtime
                 default:
                 {
                     if (info.A != Arch.Gas) Yard(g, l, info.Lot.Inset(0.06f), info.A == Arch.Industrial ? Hex("#615c50") : Hex("#6c675a"));
-                    float H = info.Dmg == 3 ? info.WallTop * 0.5f : info.WallTop;
+                    if (info.Dmg == 3) { LoShell(g, R, info.WallTop * 0.55f, info.Wall); return; }   // v0.19 audit: hollow like the near shell
+                    float H = info.WallTop;
                     g.Box(R.Quad(), 0f, H, info.Wall, info.Dmg == 3 ? INTERIOR : info.Roof, 0.3f);
                     g.Shadow(R.Quad(), H + 0.17f, 0.36f);
                     return;
                 }
             }
+        }
+
+        /// <summary>Far-LOD burnt / gutted shell: four thick walls round a dark rubble floor, so it reads hollow like the
+        /// near-LOD Shell / GuttedShell instead of a solid block that pops when the chunk switches LOD (v0.19 audit).</summary>
+        void LoShell(Geo g, ORect R, float h, Color wall)
+        {
+            const float t = 0.08f;
+            Color top = Lerp(wall, INTERIOR, 0.3f);
+            for (int f = 0; f < 4; f++)
+            {
+                FaceEdge(R, f, out var a, out var b, out var o);
+                g.Box(new[] { a, b, b - o * t, a - o * t }, 0f, h, wall, top, 0.2f);
+            }
+            g.Flat(R.Inset(t).Quad(), 0.03f, Lerp(INTERIOR, RUBBLE_D, 0.5f));
+            var mb = R.Inset(Mathf.Min(0.15f, R.Short * 0.3f));
+            g.Frustum(mb.Quad(), 0.03f, mb.Inset(mb.Short * 0.6f).Quad(), 0.03f + h * 0.22f, Lerp(wall, RUBBLE_D, 0.5f), RUBBLE_D);   // rubble heap inside
+            g.Shadow(R.Quad(), h, 0.3f);
         }
 
         void Yard(Geo g, int l, ORect r, Color c)

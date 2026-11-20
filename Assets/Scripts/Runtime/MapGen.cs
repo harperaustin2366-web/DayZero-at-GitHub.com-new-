@@ -330,9 +330,10 @@ namespace DayZero.Runtime
             AddCityOverlay(g, x0, y0, x1, y1); Stat("roads+props");
             AddWildRoads(g, x0, y0, x1, y1); Stat("wildroads");
             AddBridges(g, cx, cy); Stat("bridges");   // MapGen.Bridges.cs: raised decks, piers, railings
-            foreach (int l in lots) AddLot(g, l);
+            var lotVerts = new List<LotSpan>(lots.Count);   // (lot, first vertex, end vertex): one tint per building
+            foreach (int l in lots) { int lv = g.M.V.Count; AddLot(g, l); lotVerts.Add(new LotSpan(l, lv, g.M.V.Count)); }
             Stat("lots");
-            DistrictPass(g, x0, y0, x1, y1, lots); Stat("districts");   // MapDistricts.cs: district palettes + props
+            DistrictPass(g, x0, y0, x1, y1, lots, lotVerts); Stat("districts");   // MapDistricts.cs: district palettes + props
             StreetPass(g, x0, y0, x1, y1, lots); Stat("street+graffiti");   // MapGen.Street.cs: street clutter + graffiti
             AddVegetation(g, x0, y0, x1, y1); Stat("vegetation");
             return new Chunk { Mesh = g.M, Shadow = g.S, Center = new Vector3(x0 + CH * 0.5f, 0f, -(y0 + CH * 0.5f)) };
@@ -413,6 +414,27 @@ namespace DayZero.Runtime
                     int a = i0 + y * gw + x, b = a + 1, c = a + gw + 1, e = a + gw;
                     m.T.Add(a); m.T.Add(b); m.T.Add(c); m.T.Add(a); m.T.Add(c); m.T.Add(e);
                 }
+            // v0.19 audit: skirt along the chunk border where the bank dips. A near (LOD0) chunk next to a far (LOD1) one
+            // has twice the border vertices, so their edges disagree on the slopes and left hairline cracks to the sky.
+            for (int side = 0; side < 4; side++)
+            {
+                int n = side < 2 ? gw : gh;
+                for (int k = 0; k + 1 < n; k++)
+                {
+                    int ia, ib;
+                    if (side == 0) { ia = i0 + k; ib = ia + 1; }                          // top row
+                    else if (side == 1) { ia = i0 + (gh - 1) * gw + k; ib = ia + 1; }     // bottom row
+                    else if (side == 2) { ia = i0 + k * gw; ib = ia + gw; }               // left column
+                    else { ia = i0 + k * gw + gw - 1; ib = ia + gw; }                     // right column
+                    var A = m.V[ia]; var B = m.V[ib];
+                    if (A.y > -0.005f && B.y > -0.005f) continue;
+                    int q = m.V.Count; var ca = m.C[ia]; var cb = m.C[ib];
+                    m.V.Add(A); m.V.Add(B); m.V.Add(new Vector3(B.x, -0.42f, B.z)); m.V.Add(new Vector3(A.x, -0.42f, A.z));
+                    m.C.Add(ca); m.C.Add(cb); m.C.Add(cb); m.C.Add(ca);
+                    m.T.Add(q); m.T.Add(q + 1); m.T.Add(q + 2); m.T.Add(q); m.T.Add(q + 2); m.T.Add(q + 3);
+                    m.T.Add(q); m.T.Add(q + 2); m.T.Add(q + 1); m.T.Add(q); m.T.Add(q + 3); m.T.Add(q + 2);   // both faces
+                }
+            }
         }
 
         static readonly Color WATER = Hex("#454e45"), WATER_DEEP = Hex("#364338");
@@ -687,7 +709,7 @@ namespace DayZero.Runtime
                     }
                 }
                 // wrecks parked / abandoned in the lanes
-                float r = _clear.Count > 0 && Cleared(ctr) ? 0.5f : MapGen.Hf(hs, 11);
+                float r = (_clear.Count > 0 && Cleared(ctr)) || InBuilding(ctr, 0.7f) ? 0.5f : MapGen.Hf(hs, 11);   // v0.19 audit: no wreck half inside a wall
                 if (pos == run / 4 || pos == (3 * run) / 4)
                 {
                     if (r < 0.022f && w >= 1.2f)
@@ -708,6 +730,7 @@ namespace DayZero.Runtime
             }
             // cracks, potholes, debris, weeds
             if (_clear.Count > 0 && Cleared(ctr)) return;
+            if (InBuilding(ctr, 0.1f)) return;   // v0.19 audit: a facade reaching over the curb hides the cell
             float rc = MapGen.Hf(hs, 31);
             if (rc < 0.05f) Crack(g, ctr, hs, y);
             else if (rc < 0.058f) g.Disc(ctr + GU * (MapGen.Hf(hs, 32) - 0.5f) * 0.3f, 0.07f + MapGen.Hf(hs, 33) * 0.08f, y + 0.003f, Hex("#24221d"), PATCH, 7, rc * 50f);

@@ -24,7 +24,7 @@ namespace DayZero.Runtime
                     if (r > 0.4f) continue;
                     var p = new Vector2(x + 0.15f + Hf(x, y * 7 + 1) * 0.7f, y + 0.15f + Hf(x * 11 + 2, y) * 0.7f);
                     if (_clear.Count > 0 && Cleared(p)) continue;
-                    if (t == Data.T_BLD && InBuilding(p, 0.25f)) continue;   // v0.19 audit: not inside a neighbour's walls either
+                    if (InBuilding(p, 0.25f)) continue;   // v0.19 audit: not inside a (neighbour's) building footprint
                     int salt = y * 4099 + x;
                     if (InCity(p.x, p.y))
                     {
@@ -50,7 +50,7 @@ namespace DayZero.Runtime
                             default: tree = 0.05f; bush = 0.1f; break;
                         }
                         int vt = g.M.V.Count;
-                        if (r < tree) { if (lo) LoTree(g, p, salt); else Tree(g, p, salt, 0.85f + Hf(salt, 3) * 0.3f, false); }
+                        if (r < tree) { if (lo) LoTree(g, p, salt, false, 0.85f + Hf(salt, 3) * 0.3f); else Tree(g, p, salt, 0.85f + Hf(salt, 3) * 0.3f, false); }
                         else if (r < bush && !lo) Bush(g, p, salt);
                         SinkToGround(g, vt, p);   // v0.19 audit: riverside trees stand on the bank slope
                     }
@@ -71,7 +71,7 @@ namespace DayZero.Runtime
                             if (l >= 0 && l < _info.Length && _info[l].Valid && _info[l].R.Contains(p, 0.25f)) continue;
                         }
                         int vt = g.M.V.Count;
-                        if (r < tree) { if (lo) LoTree(g, p, salt); else ForestTree(g, p, salt); }
+                        if (r < tree) { if (lo) LoTree(g, p, salt, true); else ForestTree(g, p, salt); }
                         else if (r < bush && !lo) Bush(g, p, salt);
                         SinkToGround(g, vt, p);
                     }
@@ -115,12 +115,30 @@ namespace DayZero.Runtime
             g.ShadowBlob(p, R * 0.95f, H * 0.62f, 0.3f);
         }
 
-        void LoTree(Geo g, Vector2 p, int salt)
+        /// <summary>Far-LOD tree. v0.19 audit: same species, height and crown as the near tree it stands in for (Tree in the
+        /// city with its scale, ForestTree outside), so trees no longer change kind or size when a chunk switches LOD.</summary>
+        void LoTree(Geo g, Vector2 p, int salt, bool forest = false, float scale = 1f)
         {
-            float H = 2.2f + Hf(salt, 71) * 1.0f, R = 0.6f + Hf(salt, 72) * 0.3f;
-            bool con = Hf(salt, 73) < 0.4f;
-            if (con) g.Cone(p, R * 0.75f, 0.1f, H, Lerp(CONIFER, Hex("#24301e"), Hf(salt, 74) * 0.5f), salt * 0.3f, 4);
-            else g.Blob(Geo.W(p, H * 0.62f), R, R * 0.75f, FOLIAGE[(int)(Hf(salt, 75) * FOLIAGE.Length) % FOLIAGE.Length], salt, 4);
+            float H, R; bool con;
+            if (forest) { H = 2.2f + Hf(salt, 71) * 1.4f; R = 0.5f + Hf(salt, 72) * 0.35f; con = Hf(salt, 73) < 0.5f; }
+            else
+            {
+                H = (1.9f + Hf(salt, 71) * 0.8f) * scale; R = (0.62f + Hf(salt, 72) * 0.3f) * scale;
+                float kind = Hf(salt, 73);
+                if (kind < 0.05f) return;   // dead tree: a bare trunk does not read at this distance
+                con = kind < 0.22f;
+            }
+            if (con)
+            {
+                Color c = forest ? Lerp(CONIFER, Hex("#24301e"), Hf(salt, 74) * 0.5f) : Lerp(CONIFER, FOLIAGE[1], Hf(salt, 74) * 0.3f);
+                g.Cone(p, R * (forest ? 0.8f : 0.75f), 0.1f, forest ? H : H * 1.08f, c, salt * 0.3f, 4);   // skirt to the ground: no trunk at this LOD
+            }
+            else
+            {
+                Color f = FOLIAGE[(int)(Hf(salt, 75) * FOLIAGE.Length) % FOLIAGE.Length];
+                if (forest) f = Lerp(f, CONIFER, 0.25f);
+                g.Blob(Geo.W(p, H * (forest ? 0.55f : 0.64f)), R * (forest ? 1.15f : 1.1f), R * 0.85f, f, salt, 4);
+            }
             g.ShadowBlob(p, R * 0.85f, H * 0.55f, 0.28f);
         }
 

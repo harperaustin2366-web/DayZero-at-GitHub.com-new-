@@ -50,13 +50,36 @@ namespace DayZero.Runtime
         }
 
         /// <summary>Tints every vertex built so far in this chunk by district / lot kind, then adds district props.</summary>
-        void DistrictPass(Geo g, int x0, int y0, int x1, int y1, List<int> lots)
+        void DistrictPass(Geo g, int x0, int y0, int x1, int y1, List<int> lots, List<LotSpan> lotVerts = null)
         {
             var V = g.M.V; var C = g.M.C;
             int n = V.Count, lastT = int.MinValue, lastLot = -2;
             Vector3 mul = new Vector3(1f, 1f, 1f); Color to = DM_MED; float amt = 0f; bool ave = false, skip = false;
+            int lr = 0;
             for (int i = 0; i < n; i++)
             {
+                // v0.19 audit: a building's geometry takes one tint (its own district and kind) instead of the tile under
+                // each vertex, so walls / roofs reaching past the lot's tiles no longer show a colour seam
+                if (lotVerts != null && lr < lotVerts.Count && i >= lotVerts[lr].V0)
+                {
+                    while (lr < lotVerts.Count && i >= lotVerts[lr].V1) lr++;
+                    if (lr < lotVerts.Count && i >= lotVerts[lr].V0 && lotVerts[lr].V1 > lotVerts[lr].V0)
+                    {
+                        var lv = lotVerts[lr]; int l = lv.L;
+                        Vector3 lm; Color lto; float la;
+                        LotTintOf(l, out lm, out lto, out la, out bool lskip);
+                        if (!lskip)
+                            for (int k = lv.V0; k < lv.V1; k++)
+                            {
+                                var c0 = C[k];
+                                float r0 = c0.r / 255f, g0 = c0.g / 255f, b0 = c0.b / 255f;
+                                if (la > 0f) { r0 += (lto.r - r0) * la; g0 += (lto.g - g0) * la; b0 += (lto.b - b0) * la; }
+                                C[k] = new Color32(B(r0 * lm.x), B(g0 * lm.y), B(b0 * lm.z), c0.a);
+                            }
+                        i = lv.V1 - 1; lastT = int.MinValue; lr++;
+                        continue;
+                    }
+                }
                 var v = V[i];
                 int tx = Mathf.FloorToInt(v.x), ty = Mathf.FloorToInt(-v.z);
                 if (tx < 0 || ty < 0 || tx >= d.W || ty >= d.H) continue;
@@ -89,7 +112,21 @@ namespace DayZero.Runtime
             HighwayWrecks(g, x0, y0, x1, y1);
         }
 
+        /// <summary>Vertex range of one lot's geometry in a chunk mesh (BuildChunk -> DistrictPass).</summary>
+        public struct LotSpan { public int L, V0, V1; public LotSpan(int l, int v0, int v1) { L = l; V0 = v0; V1 = v1; } }
+
         static byte B(float v) => (byte)Mathf.Clamp(Mathf.RoundToInt(v * 255f), 0, 255);
+
+        /// <summary>The tint a whole lot's geometry gets: the district under its centre and its own kind.</summary>
+        void LotTintOf(int l, out Vector3 mul, out Color to, out float amt, out bool skip)
+        {
+            var L = d.Lots[l];
+            var c = _info[l].Valid ? _info[l].Lot.C : new Vector2(L.X + L.W * 0.5f, L.Y + L.H * 0.5f);
+            int tx = Mathf.Clamp(Mathf.FloorToInt(c.x), 0, d.W - 1), ty = Mathf.Clamp(Mathf.FloorToInt(c.y), 0, d.H - 1);
+            mul = DistrictMul(d.Districts[d.DistrictMap[ty * d.W + tx]].Kind);
+            skip = _campLots.Contains(l);   // the survivors' base keeps its own warm look
+            if (skip || !LotTint(L.Kind, out to, out amt)) { to = DM_MED; amt = 0f; }
+        }
 
         void DistrictLotProps(Geo g, int l)
         {
@@ -247,7 +284,7 @@ namespace DayZero.Runtime
                     int run = dir == 1 ? runV[k] : runU[k], pos = dir == 1 ? posV[k] : posU[k];
                     if (run < 4 || (pos != run / 4 && pos != (run * 3) / 4)) continue;
                     if (Hf(k, 701) > 0.022f) continue;
-                    if (ClearedRect(new ORect(ctr, GU, 0.7f, 0.4f))) continue;
+                    if (ClearedRect(new ORect(ctr, GU, 0.7f, 0.4f)) || InBuilding(ctr, 0.7f)) continue;   // v0.19 audit
                     var ax = dir == 1 ? GU : GV;
                     if (Hf(k, 702) < 0.5f) ax = -ax;
                     float an = Mathf.Atan2(ax.y, ax.x) + (Hf(k, 703) - 0.5f) * 0.7f;
@@ -261,7 +298,7 @@ namespace DayZero.Runtime
             float y = ROAD_Y;
             // scorch mark on the asphalt
             var sc = new ORect(p, dir, 0.95f, 0.5f);
-            g.Flat(sc.Quad(), y + 0.003f, Lerp(SCORCH, Hex("#3c3934"), 0.3f));
+            g.Flat(sc.Quad(), y + 0.0055f, Lerp(SCORCH, Hex("#3c3934"), 0.3f));   // v0.19 audit: above the lane paint (y + 0.003), no z-fight
             Color body = Lerp(Hex("#2a2622"), Hex("#4c3022"), Hf(salt, 8) * 0.8f), dark = Hex("#151412");
             float hl = 0.64f, hw = 0.27f;
             // sits on its rims (no tyres), body slightly sunk and crooked

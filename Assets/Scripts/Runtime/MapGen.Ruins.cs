@@ -78,7 +78,7 @@ namespace DayZero.Runtime
             {
                 if (style == 0) g.Frustum(R.Inset(-0.1f).Quad(), 0f, R.Inset(R.Short * 0.5f).Quad(), Mathf.Min(0.5f, 0.15f + H * 0.12f), Lerp(info.Wall, DUST, 0.5f), DUST);
                 else if (style == 1) { g.Box(R.Sub(-1f, 0f, -1f, 1f).Quad(), 0f, H, info.Wall, INTERIOR, 0.2f); g.Frustum(R.Sub(0f, 1.3f, -1.1f, 1.1f).Quad(), 0f, R.Sub(0.1f, 0.6f, -0.5f, 0.5f).Quad(), H * 0.2f, DUST, DUST); }
-                else g.Box(R.Quad(), 0f, H * 0.9f, info.Wall, INTERIOR, 0.2f);
+                else LoShell(g, R, H * 0.85f, info.Wall);   // v0.19 audit: gutted shell stays hollow at far LOD
                 return true;
             }
             if (info.A != Arch.House) Yard(g, l, info.Lot.Inset(0.06f), Hex("#6c675a"));
