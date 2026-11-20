@@ -20,6 +20,7 @@ namespace DayZero.Runtime
             public string Title = "", Type = "";
             public readonly List<KeyValuePair<string, string>> Rows = new List<KeyValuePair<string, string>>();
             public Vector2 At;
+            public int PersonId = -1;   // v0.19: one of your survivors (the card gets TALK, GameUI.Talk.cs)
             public void Row(string k, string v) => Rows.Add(new KeyValuePair<string, string>(k, string.IsNullOrEmpty(v) ? "-" : v));
         }
 
@@ -60,7 +61,7 @@ namespace DayZero.Runtime
 
         public static Card Survivor(Game g, Person p)
         {
-            var c = new Card { Title = p.Name, Type = "Survivor - " + p.Job, At = p.Pos };
+            var c = new Card { Title = p.Name, Type = "Survivor - " + p.Job, At = p.Pos, PersonId = SurvivorMind.CanTalk(g, p) ? p.Id : -1 };
             c.Row("HP", ((int)Math.Round(p.Hp)).ToString() + (p.Known && p.Inf >= 0.0 ? "  (bitten)" : ""));
             string st;
             switch (p.St)
@@ -284,9 +285,10 @@ namespace DayZero.Runtime
                 UiKit.FitLabel(row[0], kv.Key.ToUpperInvariant(), 14, TextAnchor.MiddleLeft, UiKit.Amber, true, 10);
                 UiKit.FitLabel(row[1], kv.Value, 16, TextAnchor.MiddleLeft, UiKit.Ink, false, 10);
             }
-            var bb = UiLayout.Columns(L.Bottom(56f), 10f, 1f, 1f);
+            var bb = c.PersonId >= 0 ? UiLayout.Columns(L.Bottom(56f), 10f, 1.2f, 1f, 1f) : UiLayout.Columns(L.Bottom(56f), 10f, 1f, 1f);
             if (KBtn(bb[0], "SHOW ON MAP", UiRole.Primary, false, 17)) map?.FlyTo(c.At);
-            if (KBtn(bb[1], "CLOSE", UiRole.Danger, false, 17)) LongPressInfo.Clear();
+            if (c.PersonId >= 0 && KBtn(bb[1], "TALK", UiRole.Accent, false, 19)) { OpenTalk(c.PersonId); return; }   // v0.19 GameUI.Talk.cs
+            if (KBtn(bb[bb.Length - 1], "CLOSE", UiRole.Danger, false, 17)) LongPressInfo.Clear();
             else if (Event.current.type == EventType.Repaint)
             {
                 // a thin bar running down to the auto-close

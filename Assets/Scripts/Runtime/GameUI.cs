@@ -145,7 +145,7 @@ namespace DayZero.Runtime
         float _offX, _offY, _scale = 1f;
 
         /// <summary>True when a modal (menu, decision, game over) covers the map or we are not in a game.</summary>
-        public bool ModalOpen => _b.State != Bootstrap.Screen2.Playing || _menuOpen || SideOpen || _b.Pending.Count > 0 || _b.Ended || ReportsModal;
+        public bool ModalOpen => _b.State != Bootstrap.Screen2.Playing || _menuOpen || SideOpen || _b.Pending.Count > 0 || _b.Ended || ReportsModal || TalkOpen;
 
         /// <summary>Screen position (top-left origin, pixels) is over a HUD element.</summary>
         public bool BlocksPointer(Vector2 screenTopLeft)
@@ -300,7 +300,7 @@ namespace DayZero.Runtime
             }
             // A sheet on top (side menu, menu overlay, decision, game over) gets the touches: IMGUI hands a press to
             // the first button drawn under it, so the HUD underneath must not see mouse events while one is up.
-            bool sheet = SideOpen || _menuOpen || _b.Pending.Count > 0 || _b.Ended || G.S.Phase == "lost" || ReportsModal;
+            bool sheet = SideOpen || _menuOpen || _b.Pending.Count > 0 || _b.Ended || G.S.Phase == "lost" || ReportsModal || TalkOpen;
             var evType = Event.current.type;
             bool swallow = sheet && (evType == EventType.MouseDown || evType == EventType.MouseUp || evType == EventType.MouseDrag || evType == EventType.ScrollWheel);
             if (swallow) Event.current.type = EventType.Ignore;
@@ -336,6 +336,7 @@ namespace DayZero.Runtime
             }
             DrawTimeControls(w, h);
             DrawB1Hud(w, h, map);   // GameUI.Alerts.cs (E16 speed drop, E17 alerts, E19 long-press card)
+            TalkTick();   // v0.19 GameUI.Talk.cs
             if (swallow) Event.current.type = evType;
 
             // modal sheets fade and slide in (v0.14.0a); a new decision or another side menu restarts the animation
@@ -347,6 +348,7 @@ namespace DayZero.Runtime
             else if (_b.Pending.Count > 0) DrawDecision(w, h, _b.Pending[0]);
             else if (_menuOpen) DrawMenuOverlay(w, h);
             else if (SideOpen) DrawSideMenu(w, h);
+            else if (TalkOpen) DrawTalk(w, h);   // v0.19 GameUI.Talk.cs
             else if (!DrawDaySting(w, h)) DrawMorningReport(w, h);   // v0.19 day sting first (GameUI.DaySting.cs), then the E6 report
             EndAnim();
         }

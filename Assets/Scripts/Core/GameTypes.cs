@@ -423,6 +423,8 @@ namespace DayZero.Core
         public int NextUid = 1;
         // E5-E15 run log (Runtime/RunStats.cs: daily population / kills, memorial wall, morning report); UI only, missing = new
         [JsonProperty("runlog", NullValueHandling = NullValueHandling.Ignore)] public Newtonsoft.Json.Linq.JObject RunLog;
+        // v0.19 survivor minds (Core/SurvivorMind.cs TalkLog): TALK history, names seen; UI only, never read by the sim, missing = new
+        [JsonProperty("talk", NullValueHandling = NullValueHandling.Ignore)] public Newtonsoft.Json.Linq.JObject Talk;
         // E14 custom game multipliers (Runtime/CustomGame.cs); null = a normal game, every multiplier 1.0
         [JsonProperty("custom", NullValueHandling = NullValueHandling.Ignore)] public CustomRules Custom;
         // zombies (only filled while saving / loading)
