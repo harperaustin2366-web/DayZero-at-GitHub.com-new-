@@ -227,7 +227,12 @@ namespace DayZero.Runtime
                 progT = string.Format("GUTTING  {0} S LEFT", (int)Math.Ceiling(left));
                 gutRowH = 0f;
             }
-            bool loot = cv == null && !g.Searched(l) && g.S.Loot[l] > 0.15f;
+            // v0.19.3: every lootable building shows LOOT (disabled with the reason when nobody can go / nothing is left)
+            var camps = g.C.Bases.Where(b => b.Done >= 1.0).ToList();
+            lp.From = camps.Count > 1 ? Mathf.Clamp(lp.From, 0, camps.Count) : 0;
+            int bid = lp.From > 0 ? camps[lp.From - 1].Id : -1;
+            var li = g.LootInfo(l, bid);
+            bool loot = li.Show;
             bool grid = (canConv || cv != null) && !(cv != null && g.ConvPlaceError(l) != "");
 
             float wantW = 1000f;
@@ -237,7 +242,7 @@ namespace DayZero.Runtime
             int cols = iw >= 900f ? 4 : iw >= 520f ? 3 : 2;
             int gridRows = (Data.CONV_ORDER.Length + cols - 1) / cols;
             float cellH = 62f;
-            float need = FrameExtra + paraH + (prog >= 0f ? 30f + GAP : 0f) + (loot ? BH + GAP : 0f) + (gutRowH > 0f ? gutRowH + GAP : 0f)
+            float need = FrameExtra + paraH + (prog >= 0f ? 30f + GAP : 0f) + (loot ? BH + 26f + GAP : 0f) + (gutRowH > 0f ? gutRowH + GAP : 0f)
                          + (grid ? gridRows * cellH + (gridRows - 1) * 6f + GAP : 0f);
             if (grid && need > area.height)   // squeeze the use grid before anything else
             {
@@ -254,24 +259,27 @@ namespace DayZero.Runtime
             if (loot)
             {
                 var row = L.Top(BH);
-                var camps = g.C.Bases.Where(b => b.Done >= 1.0).ToList();
-                int bid = -1;
                 Rect btn = row;
                 if (camps.Count > 1)
                 {
                     var items = new List<string> { "NEAREST CAMP" };
                     foreach (var b in camps) items.Add(g.BaseLabel(b).ToUpperInvariant());
                     var parts = UiLayout.Columns(row, GAP, 1.1f, 1f);
-                    lp.From = Mathf.Clamp(lp.From, 0, items.Count - 1);
                     lp.From = p.WheelH("loot_from", parts[0], items, lp.From, 3, 17);
-                    if (lp.From > 0) bid = camps[lp.From - 1].Id;
                     btn = parts[1];
                 }
-                if (p.Button(btn, "SEND TASK FORCE TO LOOT", UiRole.Accent, false, 20))
+                if (p.Button(btn, li.Ok ? "LOOT - SEND SURVIVORS" : "LOOT", li.Ok ? UiRole.Accent : UiRole.Disabled, false, 20))
                 {
-                    var e = bid >= 0 ? H.Do("send_raid", l, bid) : H.Do("send_raid", l);
-                    H.Toast(e == "" ? "A task force is heading there for supplies." : e);
+                    if (!li.Ok) H.Toast(li.Text);
+                    else
+                    {
+                        H.Click?.Invoke();
+                        var e = bid >= 0 ? H.Do("send_raid", l, bid) : H.Do("send_raid", l);   // resumes a paused game (TimeCtl.IsDispatch)
+                        H.Toast(e == "" ? "Survivors are heading there to search it for supplies." : e);
+                        H.Dirty?.Invoke();
+                    }
                 }
+                p.Fit(L.Top(26f - GAP), li.Text, 16, MenuAlign.Left, li.Ok ? Dim : Warn, false, 11);
             }
             if (gutRowH > 0f) gutRow(L.Top(gutRowH));
             if (!grid) return true;
