@@ -498,7 +498,7 @@ namespace DayZero.Runtime
                 else Debris(g, p, hs, y);
             }
             // an abandoned car on about half the bridges
-            if (Hf(salt, 90) < 0.5f && roadW >= 1.2f)
+            if (Hf(salt, 90) < 0.5f && roadW >= 1.2f && !Game.ExpansionRules)   // v0.19.3 Expansion: cars on bridges are sim wrecks
             {
                 float a = Mathf.Lerp(s.W0 + 1f, s.W1 - 1f, 0.3f + Hf(salt, 91) * 0.4f);
                 float c = (Hf(salt, 92) < 0.5f ? -1f : 1f) * Mathf.Min(hr * 0.5f, 0.6f);

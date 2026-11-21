@@ -105,10 +105,56 @@ namespace DayZero.Runtime
                 foreach (var w in game.S.Wrecks)
                 {
                     var wp = new Vector2(w.Pos.x + 0.5f, w.Pos.y + 0.5f);
-                    float a = (w.Id % 7) * 0.9f + (w.Id % 3) * 0.3f;   // view3d.gd wreck_xf
-                    Vehicle(g, wp, new Vector2(Mathf.Cos(a), Mathf.Sin(a)), w.Type, w.Id * 97 + 11, VehLook.Wreck, ROAD_Y + DeckLift(wp));
+                    // v0.19.3 Expansion: the (many) map wrecks are drawn per chunk near the camera (BuildWreckChunk); only the ring here
+                    if (!Game.ExpansionRules) Wreck(g, w);
                     if (w.Id == selWreck) Ring(g, wp, VehicleSize(w.Type).x + 0.35f, Hex("#e0a030"));
                 }
+            return new Chunk { Mesh = g.M, Shadow = g.S };
+        }
+
+        /// <summary>One wreck on the map. Expansion runs: its own facing (Wreck.Ang, along the road / stall) and burnt
+        /// look only when the sim says it is a burnt-out shell (Wreck.Burnt); classic keeps the original hash look.</summary>
+        void Wreck(Geo g, Wreck w)
+        {
+            var wp = new Vector2(w.Pos.x + 0.5f, w.Pos.y + 0.5f);
+            if (Game.ExpansionRules) wp = WreckSpot(w, wp);
+            float a = w.Ang ?? (w.Id % 7) * 0.9f + (w.Id % 3) * 0.3f;   // view3d.gd wreck_xf
+            int burnt = Game.ExpansionRules ? (w.Burnt ? 1 : 0) : -1;
+            Vehicle(g, wp, new Vector2(Mathf.Cos(a), Mathf.Sin(a)), w.Type, w.Id * 97 + 11, VehLook.Wreck, ROAD_Y + DeckLift(wp), burnt);
+        }
+
+        /// <summary>v0.19.3 Expansion: where a sim wreck is drawn. Its tile centre can sit inside a drawn building (the city
+        /// grid is turned, the tiles are not): a parking-lot car is pulled onto its lot's tarmac, a road car nudged up to
+        /// ~1.2 tiles out of the wall (taps still find it: WreckNear 1.1 tiles around the tile). Look only.</summary>
+        Vector2 WreckSpot(Wreck w, Vector2 wp)
+        {
+            int l = d.LotAt(w.Pos);
+            if (l >= 0 && l < _info.Length && d.LotKind(l) == "parking")
+            {
+                var r = _info[l].Lot.Inset(0.05f);
+                var o = wp - r.C;
+                float u = Vector2.Dot(o, r.U), v = Vector2.Dot(o, r.V);
+                float mu = Mathf.Max(0f, r.Hu - 0.5f), mv = Mathf.Max(0f, r.Hv - 0.45f);
+                wp = r.C + r.U * Mathf.Clamp(u, -mu, mu) + r.V * Mathf.Clamp(v, -mv, mv);
+            }
+            if (!InBuilding(wp, 0.3f)) return wp;
+            for (int k = 1; k <= 3; k++)
+                for (int j = 0; j < 8; j++)
+                {
+                    float ang = j * Mathf.PI * 0.25f + (w.Id % 8) * 0.1f;
+                    var q = wp + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * (0.4f * k);
+                    if (!InBuilding(q, 0.3f)) return q;
+                }
+            return wp;
+        }
+
+        /// <summary>v0.19.3 Expansion: the wrecks inside one map chunk (MapView streams these near the camera).</summary>
+        public Chunk BuildWreckChunk(Game game, int cx, int cy)
+        {
+            var g = new Geo(new MeshData(), new MeshData());
+            if (game?.S?.Wrecks != null)
+                foreach (var w in game.S.Wrecks)
+                    if (w.Pos.x / CH == cx && w.Pos.y / CH == cy) Wreck(g, w);
             return new Chunk { Mesh = g.M, Shadow = g.S };
         }
 

@@ -1209,7 +1209,7 @@ namespace DayZero.Runtime
                     var nn = U * 0.018f;
                     g.Flat(p0 - nn, p1 - nn, p1 + nn, p0 + nn, PAVE_Y + 0.006f, pc, pc, pc, pc);
                 }
-            int n = 1 + (int)(Hf(l, 21) * 4f);
+            int n = Game.ExpansionRules ? 0 : 1 + (int)(Hf(l, 21) * 4f);   // v0.19.3 Expansion: parked cars are sim wrecks
             for (int c = 0; c < n; c++)
             {
                 float s = -hu + 0.7f + Hf(l, 30 + c) * Mathf.Max(0.1f, hu * 2f - 1.4f);

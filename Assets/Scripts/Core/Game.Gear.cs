@@ -383,7 +383,7 @@ namespace DayZero.Core
             return best;
         }
 
-        public int GarageCap(Base b) => b == null ? 0 : 2 * ConvN("garage", b.Id) + b.U("garage");
+        public int GarageCap(Base b) => b == null ? 0 : ExpansionRules ? ExpGarageCap(b) : 2 * ConvN("garage", b.Id) + b.U("garage");   // Expansion: 4 per Garage
         public bool HasGarage(Base b) => GarageCap(b) > 0;
 
         public int GarageUsed(Base b) => C.Vehs.Count(v => v.Base == b.Id) + C.Squads.Count(q => q.Base == b.Id && q.Towing != null);
@@ -415,6 +415,7 @@ namespace DayZero.Core
             int glv = Data.VehDef(v.Type).GarageLvl ?? 0;
             if ((b?.U("garage") ?? 0) < glv)
                 return string.Format("A {0} needs a level {1} Garage upgrade at {2}.", Data.VehDef(v.Type).Name, glv, b?.Name ?? "its camp");
+            if (ExpansionRules) { string me = ExpRepairError(v); if (me != "") return me; }   // Expansion: needs a mechanic
             foreach (var part in v.Need)
                 if (C.Parts.Get(part, 0) < 1) return string.Format("Missing a {0}. Scavenge gas stations, parking lots, warehouses.", Lower(Data.PART_LABEL.TryGetValue(part, out var pl) ? pl : part));
             var c = VehRepairCost(v);
@@ -432,8 +433,9 @@ namespace DayZero.Core
             v.Need = new List<string>();
             v.St = "repair";
             v.End = S.T + VehRepairHours(v);
+            if (ExpansionRules) { v.End = VehRepairHours(v); v.Prog = 0.0; }   // Expansion: End = mechanic-hours of work, Prog = done
             VehBump();
-            AddLog(string.Format("{0}: mechanics start on the {1} ({2:0}h).", BaseById(v.Base)?.Name ?? "Garage", Lower(Data.VehDef(v.Type).Name), v.End - S.T), "info");
+            AddLog(string.Format("{0}: mechanics start on the {1} ({2:0}h).", BaseById(v.Base)?.Name ?? "Garage", Lower(Data.VehDef(v.Type).Name), ExpansionRules ? v.End : v.End - S.T), "info");
             PlaySfx("hammer", V.F(BaseById(v.Base)?.Pos ?? new Vector2Int(0, 0)));
             EmitChanged();
             return "";
@@ -476,10 +478,11 @@ namespace DayZero.Core
         void StepVehicles()
         {
             bool ch = false;
+            if (ExpansionRules) { ExpStepRepairs(); EnsureLotWrecks(); }   // Expansion: mechanics, map cars
             foreach (var v in C.Vehs)
-                if (v.St == "repair" && S.T >= v.End)
+                if (v.St == "repair" && (ExpansionRules ? v.Prog >= v.End - 1e-9 : S.T >= v.End))
                 {
-                    v.St = "ok"; v.Hp = 1.0; ch = true;
+                    v.St = "ok"; v.Hp = 1.0; ch = true; v.Prog = 0.0;
                     AddLog(string.Format("{0}: the {1} is fixed and ready to drive.", BaseById(v.Base)?.Name ?? "Garage", Lower(Data.VehDef(v.Type).Name)), "good");
                 }
             VehSyncParked();
@@ -498,7 +501,7 @@ namespace DayZero.Core
             {
                 var p = team[i];
                 p.Veh = true; p.Vlead = i == 0;
-                p.Vt = v.Type; p.Vspd = d.Speed; p.Vcargo = Data.VehCargoMult(v.Type); p.Varm = d.Armor * V.Clamp(v.Hp + 0.3, 0.3, 1.0);
+                p.Vt = v.Type; p.Vspd = VehSpeed(v); p.Vcargo = Data.VehCargoMult(v.Type); p.Varm = VehArmor(v) * V.Clamp(v.Hp + 0.3, 0.3, 1.0);   // Expansion: plating (== d.Speed / d.Armor in classic)
             }
             v.Drv = team.Count > 0 ? team[0].Id : -1;
         }
@@ -521,7 +524,7 @@ namespace DayZero.Core
                 var d = Data.VehDef(v.Type);
                 if (team.Count > d.Seats) continue;
                 double dist = tgt.x < 0 ? 8.0 : V.F(tgt).DistTo(V.F(b.Pos)) * 1.3;
-                double need = Math.Max(0.5, 2.0 * dist * d.Use);
+                double need = Math.Max(0.5, 2.0 * dist * VehUse(v));
                 if (v.Fuel < need) continue;
                 v.Fuel -= need;
                 v.St = "out";
@@ -569,7 +572,7 @@ namespace DayZero.Core
                 AddLog(string.Format("{0}: the {1} seats {2}, so the squad walks.", q.Name, Lower(d.Name), d.Seats), "info");
                 return false;
             }
-            double need = path.Count * d.Use;
+            double need = path.Count * VehUse(v);
             if (v.Fuel < need)
             {
                 AddLog(string.Format("{0}: not enough fuel in the {1} for the way out, so the squad walks.", q.Name, Lower(d.Name)), "info");
@@ -590,7 +593,7 @@ namespace DayZero.Core
             var v = VehicleById(q.Vid);
             if (v == null || v.St != "out") return;
             var d = Data.VehDef(v.Type);
-            double need = q.Route.Count * d.Use;
+            double need = q.Route.Count * VehUse(v);
             if (v.Fuel >= need)
             {
                 v.Fuel -= need;
@@ -626,7 +629,7 @@ namespace DayZero.Core
             var v = VehicleById(q.Vid);
             if (v == null || v.St != "out") return;
             var d = Data.VehDef(v.Type);
-            v.Hp -= risk * 120.0 * (1.0 - d.Armor) / d.Hp;
+            v.Hp -= risk * 120.0 * (1.0 - VehArmor(v)) / d.Hp;
             VehBump();
             if (v.Hp <= 0.0)
             {
@@ -641,7 +644,7 @@ namespace DayZero.Core
             if (q.Vid < 0) return 0.0;
             var v = VehicleById(q.Vid);
             if (v == null || v.St != "out") return 0.0;
-            return Data.VehDef(v.Type).Armor;
+            return VehArmor(v);
         }
 
         void VehSquadHome(Squad q)
@@ -683,6 +686,7 @@ namespace DayZero.Core
         {
             var w = WreckById(wid);
             if (w == null) return "That wreck is gone.";
+            if (w.Burnt) return "Burnt out to the frame: beyond repair. STRIP it for scrap metal instead.";   // Expansion
             var q = SquadById(sid);
             if (q == null) return "No such squad.";
             string e = SquadReady(q);
@@ -696,7 +700,7 @@ namespace DayZero.Core
             var path = SquadRoute(q, w.Pos);
             if (path.Count < 2) return "No way to get there.";
             if (path.Count > SquadRange()) return string.Format("Too far: squads go up to {0} tiles of road from their base.", SquadRange());
-            bool canDrive = v != null && VehRuns(v) && v.Fuel >= 2.0 * path.Count * Data.VehDef(v.Type).Use;
+            bool canDrive = v != null && VehRuns(v) && v.Fuel >= 2.0 * path.Count * VehUse(v);
             if (canDrive) return "";
             if (d.Light && SquadMembers(q).Count >= 4) return "";
             if (d.Light) return string.Format("Needs a working, fuelled vehicle assigned to {0}, or a squad of 4 to push and drag it.", q.Name);
@@ -774,6 +778,7 @@ namespace DayZero.Core
         {
             var w = WreckById(wid);
             if (w == null) return "That wreck is gone.";
+            if (w.Burnt) return "Burnt out: nothing left in the tank.";
             if (w.Fuel < 0.5) return "The tank is dry.";
             bool near = C.Bases.Any(b => V.F(b.Pos).DistTo(V.F(w.Pos)) <= AutoRadius() + 4.0);
             if (!near) return "Too far from your camps: only inside the auto-scavenge radius.";
@@ -789,6 +794,7 @@ namespace DayZero.Core
         public static string WreckInfo(Wreck w)
         {
             var d = Data.VehDef(w.Type);
+            if (w.Burnt) return string.Format("Burnt-out shell: beyond repair. Strip it for scrap metal ({0}).", d.Light ? "4-8" : "8-12");
             var nd = w.Need.Select(x => Lower(Data.PART_LABEL.TryGetValue(x, out var l) ? l : x)).ToList();
             return string.Format("Condition {0}% · needs {1} · fuel left {2} · {3} seats, cargo {4}, armour {5}%", (int)(w.Hp * 100.0),
                 nd.Count > 0 ? string.Join(", ", nd) : "no parts", (int)w.Fuel, d.Seats, d.Cargo, (int)(d.Armor * 100.0));

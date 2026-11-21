@@ -114,7 +114,7 @@ namespace DayZero.Runtime
             {
                 case "send_rescue": case "send_raid": case "heli_rescue":
                 case "send_squad": case "send_squad_scav": case "send_squad_map": case "squad_attack": case "recall_squad":
-                case "tow_wreck": case "siphon_wreck": case "gut":
+                case "tow_wreck": case "siphon_wreck": case "gut": case "car_scav": case "car_recall":
                     return true;
             }
             return false;

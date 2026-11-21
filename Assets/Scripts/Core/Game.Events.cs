@@ -389,6 +389,14 @@ namespace DayZero.Core
                 case "assign_vehicle": return AssignVehicle(I(a[0]), I(a[1]));
                 case "tow_wreck": return TowWreck(I(a[0]), I(a[1]));
                 case "siphon_wreck": return SiphonWreck(I(a[0]));
+                case "strip_wreck": return StripWreck(I(a[0]));   // Expansion vehicles
+                case "plate_vehicle": return PlateVehicle(I(a[0]));
+                case "car_scav":
+                    {
+                        if (a.Count < 2 || !(a[1] is IEnumerable) || a[1] is string) return "Pick a crew.";
+                        return StartCarRun(I(a[0]), ((IEnumerable)a[1]).Cast<object>().Select(I).ToList());
+                    }
+                case "car_recall": return RecallCarRun(I(a[0]));
                 case "set_job":
                     {
                         var p = OwnPerson(I(a[0]));

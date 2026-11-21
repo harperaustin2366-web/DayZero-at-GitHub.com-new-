@@ -29,12 +29,13 @@ namespace DayZero.Runtime
 
         /// <summary>Draw one vehicle centred at p, nose along dir. salt picks colour and variant; look = clean (driving),
         /// a wreck (rust, missing wheel, smashed glass, sometimes burnt out, hood up) or a wreck on a tow line.</summary>
-        public static void Vehicle(Geo g, Vector2 p, Vector2 dir, string type, int salt, VehLook look, float y = 0.012f)
+        public static void Vehicle(Geo g, Vector2 p, Vector2 dir, string type, int salt, VehLook look, float y = 0.012f, int burntSim = -1, int plate = 0)
         {
             if (dir.sqrMagnitude < 1e-6f) dir = new Vector2(1f, 0f);
             dir = dir.normalized;
             bool wreck = look != VehLook.Driving;
-            bool burnt = wreck && Hf(salt, 41) < 0.18f;
+            // v0.19.3: burntSim 0/1 = the sim decides (Expansion: only burnt-out shells look burnt, they can't be towed); -1 = hash
+            bool burnt = wreck && (burntSim >= 0 ? burntSim == 1 : Hf(salt, 41) < 0.18f);
             bool rust = wreck && !burnt && Hf(salt, 42) < 0.7f;
             int missing = wreck && Hf(salt, 43) < 0.55f ? (int)(Hf(salt, 44) * 4f) % 4 : -1;   // wheel gone
             float sink = missing >= 0 && look == VehLook.Wreck ? 0.035f : 0f;
@@ -128,6 +129,7 @@ namespace DayZero.Runtime
                     }
                     break;
             }
+            if (plate > 0 && type != "tank") VehPlates(g, p, dir, side, hl, hw, y, plate);
             // wheels (one gone on many wrecks: that corner rests on the hub)
             for (int k = 0; k < 4; k++)
             {
@@ -160,6 +162,37 @@ namespace DayZero.Runtime
                 g.Box(new[] { d0, d1, d1 + dir * 0.015f, d0 + dir * 0.015f }, y + 0.1f, y + 0.36f, paint, paint);
             }
             g.Shadow(new ORect(p, dir, hl, hw).Quad(), type == "truck" ? 0.6f : 0.35f, 0.38f);
+        }
+
+        static readonly Color PLATE_STEEL = Hex("#5e5f5a"), PLATE_RUST = Hex("#6e4a32"), PLATE_BOLT = Hex("#2e2e2a");
+
+        /// <summary>v0.19.3 armour plating: welded scrap panels along both flanks (and over the nose and grille at level 2).</summary>
+        static void VehPlates(Geo g, Vector2 p, Vector2 dir, Vector2 side, float hl, float hw, float y, int plate)
+        {
+            for (int s = -1; s <= 1; s += 2)
+            {
+                int n = 3;
+                for (int k = 0; k < n; k++)
+                {
+                    float a0 = -hl * 0.85f + k * (hl * 1.7f / n), a1 = a0 + hl * 1.7f / n - 0.02f;
+                    Color c = (k + s) % 2 == 0 ? PLATE_STEEL : Lerp(PLATE_STEEL, PLATE_RUST, 0.55f);
+                    var A = p + dir * a0 + side * (hw + 0.012f) * s; var B = p + dir * a1 + side * (hw + 0.012f) * s;
+                    g.Wall(A, B, side * s, y + 0.1f, y + (plate >= 2 ? 0.42f : 0.3f), c);
+                    g.Wall(Vector2.Lerp(A, B, 0.1f) + side * 0.004f * s, Vector2.Lerp(A, B, 0.14f) + side * 0.004f * s, side * s, y + 0.25f, y + 0.27f, PLATE_BOLT);
+                }
+            }
+            // nose plate / ram bar
+            var nose = p + dir * (hl + 0.03f);
+            g.BoxAt(nose, dir, 0.03f, hw * 0.95f, y + 0.08f, y + (plate >= 2 ? 0.32f : 0.22f), PLATE_STEEL, Lerp(PLATE_STEEL, PLATE_RUST, 0.3f));
+            if (plate >= 2)
+            {
+                // mesh grille over the windscreen
+                for (int k = -2; k <= 2; k++)
+                {
+                    var b0 = p + dir * (hl * 0.42f) + side * (k * hw * 0.35f);
+                    g.Beam(Geo.W(b0, y + 0.3f), Geo.W(b0 - dir * 0.08f, y + 0.55f), 0.012f, PLATE_BOLT);
+                }
+            }
         }
 
         static void Apc(Geo g, Vector2 p, Vector2 dir, Vector2 side, Color paint, Color glass, float y, bool wreck, int missing, int salt)

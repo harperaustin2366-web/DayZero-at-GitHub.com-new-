@@ -61,8 +61,12 @@ namespace DayZero.Core
         public event Action WorldChanged;
         public event Action WorldChanging;
 
-        public static readonly string[] JOBS = { "Scavenger", "Civilian", "Farmer", "Medic", "Soldier", "Cop", "Engineer", "Scientist" };
+        static readonly string[] JOBS_CLASSIC = { "Scavenger", "Civilian", "Farmer", "Medic", "Soldier", "Cop", "Engineer", "Scientist" };
+        // v0.19.3 Expansion vehicles: the Mechanic (repairs vehicles in a Garage, Game.Vehicles.cs). Classic keeps the original 8 jobs.
+        static readonly string[] JOBS_EXP = { "Scavenger", "Civilian", "Farmer", "Medic", "Soldier", "Cop", "Engineer", "Scientist", "Mechanic" };
+        public static string[] JOBS => Game.ExpansionRules ? JOBS_EXP : JOBS_CLASSIC;
         public static readonly int[] JOB_WEIGHTS = { 14, 34, 10, 9, 8, 8, 10, 7 };
+        static readonly int[] JOB_WEIGHTS_EXP = { 14, 34, 10, 9, 8, 8, 10, 7, 5 };
         public static readonly Dictionary<string, string> JOB_DESC = new Dictionary<string, string>
         {
             ["Scavenger"] = "Goes out by day to loot nearby buildings. Best haul, picks safe routes.",
@@ -73,15 +77,16 @@ namespace DayZero.Core
             ["Cop"] = "Guards and patrols. Cheaper on ammo than soldiers, keeps order.",
             ["Engineer"] = "Builds outposts, repairs fences and towers, runs the workshop.",
             ["Scientist"] = "Runs research projects.",
+            ["Mechanic"] = "Repairs vehicles in a Garage. Without one, broken cars stay broken. Salvages a little when idle.",
             ["Child"] = "Too young to work. Eats, sleeps and keeps everyone going.",
         };
         public static readonly Dictionary<string, string> JOB_SHORT = new Dictionary<string, string>
-        { ["Scavenger"] = "SCV", ["Civilian"] = "CIV", ["Farmer"] = "FRM", ["Medic"] = "MED", ["Soldier"] = "SOL", ["Cop"] = "COP", ["Engineer"] = "ENG", ["Scientist"] = "SCI", ["Child"] = "KID" };
+        { ["Scavenger"] = "SCV", ["Civilian"] = "CIV", ["Farmer"] = "FRM", ["Medic"] = "MED", ["Soldier"] = "SOL", ["Cop"] = "COP", ["Engineer"] = "ENG", ["Scientist"] = "SCI", ["Mechanic"] = "MEC", ["Child"] = "KID" };
         public static readonly Dictionary<string, Color> JOB_COLOR = new Dictionary<string, Color>
         {
             ["Scavenger"] = Gd.Hex("#c9b26a"), ["Civilian"] = Gd.Hex("#7fd46a"), ["Farmer"] = Gd.Hex("#a6d65a"), ["Medic"] = Gd.Hex("#f2f2f2"),
             ["Soldier"] = Gd.Hex("#5fbf3f"), ["Cop"] = Gd.Hex("#5aa8ff"), ["Engineer"] = Gd.Hex("#f0a040"), ["Scientist"] = Gd.Hex("#7fe0d0"),
-            ["Child"] = Gd.Hex("#f5d6a0"),
+            ["Mechanic"] = Gd.Hex("#d08a5a"), ["Child"] = Gd.Hex("#f5d6a0"),
         };
 
         public static readonly string[] DANGER_JOBS = { "Scavenger", "Soldier", "Cop" };
@@ -1359,12 +1364,13 @@ namespace DayZero.Core
         public string RandomJob(IRng rng)
         {
             int tot = 0;
-            foreach (int w in JOB_WEIGHTS) tot += w;
+            var jobs = JOBS; var wts = Game.ExpansionRules ? JOB_WEIGHTS_EXP : JOB_WEIGHTS;
+            foreach (int w in wts) tot += w;
             int r = rng.RandiRange(1, tot);
-            for (int i = 0; i < JOBS.Length; i++)
+            for (int i = 0; i < jobs.Length; i++)
             {
-                r -= JOB_WEIGHTS[i];
-                if (r <= 0) return JOBS[i];
+                r -= wts[i];
+                if (r <= 0) return jobs[i];
             }
             return "Civilian";
         }

@@ -227,6 +227,7 @@ namespace DayZero.Core
             for (int i = 0; i < Math.Max(1, ncols); i++) AddColony("");
             Use(0);
             SpawnWrecks(WRECKS_NEW, 51829);
+            if (ExpansionRules) EnsureLotWrecks();   // Expansion vehicles: parked / abandoned map cars are towable wrecks
             ViewCol = 0;
             _wInf = new float[SW * SH];
             ResetWeights();
@@ -944,6 +945,7 @@ namespace DayZero.Core
             RebuildBuckets();
             _openHumans.Clear();
             EachCol(() => MovePeople(dh)); Dbg("MovePeople");
+            if (ExpansionRules) EachCol(() => StepCarRuns(dh));   // Expansion vehicles: scavenging parties in cars
             _accCombat += dh;
             if (_accCombat >= 0.25)
             {

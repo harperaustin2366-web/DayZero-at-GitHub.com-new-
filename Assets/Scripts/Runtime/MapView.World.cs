@@ -42,6 +42,7 @@ namespace DayZero.Runtime
             if (!Ready || _gen == null || _root == null || g?.S == null) return;
             if (SelectedGroup >= 0 && MapGen.SosPin(g.GroupById(SelectedGroup), -1) == MapGen.SOS_NONE) SelectedGroup = -1;   // rescued / gone: sheet and ring go too
             UpdateLootMarks(g);
+            StreamWreckChunks(g);   // v0.19.3 Expansion: wreck meshes near the camera
             if (_worldGo == null) _worldKey = "";   // destroyed with the map root on a rebuild
             _worldT -= Time.unscaledDeltaTime;
             if (_worldT > 0f && _worldKey != "") return;
@@ -144,6 +145,7 @@ namespace DayZero.Runtime
             if (g.S.Wrecks != null)
                 foreach (var w in g.S.Wrecks)
                 {
+                    if (!WreckPinned(g, w, SelectedWreck)) continue;   // v0.19.3 Expansion: street cars have no pin
                     var q = g.TowingSquad(w.Id);
                     _marks.Add(new WorldMark { Kind = MarkKind.Wreck, Id = w.Id, World = Geo.W(new Vector2(w.Pos.x + 0.5f, w.Pos.y + 0.5f), 0.95f),
                         Col = w.Own == g.ViewCol ? new Color(0.45f, 0.75f, 0.35f) : new Color(0.62f, 0.58f, 0.5f), Label = Data.VehDef(w.Type).Name + " wreck", Sub = q != null ? q.Name + " on the way" : "" });

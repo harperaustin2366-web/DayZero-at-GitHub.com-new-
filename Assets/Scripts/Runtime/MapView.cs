@@ -152,7 +152,7 @@ namespace DayZero.Runtime
             if (!playing || !Ready) FxFeel.Hide();   // v0.19 game feel (E8 / E10)
             if (!playing) return;
 
-            string key = D.WorldSeed + ":" + D.Lots.Count + ":" + D.W + "x" + D.H;
+            string key = D.WorldSeed + ":" + D.Lots.Count + ":" + D.W + "x" + D.H + (Game.ExpansionRules ? ":x" : "");   // v0.19.3: Expansion maps draw no decorative cars
             if (key != _builtKey && !Building) StartCoroutine(Build(key));
             if (!Ready) return;
 
@@ -520,6 +520,7 @@ namespace DayZero.Runtime
             foreach (var c in _lod0.Values) if (c != null) Destroy(c);
             _lod1 = new GameObject[0]; _lod0.Clear();
             _lod0Ver++; _lod0Seen.Clear(); _lod0Verts.Clear();
+            ClearWreckChunks();   // v0.19.3 Expansion wreck meshes (MapView.Wrecks.cs)
             if (_root != null) Destroy(_root);
             if (_dyn != null) Destroy(_dyn);
             ClearSelection();

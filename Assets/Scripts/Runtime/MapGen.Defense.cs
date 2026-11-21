@@ -700,7 +700,7 @@ namespace DayZero.Runtime
                     if (cv.Type == "garage")
                     {
                         for (int k = 0; k < 3; k++) g.Cyl(tz + fd * (k * 0.2f), 0.09f, 0.05f, 0.33f, Hex("#7a2e24"), Hex("#2e2c28"), 8);
-                        AddCar(g, fm + fo * 0.95f - fd * 0.6f, Mathf.Atan2(fo.y, fo.x), l, 0.05f);
+                        if (!Game.ExpansionRules) AddCar(g, fm + fo * 0.95f - fd * 0.6f, Mathf.Atan2(fo.y, fo.x), l, 0.05f);   // v0.19.3 Expansion: your cars sit in the garage (sim)
                     }
                     else
                     {

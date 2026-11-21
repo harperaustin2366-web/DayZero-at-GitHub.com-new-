@@ -151,6 +151,9 @@ namespace DayZero.Core
         public string St = "ok";   // ok | out | repair | wreck
         public double End;
         public int Drv = -1;
+        // v0.19.3 Expansion vehicles (Game.Vehicles.cs): armour plating level 0..2, repair work done (mechanic hours)
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public int Plate;
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public double Prog;
     }
 
     public sealed class Wreck
@@ -162,6 +165,34 @@ namespace DayZero.Core
         public List<string> Need = new List<string>();
         public double Fuel;
         public int Own = -1;
+        // v0.19.3 Expansion vehicles: a burnt-out shell (beyond repair, strip for scrap) and the facing it lies at
+        // (radians, map plane); null = the legacy hash angle (view3d.gd wreck_xf)
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public bool Burnt;
+        public float? Ang;
+    }
+
+    /// <summary>v0.19.3 Expansion: a scavenging party in a car. The car drives the roads from building to building
+    /// (nearest first), the crew gets out and searches each one, the loot goes into the car until it is full, the
+    /// fuel runs low or it gets too dangerous, then it drives home and unloads (Game.Vehicles.cs).</summary>
+    public sealed class CarRun
+    {
+        public int Id, Vid, Base;
+        public List<int> Crew = new List<int>();
+        public string St = "drive";            // drive (to Lot) | stop (crew searching Lot) | home (driving back)
+        public List<Vector2> Path = new List<Vector2>();
+        public int Pi;
+        public double Seg;
+        public Vector2 Pos, Dir = new Vector2(1f, 0f);
+        public int Lot = -1;
+        public Vector2 Park;                    // where the car stands while the crew searches Lot
+        public double StopT0, StopT1;
+        public ODict<string, double> Cargo = new ODict<string, double>();
+        public double Cap;
+        public int Stops;
+        public List<int> Done = new List<int>();
+        public double T0, RealSec, FuelUsed;
+        public string Why = "";
+        public int Rams, Bites, Kills;
     }
 
     public sealed class Squad
@@ -291,6 +322,8 @@ namespace DayZero.Core
         public PeopleCfg Ppl;
         // v0.19 leader popularity (Core/Popularity.cs): support, mutiny clock, camp vote, last exile; null in classic runs
         public LeaderStanding Lead;
+        // v0.19.3 Expansion vehicles: scavenging parties out in a car (Game.Vehicles.cs); null in classic runs
+        public List<CarRun> Runs;
         // end Expansion: people
         public int Stat(string k) => Stats.Get(k, 0);
         public void AddStat(string k, int v) => Stats[k] = Stats.Get(k, 0) + v;
@@ -422,6 +455,7 @@ namespace DayZero.Core
         public string Mode = "solo";
         public List<Wreck> Wrecks = new List<Wreck>();
         public int VehN = 1, VehVer = 1;
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)] public bool LotWrecks;   // v0.19.3 Expansion: parked / abandoned map cars are sim wrecks
         public int NextUid = 1;
         // E5-E15 run log (Runtime/RunStats.cs: daily population / kills, memorial wall, morning report); UI only, missing = new
         [JsonProperty("runlog", NullValueHandling = NullValueHandling.Ignore)] public Newtonsoft.Json.Linq.JObject RunLog;

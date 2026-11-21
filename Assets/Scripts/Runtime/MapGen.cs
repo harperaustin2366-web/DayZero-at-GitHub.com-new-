@@ -712,7 +712,7 @@ namespace DayZero.Runtime
                 float r = (_clear.Count > 0 && Cleared(ctr)) || InBuilding(ctr, 0.7f) ? 0.5f : MapGen.Hf(hs, 11);   // v0.19 audit: no wreck half inside a wall
                 if (pos == run / 4 || pos == (3 * run) / 4)
                 {
-                    if (r < 0.022f && w >= 1.2f)
+                    if (r < 0.022f && w >= 1.2f && !Game.ExpansionRules)   // v0.19.3 Expansion: road cars are sim wrecks (S.Wrecks)
                     {
                         float ang = Mathf.Atan2(A.y, A.x) + (MapGen.Hf(hs, 12) < 0.5f ? 0f : Mathf.PI) + (MapGen.Hf(hs, 13) - 0.5f) * (MapGen.Hf(hs, 14) < 0.2f ? 1.4f : 0.35f);
                         AddCar(g, ctr, ang, (int)(hs & 0x7fffffff), y);

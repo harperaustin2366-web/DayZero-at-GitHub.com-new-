@@ -75,6 +75,9 @@ namespace DayZero.Core
                     case "Scavenger":
                         r["materials"] += 0.5;
                         break;
+                    case "Mechanic":   // Expansion vehicles: salvages a little between repairs
+                        r["materials"] += 0.8;
+                        break;
                 }
                 if (pre != null) PplScale(r, pre, PplOutMult(p));   // Expansion: fatigue / morale output
             }
@@ -483,6 +486,7 @@ namespace DayZero.Core
                 case "sqt": SquadTow(p); return;
                 case "hop": SquadHopDone(p); return;
                 case "hold": p.Wt = 1000000.0; return;
+                case "crun": p.Wt = 1000000.0; return;   // Expansion: out with a scavenging party (Game.Vehicles.cs moves them)
                 case "sqw":
                     var qq = SquadById(p.Sq);
                     if (qq != null && qq.St == "search") qq.St = "return";
@@ -576,6 +580,7 @@ namespace DayZero.Core
             double engage = 0.65 * (1.0 - Math.Min(0.6, Rx("quiet"))) * (p.Veh ? (0.45 - Math.Min(0.3, Rx("veh_safe"))) : 1.0);
             if (sq) engage = 0.9;
             if (ExpansionRules) engage = Math.Min(0.97, engage * ExpEncounterMul(p.Pos));   // Expansion: danger, fog
+            if (ExpansionRules && p.Veh) engage *= 1.0 - 0.7 * (p.Varm ?? 0.0);   // Expansion vehicles: armour keeps the dead off the people inside
             if (Rng.Randf() > engage) return;
             double win = p.Job == "Soldier" ? 0.93 : p.Job == "Cop" ? 0.87 : p.Job == "Scavenger" ? 0.74 : 0.6;
             foreach (var q in _openHumans)
@@ -602,7 +607,7 @@ namespace DayZero.Core
             }
             double arm = ArmorOf(p);
             p.Hp -= Blow(p, 30.0);
-            double shield = Rx("recon") + (sq ? Rx("squad_safe") : 0.0) + (sq && p.Veh ? (p.Varm ?? 0.1) : 0.0) + arm * 0.8;
+            double shield = Rx("recon") + (sq ? Rx("squad_safe") : 0.0) + ((sq || ExpansionRules) && p.Veh ? (p.Varm ?? 0.1) : 0.0) + arm * 0.8;
             if (p.Hp > 0.0 && Rng.Randf() < Math.Min(0.6 + arm * 0.4, shield))
             {
                 PlaySfx("hit", p.Pos);
